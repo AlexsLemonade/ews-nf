@@ -35,8 +35,6 @@ workflow {
   sample_ids = params.sample_ids?.tokenize(';, ') ?: []
   run_all = sample_ids[0] == "All"
 
-  println "scpca_nf_dir = ${params.scpca_nf_dir}"
-
   // create a channel of [sample id, library_id, path to processed SCE file]
   library_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed.rds", type: 'file')
     .map{ file -> tuple(
@@ -44,6 +42,7 @@ workflow {
       file.name.replace("_processed.rds", ""), // extract library id
       file // full path to file
     )}
+    .filter{ run_all || (it[0] in sample_ids) } // filter to only specified samples
 
   // TODO: Remove this when we add our first module
   // run stub test to make sure setup is good
