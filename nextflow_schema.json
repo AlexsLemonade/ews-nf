@@ -20,7 +20,7 @@
         },
         "scpca_nf_dir": {
           "type": "string",
-          "default": "scpca-nf-out/SCPCP000015",
+          "default": "scpca-nf-out",
           "description": "Path to directory containing output files from running scpca-nf"
         },
         "sample_ids": {
