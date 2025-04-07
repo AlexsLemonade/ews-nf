@@ -10,15 +10,6 @@ validateParameters()
 // Print summary of supplied parameters
 log.info paramsSummaryLog(workflow)
 
-if (!params.scpca_nf_dir.exists()) {
-  log.error "scpca-nf output directory does not exist: ${scpca_nf_dir}"
-  param_error = true
-}
-
-if (param_error) {
-  System.exit(1)
-}
-
 // stub test
 process test_setup {
   publishDir "${params.outdir}/${sample_id}"
@@ -45,9 +36,7 @@ workflow {
 
   // create a channel of [sample id, [path to processed SCE files]]
   sample_ch = Channel.fromList(Utils.getLibraryFiles(params.scpca_nf_dir))
-    .filter{
-      run_all || (it[0] in sample_ids)
-    }
+    .filter{ run_all || (it[0] in sample_ids) }
 
   // TODO: Remove this when we add our first module
   // run stub test to make sure setup is good
