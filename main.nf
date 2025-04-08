@@ -1,0 +1,27 @@
+#!/usr/bin/env nextflow
+
+// **** Parameter checks ****
+include { validateParameters; paramsSummaryLog } from 'plugin/nf-schema'
+param_error = false
+
+// Validate input parameters
+validateParameters()
+
+// Print summary of supplied parameters
+log.info paramsSummaryLog(workflow)
+
+
+workflow {
+  sample_ids = params.sample_ids?.tokenize(';, ') ?: []
+  run_all = sample_ids[0] == "All"
+
+  // create a channel of [sample id, library_id, path to processed SCE file]
+  library_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed.rds", type: 'file')
+    .map{ file -> tuple(
+      file.parent.name, // extract sample id from file path
+      file.name.replace("_processed.rds", ""), // extract library id
+      file // full path to file
+    )}
+    .filter{ run_all || (it[0] in sample_ids) } // filter to only specified samples
+
+}

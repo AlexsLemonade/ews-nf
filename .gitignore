@@ -1,0 +1,11 @@
+# ignore nextflow logs
+.nextflow*
+
+# ignore work directory
+work/
+
+# ignore test results
+stub/ews-nf-out
+
+# ignore hidden `DS_Store`
+.DS_Store

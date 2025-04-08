@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ews-nf//nextflow_schema.json",
+  "title": "ews-nf pipeline parameters",
+  "description": "A workflow for analyzing Ewing sarcoma single-cell RNA-sequencing samples.",
+  "type": "object",
+  "$defs": {
+    "input_and_output_parameters": {
+      "title": "Input and Output Parameters",
+      "type": "object",
+      "description": "",
+      "default": "",
+      "properties": {
+        "outdir": {
+          "type": "string",
+          "format": "directory-path",
+          "description": "The output directory where the results will be saved. You have to use absolute paths to storage on Cloud infrastructure.",
+          "fa_icon": "fas fa-folder-open",
+          "default": "ews-nf-out"
+        },
+        "scpca_nf_dir": {
+          "type": "string",
+          "default": "scpca-nf-out",
+          "description": "Path to directory containing output files from running scpca-nf"
+        },
+        "sample_ids": {
+          "type": "string",
+          "default": "All",
+          "description": "List of sample IDs to process, must match the folder names in scpca_nf_dir"
+        }
+      }
+    },
+      "containers": {
+      "title": "Containers",
+      "type": "object",
+      "description": "Locations for Docker images used by workflow processes",
+      "default": "",
+      "properties": {
+        "cell_type_ewing_container": {
+          "type": "string",
+          "default": "public.ecr.aws/openscpca/cell-type-ewings:v0.2.2",
+          "description": "Container to use for running individual modules"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "#/$defs/input_and_output_parameters"
+    },
+    {
+      "$ref": "#/$defs/containers"
+    }
+  ]
+}
