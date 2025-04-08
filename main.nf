@@ -10,26 +10,6 @@ validateParameters()
 // Print summary of supplied parameters
 log.info paramsSummaryLog(workflow)
 
-// TODO: remove this once we add in a real process
-// for now just use this to test the configuration 
-process test_setup {
-  publishDir "${params.outdir}/${sample_id}"
-  input:
-    tuple val(sample_id), val(library_id), path(library_file)
-  output:
-    path test_output
-  script: 
-    test_output = "test.txt"
-    """
-    touch ${test_output}
-    """
-  stub:
-    test_output = "test.txt"
-    """
-    touch ${test_output}
-    """
-}
-
 
 workflow {
   sample_ids = params.sample_ids?.tokenize(';, ') ?: []
@@ -43,9 +23,5 @@ workflow {
       file // full path to file
     )}
     .filter{ run_all || (it[0] in sample_ids) } // filter to only specified samples
-
-  // TODO: Remove this when we add our first module
-  // run stub test to make sure setup is good
-  test_setup(library_ch)
 
 }
