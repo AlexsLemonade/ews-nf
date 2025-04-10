@@ -1,7 +1,6 @@
 # Gene sets
 
 This directory contains information for any gene sets that can be used as input to `AUCell`. 
-The `setup` folder contains any scripts used to assist in creating these gene sets. 
 
 ## MSigDB gene sets
 
@@ -19,6 +18,7 @@ The following columns can be found in the file:
 ## Custom gene sets 
 
 The `custom-gene-sets.tsv` file contains all genes that belong to a custom gene set that was either sent by an investigator or present in a publication. 
+The `setup` folder contains a script, `convert-symbols.R`, that was used to convert the provided gene symbols to Ensembl identifiers. 
 
 The following custom gene sets are included: 
 
