@@ -9,3 +9,4 @@ stub/ews-nf-out
 
 # ignore hidden `DS_Store`
 .DS_Store
+.Rproj.user
