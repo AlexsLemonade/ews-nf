@@ -15,8 +15,8 @@ on:
     branches: 
       - main
     paths:
-      - 'docker/Dockerfile'
-      - 'renv.lock'
+      - Dockerfile
+      - renv.lock
 
 
 env:
