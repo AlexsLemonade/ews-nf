@@ -8,7 +8,7 @@ The `msigdb-gene-sets.tsv` file contains a table of gene sets from [`MSigDB`](ht
 
 The following columns can be found in the file: 
 
-| | | 
+| Column name | Description | 
 | -- | -- | 
 | name | Abbreviated name of the gene set | 
 | geneset | Full name of gene set as listed in `MSigDB` | 
