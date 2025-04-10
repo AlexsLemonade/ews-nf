@@ -1,6 +1,7 @@
 # Gene sets
 
 This directory contains information for any gene sets that can be used as input to `AUCell`. 
+The `setup` folder contains any scripts used to assist in creating these gene sets. 
 
 ## MSigDB gene sets
 
