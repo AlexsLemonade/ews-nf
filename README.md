@@ -68,3 +68,22 @@ nextflow run AlexsLemonade/ews-nf -profile stub -stub
 ## Output files 
 
 TBD 
+
+## Managing software dependencies 
+
+All software dependencies are managed with `renv` and a Dockerfile is used to build an image with R, Bioconductor, and all packages included in `renv`. 
+
+The following command can be used to build the image: 
+
+```sh
+docker buildx build . -t ews-nf --platform linux/amd64
+```
+
+Alternatively, the latest version should be available via:
+
+```sh
+docker pull ghcr.io/alexslemonade/ews-nf:edge
+```
+
+To add any packages to the image outside of `renv`, the `Dockerfile` should be updated to include installation of the desired package.
+This image is built and pushed to `ghcr.io/alexslemonade/ews-nf:edge` automatically on every update to `ews-nf` (`main`) in which the `Dockerfile` or `renv.lock` files are changed.
