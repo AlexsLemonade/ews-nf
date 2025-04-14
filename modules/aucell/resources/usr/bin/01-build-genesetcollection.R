@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 # This script is used to generate a GeneSetCollection containing a 
-# group of custom and MsigDB genesets to be used for running AUCell on a processed SCE object
+# group of custom and MSigDB genesets to be used for running AUCell on a processed SCE object
 # The GeneSetCollection is saved as an RDS file
 
 library(optparse)
@@ -37,7 +37,7 @@ opt <- parse_args(OptionParser(option_list = option_list))
 stopifnot(
   "MSigDB gene set file does not exist" = file.exists(opt$msigdb_genesets),
   "Custom gene set file does not exist" = file.exists(opt$custom_geneset_file),
-  "Output file must end in .rds" = stringr::str_detect(opt$output_file, ".rds$")
+  "Output file must end in .rds" = stringr::str_detect(opt$output_file, "\\.rds$")
 )
 
 # make sure directory exists for writing output

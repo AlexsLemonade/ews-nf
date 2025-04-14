@@ -61,7 +61,7 @@ stopifnot(
   "sce file does not exist" = file.exists(opt$sce_file),
   "GeneSetCollection file does not exist" = file.exists(opt$gene_set_collection_file),
   "max_rank_threshold must be between 0 and 1" = (opt$max_rank_threshold <= 1 & opt$max_rank_threshold > 0),
-  "Output file must end in .tsv" = stringr::str_detect(opt$output_file, ".tsv$")
+  "Output file must end in .tsv" = stringr::str_detect(opt$output_file, "\\.tsv$")
 )
 
 # load SCE
@@ -129,7 +129,7 @@ max_rank <- ceiling(opt$max_rank_threshold*nrow(counts_mtx))
 # run aucell
 auc_results <- AUCell::AUCell_run(
   counts_mtx,
-  collection,
+  gene_set_collection,
   aucMaxRank = max_rank,
   BPPARAM = bp_param
 )
@@ -165,7 +165,7 @@ auc_df <- auc_results@assays@data$AUC |>
   ) |>
   # add in threshold column
   dplyr::left_join(threshold_df, by = "gene_set") |>
-  dplyr:::relocate(gene_set, .after = barcodes)
+  dplyr::relocate(gene_set, .after = barcodes)
 
 # export results as table
 readr::write_tsv(auc_df, opt$output_file)
