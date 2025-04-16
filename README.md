@@ -27,8 +27,8 @@ Below is a table of parameters that can be modified:
 | | | 
 | -- | -- | 
 | `scpca_nf_out` | This parameter is used to define the path to the directory containing output from `scpca-nf`. The default directory is `scpca-nf-out`. | 
-| `--sample_ids` | Comma or semi-colon separated list of sample ids (names of folders in `scpca_nf_out` containing the `_processed.rds` files) to run the workflow on. By default, the workflow will be run on all samples that are present in `scpca_nf_out`. |
-| `--outdir` | Full path to the directory to save the output files from `ews-nf`. The default directory is `ews-nf-out` | 
+| `sample_ids` | Comma or semi-colon separated list of sample ids (names of folders in `scpca_nf_out` containing the `_processed.rds` files) to run the workflow on. By default, the workflow will be run on all samples that are present in `scpca_nf_out`. |
+| `outdir` | Full path to the directory to save the output files from `ews-nf`. The default directory is `ews-nf-out` | 
 
 To run the workflow specifying these parameters use the following command: 
 
