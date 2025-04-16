@@ -10,14 +10,12 @@ option_list <- list(
   make_option(
     opt_str = c("--custom_genesets_file"),
     type = "character",
-    default = here::here("genesets", "custom-gene-sets.tsv"),
     help = "Path to TSV file containing a list of custom gene sets.
       Must contain a `geneset` column with the name of the gene set and `ensembl_gene_id` with the Ensembl gene identifier."
   ),
   make_option(
     opt_str = c("--msigdb_genesets"),
     type = "character",
-    default = here::here("genesets", "msigdb-gene-sets.tsv"),
     help = "Path to TSV file containing all gene sets from MSigDB to use with AUCell.
       Must contain columns with `name`, `geneset`, `category`, and `subcategory`."
   ),
