@@ -15,7 +15,8 @@ process create_geneset_collection {
     """
     01-build-genesetcollection.R \
       --custom_genesets_file ${custom_genesets_file} \
-      --msigdb_genesets ${msigdb_genesets_file}
+      --msigdb_genesets ${msigdb_genesets_file} \
+      --output_file ${geneset_collection_file}
     """
   stub:
     geneset_collection_file = "ews-gene-set-collection.rds"
