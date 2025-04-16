@@ -10,3 +10,7 @@ stub/ews-nf-out
 # ignore hidden `DS_Store`
 .DS_Store
 .Rproj.user
+
+# ignore default input and output folders 
+scpca-nf-out/*
+ews-nf-out/*
