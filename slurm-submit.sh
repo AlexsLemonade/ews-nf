@@ -7,7 +7,7 @@
 #SBATCH --mem=5G
 #SBATCH --time=7-00:00
 #SBATCH --cluster=smp
-#SBATCH --partition=high-mem
+#SBATCH --partition=smp
 
 #TODO: ADD IN RUNNING SUBSET OF SAMPLE IDS#
 
