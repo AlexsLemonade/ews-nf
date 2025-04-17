@@ -41,7 +41,7 @@
       "description": "Locations for Docker images used by workflow processes",
       "default": "",
       "properties": {
-        "--ews_nf_container": {
+        "ews_nf_container": {
           "type": "string",
           "default": "ghcr.io/alexslemonade/ews-nf:edge",
           "description": "Container to use for running individual modules"
@@ -71,9 +71,9 @@
           "description": "Table of MSigDB gene sets"
         },
         "aucell_max_rank_threshold": {
-          "type": "integer",
-          "default": 1,
-          "description": "Percentage of detected genes to use as the threshold for the max AUC rank when running AUCell"
+          "type": "number",
+          "default": 0.01,
+          "description": "Proportion of detected genes to use as the threshold for the max AUC rank when running AUCell"
         }
       }
     }
@@ -86,7 +86,7 @@
       "$ref": "#/$defs/containers"
     },
     {
-      "ref": "#/$defs/module_specific_parameters"
+      "$ref": "#/$defs/module_specific_parameters"
     }
   ]
 }
