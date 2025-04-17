@@ -6,19 +6,20 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=5G
 #SBATCH --time=7-00:00
-#SBATCH --cluster=htc
-#SBATCH --partition=htc
+#SBATCH --cluster=smp
+#SBATCH --partition=smp
 
-#TODO: ADD IN SAMPLE ID SPECIFICATIONS # 
+#TODO: ADD IN RUNNING SUBSET OF SAMPLE IDS#
 
 #####################################################
 # This script is used to run the nextflow ews-nf workflow on a slurm cluster
+# It assumes that you have cloned the workflow into your home directory, use the `--project_dir` argument to specify a different location
 
 # Any of the following paramaters can be invoked at the command line:
 
-# workflow_version: Version of the ews-nf workflow to run, default is "main"
 # scpca_nf_dir : Path to directory with output from scpca-nf 
 # outdir: Path to the output directory where the results will be saved
+# project_dir: Path to the ews-nf repo, default is $HOME/ews-nf
 # tower_pat : Personal access token used to track job submission on Nextflow tower
 
 # To submit this script use the following example:
@@ -28,10 +29,12 @@
 
 set -euo pipefail
 module load nextflow
+# modules for using singularity
+module load singularity
+module load squashfs-tools
 
 # Define the project directory for nextflow
-cd $(dirname "$0")
-project_dir=$(pwd)
+project_dir=$HOME/ews-nf
 
 # set defaults for all arguments
 scpca_nf_dir="$project_dir/scpca-nf-out"
