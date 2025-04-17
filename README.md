@@ -55,10 +55,10 @@ nextflow run AlexsLemonade/ews-nf
 - `pitt_hpc`: This profile can be used to run the workflow using the Pittsburgh HPC. 
 **Note that this workflow is still in the process of being set up.**
 
-To use the `pitt_hpc` profile run: 
+To use the `pitt_htc` profile run: 
 
 ```sh
-nextflow run AlexsLemonade/ews-nf -profile pitt_hpc
+nextflow run AlexsLemonade/ews-nf -profile pitt_htc
 ```
 
 - `stub`: This profile can be used for testing the workflow configuration and process input/outputs. 
