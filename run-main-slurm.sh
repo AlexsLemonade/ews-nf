@@ -23,25 +23,29 @@
 
 # To submit this script use the following example:
 # sbatch run-main-slurm.sh
-# sbatch outdir="ews-nf-out" run-main-slurm.sh
+# sbatch run-main-slurm.sh --scpca_nf_dir /path/to/scpca-nf-out --outdir /path/to/ews-nf-out
 ######################################################
 
 set -euo pipefail
-module load java/18.0.2
+module load nextflow
 
 # Define the project directory for nextflow
 cd $(dirname "$0")
 project_dir=$(pwd)
 
 # set defaults for all arguments
-workflow_version="main"
 scpca_nf_dir="$project_dir/scpca-nf-out"
 outdir="$project_dir/ews-nf-out"
 tower_pat=${TOWER_ACCESS_TOKEN:-0}
-workdir="$SLURM_SCRATCH/nextflow/work"
 
-# make the workdir if it doesn't exist
-mkdir -p $workdir
+# grab arguments from command line
+while [ $# -gt 0 ]; do
+    if [[ $1 == *'--'* ]]; then
+        v="${1/--/}"
+        declare $v="$2"
+    fi
+    shift
+done
 
 # set up nextflow tower
 export TOWER_ACCESS_TOKEN=$tower_pat
@@ -53,10 +57,9 @@ fi
 
 
 # run ews-nf workflow with specified parameters
-nextflow run AlexsLemonade/ews-nf \
-  -r $workflow_version \
+nextflow run $project_dir/main.nf \
   -profile "pitt_htc" \
-  -work-dir $workdir \
+  -work-dir $SLURM_SCRATCH \
   --scpca_nf_dir "$scpca_nf_dir" \
   --outdir "$outdir" \
   $tower_flag
