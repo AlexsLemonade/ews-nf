@@ -1,5 +1,20 @@
 # ews-nf
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents** 
+
+- [Description](#description)
+- [Running the workflow](#running-the-workflow)
+  - [Parameters](#parameters)
+  - [Profiles](#profiles)
+  - [Running the workflow on the Pittsburgh High Throughput Cluster](#running-the-workflow-on-the-pittsburgh-high-throughput-cluster)
+- [Monitoring the workflow with Seqera](#monitoring-the-workflow-with-seqera)
+- [Output files](#output-files)
+- [Managing software dependencies](#managing-software-dependencies)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Description 
 
 This repository holds a Nextflow workflow used to analyze single-cell RNA-sequencing samples obtained from patients with Ewing sarcoma. 
@@ -11,10 +26,12 @@ Gene sets used are found in `genesets/msigdb-gene-sets.tsv` and `genesets/custom
 
 ## Running the workflow 
 
+In order to run the workflow you will first need to clone the repository. 
+
 Prior to running this worklow, quantified gene expression data must be obtained by running [`scpca-nf`](https://github.com/AlexsLemonade/scpca-nf). 
 The processed `SingleCellExperiment` objects output from that workflow are then used as input to `ews-nf`. 
 
-The following command will run the workflow locally with all default parameters (see more below):
+The following command can be run from within the cloned repository and will run the workflow locally with all default parameters (see more below):
 
 ```sh
 nextflow run AlexsLemonade/ews-nf
@@ -33,7 +50,7 @@ Below is a table of parameters that can be modified:
 To run the workflow specifying these parameters use the following command: 
 
 ```sh
-nextflow run AlexsLemonade/ews-nf \
+nextflow run main.nf \
   --scpca_nf_out <path to scpca-nf output> \
   --sample_ids <comma separated list of sample ids> \
   --outdir <path to directory to save output from workflow>
@@ -49,16 +66,17 @@ If no profile is specified, then the workflow will use this profile and run the 
 To use the `standard` profile run: 
 
 ```sh
-nextflow run AlexsLemonade/ews-nf 
+nextflow run main.nf
 ```
 
-- `pitt_hpc`: This profile can be used to run the workflow using the Pittsburgh HPC. 
-**Note that this workflow is still in the process of being set up.**
+- `pitt_hpc`: This profile can be used to run the workflow using the Pittsburgh High Throughput Cluster (HTC). 
+**Note:** It is not recommended to run the workflow from the login node on the HTC. 
+Instead, please follow the [instructions on running the workflow using the HTC below](#running-the-workflow-on-the-pittsburgh-high-throughput-cluster). 
 
 To use the `pitt_htc` profile run: 
 
 ```sh
-nextflow run AlexsLemonade/ews-nf -profile pitt_htc
+nextflow run main.nf -profile pitt_htc
 ```
 
 - `stub`: This profile can be used for testing the workflow configuration and process input/outputs. 
@@ -66,12 +84,45 @@ nextflow run AlexsLemonade/ews-nf -profile pitt_htc
 To use the `stub` profile run: 
 
 ```sh
-nextflow run AlexsLemonade/ews-nf -profile stub -stub 
+nextflow run main.nf -profile stub -stub 
 ```
+
+### Running the workflow on the Pittsburgh High Throughput Cluster
+
+The `slurm-submit.sh` script can be used to run `ews-nf` on the Pittsburgh High Throughput Cluster (HTC) using the `pitt_htc` profile. 
+You will need to clone the repository into your home directory and then use the following command to submit the workflow to the SLURM workload manager: 
+
+```sh
+sbatch slurm-submit.sh
+```
+
+To modify any of the workflow parameters, specify them at the command line when submitting to slurm: 
+
+```sh
+sbatch slurm-submit.sh --scpca_nf_dir <full path to outputs from scpca-nf> 
+```
+
+If the repository is not located in your home directory, be sure to provide the full path to the repo using the `--project_dir` argument: 
+
+```sh
+sbatch slurm-submit.sh --project_dir <full path to cloned repository> 
+```
+
+## Monitoring the workflow with Seqera 
+
+To track the progress of the workflow run, you can optionally use the [Seqera platform](https://tower.nf/).
+Seqera provides some nice visualizations of the resource usage of each job, as well as a easy to navigate record of run logs that can be useful for debugging.
+You will need to create an account on https://tower.nf/ (it is recommended to use your github account for this).
+
+You can then follow the instructions on running [Nextflow via the command line](https://help.tower.nf/getting-started/usage/#via-nextflow-run-command) to create a new token.
+You will want to create your token value from https://tower.nf/tokens.
+Next, you will want to create an environment variable with this token value using the following command at the command line: `export TOWER_ACCESS_TOKEN=<MYTOWERTOKEN>`
+We recommend that you also add this line to your `~/.bash_profile` or equivalent (`~/.zshrc`).
+You can also include this line in any scripts that are used to submit nextflow jobs.
 
 ## Output files 
 
-TBD 
+TBD
 
 ## Managing software dependencies 
 
