@@ -29,8 +29,5 @@ RUN Rscript -e 'renv::restore()' && \
   rm -rf /tmp/downloaded_packages && \
   rm -rf /tmp/Rtmp*
 
-# Install additional dependencies not captured in renv 
-RUN R -e "install.packages('msigdbdf', repos = 'https://igordot.r-universe.dev')"
-
 # Set CMD to bash to activate the environment for any commands
 CMD ["/bin/bash"]

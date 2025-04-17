@@ -3602,6 +3602,51 @@
       "Maintainer": "Derek Young <derek.young@uky.edu>",
       "Repository": "CRAN"
     },
+    "msigdbdf": {
+      "Package": "msigdbdf",
+      "Version": "24.1.0",
+      "Source": "Repository",
+      "Type": "Package",
+      "Title": "MSigDB Data Frame",
+      "Authors@R": "person(\"Igor\", \"Dolgalev\", , \"igor.dolgalev@nyumc.org\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0003-4451-126X\"))",
+      "Description": "Provides the Molecular Signatures Database (MSigDB) gene sets (Subramanian et al. 2005 <doi:10.1073/pnas.0506580102>, Liberzon et al. 2015 <doi:10.1016/j.cels.2015.12.004>, Castanza et al. 2023 <doi:10.1038/s41592-023-02014-7>) in an R data frame. Serves as the data source for 'msigdbr' <doi:10.32614/CRAN.package.msigdbr> (split into a separate package due to CRAN size restrictions).",
+      "License": "MIT + file LICENSE",
+      "URL": "https://github.com/igordot/msigdbdf",
+      "BugReports": "https://github.com/igordot/msigdbdf/issues",
+      "Depends": [
+        "R (>= 4.1)"
+      ],
+      "Imports": [
+        "dplyr",
+        "readr",
+        "rlang",
+        "stringr",
+        "tibble",
+        "tidyr",
+        "tidyselect (>= 1.2.0)",
+        "utils"
+      ],
+      "Suggests": [
+        "DBI",
+        "RCurl",
+        "rmarkdown",
+        "roxygen2",
+        "RSQLite",
+        "testthat (>= 3.0.0)"
+      ],
+      "Config/testthat/edition": "3",
+      "Encoding": "UTF-8",
+      "Roxygen": "list(markdown = TRUE)",
+      "RoxygenNote": "7.3.2",
+      "Config/pak/sysreqs": "libicu-dev libx11-dev",
+      "Repository": "https://igordot.r-universe.dev",
+      "RemoteUrl": "https://github.com/igordot/msigdbdf",
+      "RemoteRef": "v24.1.0",
+      "RemoteSha": "b61c2dcf4956de61bf9a3fe3e170ddc8e40d6c8b",
+      "NeedsCompilation": "no",
+      "Author": "Igor Dolgalev [aut, cre] (<https://orcid.org/0000-0003-4451-126X>)",
+      "Maintainer": "Igor Dolgalev <igor.dolgalev@nyumc.org>"
+    },
     "msigdbr": {
       "Package": "msigdbr",
       "Version": "10.0.1",
