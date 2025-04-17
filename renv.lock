@@ -3639,7 +3639,7 @@
       "Roxygen": "list(markdown = TRUE)",
       "RoxygenNote": "7.3.2",
       "Config/pak/sysreqs": "libicu-dev libx11-dev",
-      "Repository": "https://igordot.r-universe.dev",
+      "Repository": "https://github.com/igordot/msigdbdf",
       "RemoteUrl": "https://github.com/igordot/msigdbdf",
       "RemoteRef": "v24.1.0",
       "RemoteSha": "b61c2dcf4956de61bf9a3fe3e170ddc8e40d6c8b",
