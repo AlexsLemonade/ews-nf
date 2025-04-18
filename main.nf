@@ -1,5 +1,8 @@
 #!/usr/bin/env nextflow
 
+// **** Included workflows and processes from modules ****
+include { aucell } from './modules/aucell'
+
 // **** Parameter checks ****
 include { validateParameters; paramsSummaryLog } from 'plugin/nf-schema'
 param_error = false
@@ -24,4 +27,7 @@ workflow {
     )}
     .filter{ run_all || (it[0] in sample_ids) } // filter to only specified samples
 
+  // run aucell 
+  aucell(library_ch)
+  
 }

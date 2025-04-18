@@ -24,7 +24,7 @@ option_list <- list(
     opt_str = c("--max_rank_threshold"),
     type = "double",
     default = 0.01,
-    help = "Percentage of genes detected to set as the `aucMaxRank`. 
+    help = "Proportion of genes detected to set as the `aucMaxRank`. 
       Must be a number between 0 and 1."
   ),
   make_option(

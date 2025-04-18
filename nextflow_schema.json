@@ -5,8 +5,8 @@
   "description": "A workflow for analyzing Ewing sarcoma single-cell RNA-sequencing samples.",
   "type": "object",
   "$defs": {
-    "input_and_output_parameters": {
-      "title": "Input and Output Parameters",
+    "global_parameters": {
+      "title": "Global Parameters",
       "type": "object",
       "description": "",
       "default": "",
@@ -27,6 +27,11 @@
           "type": "string",
           "default": "All",
           "description": "List of sample IDs to process, must match the folder names in scpca_nf_dir"
+        },
+        "seed": {
+          "type": "integer",
+          "default": 2025,
+          "description": "Random seed"
         }
       }
     },
@@ -36,20 +41,52 @@
       "description": "Locations for Docker images used by workflow processes",
       "default": "",
       "properties": {
-        "cell_type_ewing_container": {
+        "ews_nf_container": {
           "type": "string",
-          "default": "public.ecr.aws/openscpca/cell-type-ewings:v0.2.2",
+          "default": "ghcr.io/alexslemonade/ews-nf:edge",
           "description": "Container to use for running individual modules"
+        }
+      }
+    },
+    "module_specific_parameters": {
+      "title": "Module-specific parameters",
+      "type": "object",
+      "description": "Parameters used by individual modules",
+      "default": "",
+      "properties": {
+        "custom_genesets_file": {
+          "type": "string",
+          "default": "${projectDir}/genesets/custom-gene-sets.tsv",
+          "pattern": "\\.tsv$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Table of custom gene sets"
+        },
+        "msigdb_genesets_file": {
+          "type": "string",
+          "default": "${projectDir}/genesets/msigdb-gene-sets.tsv",
+          "pattern": "\\.tsv$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Table of MSigDB gene sets"
+        },
+        "aucell_max_rank_threshold": {
+          "type": "number",
+          "default": 0.01,
+          "description": "Proportion of detected genes to use as the threshold for the max AUC rank when running AUCell"
         }
       }
     }
   },
   "allOf": [
     {
-      "$ref": "#/$defs/input_and_output_parameters"
+      "$ref": "#/$defs/global_parameters"
     },
     {
       "$ref": "#/$defs/containers"
+    },
+    {
+      "$ref": "#/$defs/module_specific_parameters"
     }
   ]
 }

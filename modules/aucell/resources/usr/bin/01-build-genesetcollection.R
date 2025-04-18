@@ -8,16 +8,14 @@ library(optparse)
 
 option_list <- list(
   make_option(
-    opt_str = c("--custom_geneset_file"),
+    opt_str = c("--custom_genesets_file"),
     type = "character",
-    default = here::here("genesets", "custom-gene-sets.tsv"),
     help = "Path to TSV file containing a list of custom gene sets.
       Must contain a `geneset` column with the name of the gene set and `ensembl_gene_id` with the Ensembl gene identifier."
   ),
   make_option(
     opt_str = c("--msigdb_genesets"),
     type = "character",
-    default = here::here("genesets", "msigdb-gene-sets.tsv"),
     help = "Path to TSV file containing all gene sets from MSigDB to use with AUCell.
       Must contain columns with `name`, `geneset`, `category`, and `subcategory`."
   ),
@@ -36,7 +34,7 @@ opt <- parse_args(OptionParser(option_list = option_list))
 # make sure input files exist
 stopifnot(
   "MSigDB gene set file does not exist" = file.exists(opt$msigdb_genesets),
-  "Custom gene set file does not exist" = file.exists(opt$custom_geneset_file),
+  "Custom gene set file does not exist" = file.exists(opt$custom_genesets_file),
   "Output file must end in .rds" = stringr::str_detect(opt$output_file, "\\.rds$")
 )
 
@@ -46,7 +44,7 @@ fs::dir_create(output_dir)
 
 # read in gene sets
 msig_genesets_df <- readr::read_tsv(opt$msigdb_genesets)
-custom_genesets_df <- readr::read_tsv(opt$custom_geneset_file)
+custom_genesets_df <- readr::read_tsv(opt$custom_genesets_file)
 
 # Msigdb genee sets ------------------------------------------------------------
 
