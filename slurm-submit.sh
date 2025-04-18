@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=5G
 #SBATCH --time=7-00:00
-#SBATCH --cluster=smp
-#SBATCH --partition=smp
+#SBATCH --cluster=htc
+#SBATCH --partition=htc
 
 #TODO: ADD IN RUNNING SUBSET OF SAMPLE IDS#
 
