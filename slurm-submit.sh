@@ -33,6 +33,9 @@ module load nextflow
 module load singularity
 module load squashfs-tools
 
+# Set Singularity image cache directory
+export NXF_SINGULARITY_CACHEDIR="$HOME/.singularity-cache"
+
 # Define the project directory for nextflow
 project_dir=$HOME/ews-nf
 
