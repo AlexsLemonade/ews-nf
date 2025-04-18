@@ -42,7 +42,6 @@ project_dir=$HOME/ews-nf
 # set defaults for all arguments
 scpca_nf_dir="$project_dir/scpca-nf-out"
 outdir="$project_dir/ews-nf-out"
-workdir=$SLURM_SCRATCH
 tower_pat=${TOWER_ACCESS_TOKEN:-0}
 
 # grab arguments from command line
@@ -66,7 +65,6 @@ fi
 # run ews-nf workflow with specified parameters
 nextflow run $project_dir/main.nf \
   -profile "pitt_htc" \
-  -work-dir $workdir \
   --scpca_nf_dir "$scpca_nf_dir" \
   --outdir "$outdir" \
   $tower_flag
