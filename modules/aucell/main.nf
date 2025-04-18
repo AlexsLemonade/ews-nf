@@ -5,6 +5,7 @@
 process create_geneset_collection {
   container params.ews_nf_container
   label 'mem_8'
+  time '2h'
   errorStrategy 'terminate'
   input:
     path custom_genesets_file
@@ -30,6 +31,7 @@ process run_aucell {
   container params.ews_nf_container
   tag "${sample_id}-${library_id}"
   label 'mem_8'
+  time '2h'
   errorStrategy 'terminate'
   publishDir "${params.outdir}/aucell/${sample_id}", mode: 'copy'
   input:
