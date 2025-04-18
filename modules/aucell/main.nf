@@ -51,6 +51,7 @@ process run_aucell {
       --gene_set_collection_file ${geneset_collection_file} \
       --max_rank_threshold ${aucell_max_rank_threshold} \
       --output_file ${aucell_output_file} \
+      --threads ${task.cpus} \
       --seed ${params.seed}
     """
 
