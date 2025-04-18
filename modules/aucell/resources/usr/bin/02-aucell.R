@@ -70,10 +70,9 @@ suppressPackageStartupMessages({
 })
 
 
-# set up multiprocessing params for running on HTC
+# set up multiprocessing params
 if (opt$threads > 1) {
-  bp_param <- BiocParallel::SnowParam(opt$threads, type = "SOCK")
-  options(mc.cores = 1)
+  bp_param <- BiocParallel::MulticoreParam(opt$threads)
 } else {
   bp_param <- BiocParallel::SerialParam()
 }
