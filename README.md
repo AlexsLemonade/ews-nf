@@ -9,7 +9,7 @@
   - [Parameters](#parameters)
   - [Profiles](#profiles)
   - [Running the workflow on the Pittsburgh High Throughput Cluster](#running-the-workflow-on-the-pittsburgh-high-throughput-cluster)
-- [Monitoring the workflow with Seqera](#monitoring-the-workflow-with-seqera)
+  - [Monitoring the workflow with Seqera](#monitoring-the-workflow-with-seqera)
 - [Output files](#output-files)
 - [Managing software dependencies](#managing-software-dependencies)
 
@@ -96,7 +96,7 @@ You will need to clone the repository into your home directory and then use the 
 sbatch slurm-submit.sh
 ```
 
-To modify any of the workflow parameters, specify them at the command line when submitting to slurm: 
+To modify any of the workflow parameters, specify them at the command line when submitting to SLURM: 
 
 ```sh
 sbatch slurm-submit.sh --scpca_nf_dir <full path to outputs from scpca-nf> 
@@ -108,17 +108,28 @@ If the repository is not located in your home directory, be sure to provide the 
 sbatch slurm-submit.sh --project_dir <full path to cloned repository> 
 ```
 
-## Monitoring the workflow with Seqera 
+### Monitoring the workflow with Seqera 
 
 To track the progress of the workflow run, you can optionally use the [Seqera platform](https://tower.nf/).
 Seqera provides some nice visualizations of the resource usage of each job, as well as a easy to navigate record of run logs that can be useful for debugging.
 You will need to create an account on https://tower.nf/ (it is recommended to use your github account for this).
 
-You can then follow the instructions on running [Nextflow via the command line](https://help.tower.nf/getting-started/usage/#via-nextflow-run-command) to create a new token.
-You will want to create your token value from https://tower.nf/tokens.
+You can then follow the instructions on running [Nextflow using the `-with-tower` flag](https://docs.seqera.io/platform-cloud/getting-started/deployment-options#nextflow--with-tower) to create a new token.
 Next, you will want to create an environment variable with this token value using the following command at the command line: `export TOWER_ACCESS_TOKEN=<MYTOWERTOKEN>`
 We recommend that you also add this line to your `~/.bash_profile` or equivalent (`~/.zshrc`).
-You can also include this line in any scripts that are used to submit nextflow jobs.
+
+To run the workflow using Seqera, use the following command: 
+
+```sh
+nextflow run main.nf -with-tower
+```
+
+If you are running the workflow on the Pittsburgh HTC and you have saved your token in your `~/.bash_profile`, then `submit-slurm.sh` will submit the Nextflow run using the `-with-tower` flag. 
+Alternatively, to specify a token to use when running the workflow use: 
+
+```sh
+sbatch slurm-submit.sh --tower_pat <Seqera Token> 
+```
 
 ## Output files 
 
