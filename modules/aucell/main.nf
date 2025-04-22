@@ -4,7 +4,7 @@
 
 process create_geneset_collection {
   container params.ews_nf_container
-  label 'mem_8'
+  memory '8 GB'
   time '2h'
   input:
     path custom_genesets_file
@@ -29,8 +29,8 @@ process create_geneset_collection {
 process run_aucell {
   container params.ews_nf_container
   tag "${sample_id}-${library_id}"
-  label 'mem_24'
-  label 'cpus_2'
+  memory '24 GB'
+  cpus 2
   time '2h'
   publishDir "${params.outdir}/aucell/${sample_id}", mode: 'copy'
   input:
