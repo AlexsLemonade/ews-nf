@@ -5,6 +5,7 @@
 process create_geneset_collection {
   container params.ews_nf_container
   label 'mem_8'
+  time '2h'
   input:
     path custom_genesets_file
     path msigdb_genesets_file
@@ -28,7 +29,9 @@ process create_geneset_collection {
 process run_aucell {
   container params.ews_nf_container
   tag "${sample_id}-${library_id}"
-  label 'mem_8'
+  label 'mem_24'
+  cpus 2
+  time '2h'
   publishDir "${params.outdir}/aucell/${sample_id}", mode: 'copy'
   input:
     tuple val(sample_id),
