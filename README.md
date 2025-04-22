@@ -99,13 +99,13 @@ sbatch slurm-submit.sh
 To modify any of the workflow parameters, specify them at the command line when submitting to SLURM: 
 
 ```sh
-sbatch slurm-submit.sh --scpca_nf_dir <full path to outputs from scpca-nf> 
+sbatch slurm-submit.sh --scpca_nf_dir [full path to outputs from scpca-nf] 
 ```
 
 If the repository is not located in your home directory, be sure to provide the full path to the repo using the `--project_dir` argument: 
 
 ```sh
-sbatch slurm-submit.sh --project_dir <full path to cloned repository> 
+sbatch slurm-submit.sh --project_dir [full path to cloned repository]
 ```
 
 ### Monitoring the workflow with Seqera 
@@ -128,7 +128,7 @@ If you are running the workflow on the Pittsburgh HTC and you have saved your to
 Alternatively, to specify a token to use when running the workflow use: 
 
 ```sh
-sbatch slurm-submit.sh --tower_pat <Seqera Token> 
+sbatch slurm-submit.sh --tower_pat [Seqera Token] 
 ```
 
 ## Output files 
