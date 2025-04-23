@@ -74,6 +74,14 @@
           "type": "number",
           "default": 0.01,
           "description": "Proportion of detected genes to use as the threshold for the max AUC rank when running AUCell"
+        },
+        "ref_celltypes_file": {
+          "type": "string",
+          "default": "${projectDir}/references/reference-celltypes.tsv",
+          "pattern": "\\.tsv$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Table of consensus cell type annotations to include when building the normal reference"
         }
       }
     }
