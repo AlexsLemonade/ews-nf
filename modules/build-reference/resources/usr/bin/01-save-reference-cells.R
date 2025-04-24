@@ -66,18 +66,10 @@ ref_celltypes <- readr::read_tsv(opt$reference_celltypes_file) |>
 
 # Extract reference cells ------------------------------------------------------
 
-# check that cells classified as reference cell type exist
-# otherwise create empty files and quit 
-celltypes <- unique(sce$consensus_celltype_annotation)
-if(!any(ref_celltypes %in% celltypes)){
-  file.create(opt$output_file)
-  quit(save = "no")
-}
-
 # make df with barcodes and consensus cell types for all ref cells 
 ref_celltype_df <- colData(sce) |> 
   as.data.frame() |> 
-  dplyr::select(barcodes, consensus_celltype_annotation) |> 
+  dplyr::select(barcodes, consensus_celltype_annotation, consensus_celltype_ontology) |> 
   dplyr::filter(consensus_celltype_annotation %in% ref_celltypes) 
 
 # subset reference cells 
@@ -95,6 +87,11 @@ small_ref_sce <- SingleCellExperiment(
 # add library id to colnames 
 library_id <- metadata(sce)$library_id
 colnames(small_ref_sce) <- glue::glue("{library_id}-{colnames(small_ref_sce)}")
+
+# print out a message if no normal cells are found 
+if(ncol(small_ref_sce) == 0){
+  message("No normal cells identified in provided SingleCellExperiment object")
+}
 
 # save to rds file
 readr::write_rds(small_ref_sce, opt$output_file, compress = "gz")

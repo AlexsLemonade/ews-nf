@@ -2,7 +2,7 @@
 
 // **** Included workflows and processes from modules ****
 include { aucell } from './modules/aucell'
-include { build_normal_ref } from './modules/build-normal-reference'
+include { build_ref } from './modules/build-reference'
 
 // **** Parameter checks ****
 include { validateParameters; paramsSummaryLog } from 'plugin/nf-schema'
@@ -29,9 +29,9 @@ workflow {
     .filter{ run_all || (it[0] in sample_ids) } // filter to only specified samples
 
   // run aucell 
-  //aucell(library_ch)
+  aucell(library_ch)
 
   // build reference of normal cells
-  build_normal_ref(library_ch)
+  build_ref(library_ch)
   
 }
