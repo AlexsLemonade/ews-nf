@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 # This script is used to extract any normal cells to be used as a reference 
-# for other modules like aucell and inferCNV
+# for other modules like AUCell and inferCNV
 # This includes any cells with an assigned consensus cell type present in the list of reference cell types
 # specified with the `--reference_celltypes_file` argument 
 

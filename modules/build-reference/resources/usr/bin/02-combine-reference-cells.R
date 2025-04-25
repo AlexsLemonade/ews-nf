@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-# This script is used to read in and combine all normal cells into a single SCE 
+# This script is used to read in and combine all SCEs containing normal cells into a single SCE to use as a normal reference
 
 library(optparse)
 
@@ -30,7 +30,7 @@ opt <- parse_args(OptionParser(option_list = option_list))
 # make sure all ref files exist and output file is an rds file 
 stopifnot(
   "Output file must end in .rds" = stringr::str_detect(opt$output_file, "\\.rds$"),
-  "List of input SCE to combine is missing" = !is.null(opt$ref_file_list)
+  "List of input SCEs to combine is missing" = !is.null(opt$ref_file_list)
 )
 
 # make list of ref files 
