@@ -53,13 +53,11 @@ ref_sce_list <- ref_sce_files |>
 # combine into a single reference sce 
 combined_ref_sce <- do.call(cbind, ref_sce_list)
 
-# combine annotations into one tsv file and save separately ?
+# combine annotations into one tsv file and save separately
 annotations_df <- colData(combined_ref_sce) |>
   as.data.frame() |> 
-  tibble::rownames_to_column("library_id") |> 
-  dplyr::mutate(
-    library_id = stringr::word(library_id, 1, sep = "-")
-  )
+  # save column with combined library and cell barcodes
+  tibble::rownames_to_column("cell_id")
 
 # export annotations and sce 
 readr::write_tsv(annotations_df, opt$output_annotation_file)

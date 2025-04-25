@@ -8,8 +8,6 @@
 # An SCE object with just the counts from reference cells 
 # and associated consensus annotations stored in the colData will be saved to an RDS file 
 
-# Counts for all reference cells will be saved to a .rds file and consensus annotations will be saved to a .tsv file 
-
 library(optparse)
 
 option_list <- list(
@@ -21,7 +19,6 @@ option_list <- list(
   make_option(
     opt_str = c("--reference_celltypes_file"),
     type = "character",
-    default = here::here("references", "reference-celltypes.tsv"), # TODO: Remove default when adding to Nextflow 
     help = "Path to TSV with list of consensus annotations to include in the reference cells."
   ),
   make_option(
@@ -66,10 +63,14 @@ ref_celltypes <- readr::read_tsv(opt$reference_celltypes_file) |>
 
 # Extract reference cells ------------------------------------------------------
 
+# get library id 
+library_id <- metadata(sce)$library_id
+
 # make df with barcodes and consensus cell types for all ref cells 
 ref_celltype_df <- colData(sce) |> 
   as.data.frame() |> 
   dplyr::select(barcodes, consensus_celltype_annotation, consensus_celltype_ontology) |> 
+  dplyr::mutate(library_id = library_id) |> 
   dplyr::filter(consensus_celltype_annotation %in% ref_celltypes) 
 
 # subset reference cells 
@@ -84,14 +85,13 @@ small_ref_sce <- SingleCellExperiment(
   colData = ref_celltype_df
 )
 
-# add library id to colnames 
-library_id <- metadata(sce)$library_id
-colnames(small_ref_sce) <- glue::glue("{library_id}-{colnames(small_ref_sce)}")
-
 # print out a message if no normal cells are found 
 if(ncol(small_ref_sce) == 0){
   message("No normal cells identified in provided SingleCellExperiment object")
 }
+
+# add library id to colnames 
+colnames(small_ref_sce) <- glue::glue("{library_id}-{colnames(small_ref_sce)}")
 
 # save to rds file
 readr::write_rds(small_ref_sce, opt$output_file, compress = "gz")
