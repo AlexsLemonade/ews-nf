@@ -25,6 +25,10 @@ Gene sets used are found in `genesets/msigdb-gene-sets.tsv` and `genesets/custom
 * `build-reference`: This module extracts the counts for any cells that should be included in a normal cell reference and saves to a single `SingleCellExperiment` object for use with other modules. 
 An additional TSV file containing the library ID, cell barcode, and consensus cell type annotations is also saved.
 Any cells with a consensus cell type present in the table of reference cell types (see [`references/reference-celltypes.tsv`](./references/reference-celltypes.tsv)) will be included in the normal reference. 
+* `infercnv`: [`inferCNV`](https://github.com/broadinstitute/inferCNV/wiki) is used to infer copy number variations in all non-reference cells. 
+All cells that are classified as reference cells using the `build-reference` module are used as a normal reference to run `inferCNV` on each library. 
+A TSV file containing the estimated CNV profile for each cell along with a heatmap displaying the output from `inferCNV` are saved for each library. 
+
 
 ## Running the workflow 
 

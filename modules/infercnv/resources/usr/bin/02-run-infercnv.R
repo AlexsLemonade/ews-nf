@@ -33,21 +33,10 @@ option_list <- list(
     help = "Path to the normal reference SCE"
   ),
   make_option(
-    opt_str = c("--output_dir"),
-    type = "character",
-    help = "Folder to save final infercnv results"
-  ),
-  make_option(
     opt_str = c("--hmm_model"),
     type = "character",
     default = "i6",
     help = "The HMM model to use with inferCNV, either 'i3' or 'i6'. Default is i6."
-  ),
-  make_option(
-    opt_str = c("--skip_hmm"),
-    action = "store_true",
-    default = FALSE,
-    help = "Use this flag to turn off fitting the HMM."
   ),
   # clustering options. context:
   # https://github.com/broadinstitute/infercnv/wiki/infercnv-tumor-subclusters#tumor-subclustering-by-leiden-clustering-preferred
@@ -83,16 +72,14 @@ option_list <- list(
       Columns are: Ensembl gene id, chr, start, stop."
   ),
   make_option(
-    opt_str = "--annotation_file",
+    opt_str = "--output_metadata_file",
     type = "character",
-    default = file.path(project_root, "scratch", "infercnv_annotation.txt"),
-    help = "Path to annotation file for inferCNV input"
+    help = "Path to file to save inferCNV results as a TSV"
   ),
   make_option(
-    opt_str = c("--scratch_dir"),
+    opt_str = "--output_heatmap_file",
     type = "character",
-    default = file.path(project_root, "scratch", "infercnv"),
-    help = "path to scratch directory to store intermediate files from infercnv"
+    help = "Path to file to save inferCNV heatmap as a PNG file"
   ),
   make_option(
     opt_str = c("-t", "--threads"),
@@ -113,13 +100,13 @@ option_list <- list(
 opts <- parse_args(OptionParser(option_list = option_list))
 
 
-# check input directories
+# check inputs and outputs 
 stopifnot(
   "sce_file does not exist" = file.exists(opts$sce_file),
   "reference_file does not exist" = file.exists(opts$reference_file),
   "gene_order_file does not exist" = file.exists(opts$gene_order_file),
-  "annotation_file not provided" = !is.null(opts$annotation_file),
-  "output_dir was not specified" = !is.null(opts$output_dir),
+  "output_metadata_file must end in .tsv" = stringr::str_detect(opt$output_metadata_file, "\\.tsv$"),
+  "output_heatmap_file must end in .png" = stringr::str_detect(opt$output_heatmap_file, "\\.png$"),
   "hmm_model not properly specified" = opts$hmm_model %in% c("i3", "i6")
 )
 
@@ -137,48 +124,21 @@ if (resolution != "auto") {
 set.seed(opts$seed)
 
 # read SCE file
-sce <- readRDS(opts$sce_file)
+sce <- readr::read_rds(opts$sce_file)
 
 # Read in reference SCE file
-ref_sce <- readRDS(opts$reference_file)
-
-# define reference name to save in output
-ref_name <- stringr::str_remove(
-  basename(opts$reference_file),
-  "^ref-"
-) |>
-  stringr::str_remove("\\.rds$")
+ref_sce <- readr::read_rds(opts$reference_file)
 
 # get library id and construct scratch directory
 library_id <- metadata(sce)$library_id
 
-# organize scratch by library id
-scratch_dir <- file.path(opts$scratch_dir, library_id)
+# create scratch directory
+scratch_dir <- "scratch"
+fs::dir_create(scratch_dir)
 
-# if scratch_dir exists, we need to remove it to prevent conflicts from previous inferCNV runs
-if (dir.exists(scratch_dir)) {
-  fs::dir_delete(scratch_dir)
-}
-
-# ensure directories we need exist
-fs::dir_create(c(
-  opts$output_dir,
-  scratch_dir,
-  dirname(opts$annotation_file)
-))
-
-# define output metadata file
-cnv_metadata_file <- file.path(opts$output_dir, glue::glue("{library_id}_cnv-metadata.tsv"))
-# define path to output cnv metadata file saved in scratch dir
+# define path to output files in scratch directory that will be copied and saved as output from script 
 scratch_metadata_file <- file.path(scratch_dir, "map_metadata_from_infercnv.txt")
-
-# define output infercnv obj
-scratch_obj_file <- file.path(scratch_dir, "run.final.infercnv_obj")
-output_obj_file <- file.path(opts$output_dir, glue::glue("{library_id}_cnv-obj.rds"))
-
-# png file to save
 scratch_png <- file.path(scratch_dir, "infercnv.png")
-output_png <- file.path(opts$output_dir, glue::glue("{library_id}_infercnv.png"))
 
 # Prepare input data  ---------------------------------------------
 
@@ -205,9 +165,10 @@ reference_group_name <- "reference"
 
 # Create and export annotation table for inferCNV:
 # "unknown" cells are uncharacterized, and "reference" cells are in the reference
+annotations_file <- "infercnv_annotations.txt"
 data.frame(cell_id = colnames(raw_counts_matrix)) |>
   dplyr::mutate(annotations = dplyr::if_else(cell_id %in% colnames(sce), "unknown", reference_group_name)) |>
-  readr::write_tsv(opts$annotation_file, col_names = FALSE)
+  readr::write_tsv(annotations_file, col_names = FALSE)
 
 
 # Run infercnv ------------------------
@@ -215,7 +176,7 @@ data.frame(cell_id = colnames(raw_counts_matrix)) |>
 # create the infercnv object
 infercnv_obj <- infercnv::CreateInfercnvObject(
   raw_counts_matrix = raw_counts_matrix,
-  annotations_file = opts$annotation_file,
+  annotations_file = annotations_file,
   delim = "\t",
   gene_order_file = opts$gene_order_file,
   ref_group_name = reference_group_name
@@ -227,7 +188,7 @@ infercnv_obj <- infercnv::run(
   cutoff = 0.1, # use 1 for smart-seq, 0.1 for 10x-genomics
   out_dir = scratch_dir, # save all intermediate files to scratch dir
   denoise = TRUE,
-  HMM = !opts$skip_hmm,
+  HMM = TRUE,
   HMM_type = opts$hmm_model, # specifies i3 or i6
   save_rds = FALSE, # don't save the intermediate rds files
   num_threads = opts$threads,
@@ -239,26 +200,18 @@ infercnv_obj <- infercnv::run(
 
 # Save final results -----------------------------------------------------------
 
-if (!opts$skip_hmm) {
-  # create table with barcodes and CNVs for each chromosome
-  infercnv::add_to_seurat(
-    seurat_obj = NULL,
-    infercnv_output_path = scratch_dir
-  )
-  
-  # add reference information to metadata file and save to output directory
-  # we have to read in with base R, since there are rownames
-  read.table(scratch_metadata_file, header = TRUE, sep = "\t") |>
-    dplyr::mutate(normal_reference = ref_name) |>
-    # pull out row names into cell_id column
-    tibble::rownames_to_column(var = "cell_id") |>
-    readr::write_tsv(cnv_metadata_file)
-}
+# create table with barcodes and CNVs for each chromosome
+infercnv::add_to_seurat(
+  seurat_obj = NULL,
+  infercnv_output_path = scratch_dir
+)
 
-# add reference information the options slot and save to output directory
-dat <- readRDS(scratch_obj_file)
-dat@options$normal_reference <- ref_name
-readr::write_rds(dat, output_obj_file)
+# add reference information to metadata file and save to output directory
+# we have to read in with base R, since there are rownames
+read.table(scratch_metadata_file, header = TRUE, sep = "\t") |>
+  # pull out row names into cell_id column
+  tibble::rownames_to_column(var = "cell_id") |>
+  readr::write_tsv(opt$output_metadata_file)
 
 # copy png file to output directory
-fs::file_copy(scratch_png, output_png, overwrite = TRUE)
+fs::file_copy(scratch_png, opt$output_heatmap_file, overwrite = TRUE)
