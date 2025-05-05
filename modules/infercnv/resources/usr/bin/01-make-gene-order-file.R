@@ -29,7 +29,7 @@ opt <- parse_args(OptionParser(option_list = option_list))
 stopifnot("GTF file does not exist" = file.exists(opt$gtf_file))
 
 # read in gtf file
-gtf <- rtracklayer::import(local_gtf_file, feature.type = "gene")
+gtf <- rtracklayer::import(opt$gtf_file, feature.type = "gene")
 
 # format gene order file
 gtf_df <- gtf |>

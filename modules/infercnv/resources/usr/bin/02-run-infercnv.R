@@ -67,7 +67,6 @@ option_list <- list(
   make_option(
     opt_str = c("--gene_order_file"),
     type = "character",
-    default = file.path(project_root, "references", "Homo_sapiens.GRCh38.104.gene_order.txt"),
     help = "Path to gene order file as tab delimited .txt file with no column headers.
       Columns are: Ensembl gene id, chr, start, stop."
   ),
@@ -97,22 +96,21 @@ option_list <- list(
 
 
 # Parse options ----------------
-opts <- parse_args(OptionParser(option_list = option_list))
+opt <- parse_args(OptionParser(option_list = option_list))
 
 
 # check inputs and outputs 
 stopifnot(
-  "sce_file does not exist" = file.exists(opts$sce_file),
-  "reference_file does not exist" = file.exists(opts$reference_file),
-  "gene_order_file does not exist" = file.exists(opts$gene_order_file),
+  "sce_file does not exist" = file.exists(opt$sce_file),
+  "reference_file does not exist" = file.exists(opt$reference_file),
+  "gene_order_file does not exist" = file.exists(opt$gene_order_file),
   "output_metadata_file must end in .tsv" = stringr::str_detect(opt$output_metadata_file, "\\.tsv$"),
   "output_heatmap_file must end in .png" = stringr::str_detect(opt$output_heatmap_file, "\\.png$"),
-  "hmm_model not properly specified" = opts$hmm_model %in% c("i3", "i6")
+  "hmm_model not properly specified" = opt$hmm_model %in% c("i3", "i6")
 )
 
-
 # make the resolution parameter numeric if it's not auto
-resolution <- opts$leiden_resolution
+resolution <- opt$leiden_resolution
 if (resolution != "auto") {
   resolution <- as.numeric(resolution)
   stopifnot(
@@ -120,25 +118,28 @@ if (resolution != "auto") {
   )
 }
 
+message("file checks complete")
+
+
 # Setup files and paths -----------------
-set.seed(opts$seed)
+set.seed(opt$seed)
 
 # read SCE file
-sce <- readr::read_rds(opts$sce_file)
+sce <- readr::read_rds(opt$sce_file)
 
 # Read in reference SCE file
-ref_sce <- readr::read_rds(opts$reference_file)
+ref_sce <- readr::read_rds(opt$reference_file)
 
 # get library id and construct scratch directory
 library_id <- metadata(sce)$library_id
 
-# create scratch directory
-scratch_dir <- "scratch"
-fs::dir_create(scratch_dir)
+temp_dir <- tempdir()
 
 # define path to output files in scratch directory that will be copied and saved as output from script 
-scratch_metadata_file <- file.path(scratch_dir, "map_metadata_from_infercnv.txt")
-scratch_png <- file.path(scratch_dir, "infercnv.png")
+scratch_metadata_file <- file.path(temp_dir, "map_metadata_from_infercnv.txt")
+scratch_png <- file.path(temp_dir, "infercnv.png")
+
+message("files read in")
 
 # Prepare input data  ---------------------------------------------
 
@@ -151,8 +152,8 @@ sce <- sce[, !(colnames(sce) %in% duplicated_cells)]
 
 # Create input matrix by combining library SCE and reference SCE counts assays
 raw_counts_matrix <- cbind(
-  as.matrix(counts(sce)),
-  as.matrix(counts(ref_sce))
+  counts(sce),
+  counts(ref_sce)
 )
 
 # Check that we removed the duplicates:
@@ -165,12 +166,12 @@ reference_group_name <- "reference"
 
 # Create and export annotation table for inferCNV:
 # "unknown" cells are uncharacterized, and "reference" cells are in the reference
-annotations_file <- "infercnv_annotations.txt"
+annotations_file <- file.path(temp_dir, "infercnv_annotations.txt")
 data.frame(cell_id = colnames(raw_counts_matrix)) |>
   dplyr::mutate(annotations = dplyr::if_else(cell_id %in% colnames(sce), "unknown", reference_group_name)) |>
   readr::write_tsv(annotations_file, col_names = FALSE)
 
-
+message("annotations file created")
 # Run infercnv ------------------------
 
 # create the infercnv object
@@ -178,32 +179,36 @@ infercnv_obj <- infercnv::CreateInfercnvObject(
   raw_counts_matrix = raw_counts_matrix,
   annotations_file = annotations_file,
   delim = "\t",
-  gene_order_file = opts$gene_order_file,
+  gene_order_file = opt$gene_order_file,
   ref_group_name = reference_group_name
 )
+
+message("infercnv object created")
 
 # run infercnv
 infercnv_obj <- infercnv::run(
   infercnv_obj,
   cutoff = 0.1, # use 1 for smart-seq, 0.1 for 10x-genomics
-  out_dir = scratch_dir, # save all intermediate files to scratch dir
+  out_dir = temp_dir,
   denoise = TRUE,
   HMM = TRUE,
-  HMM_type = opts$hmm_model, # specifies i3 or i6
+  HMM_type = opt$hmm_model, # specifies i3 or i6
   save_rds = FALSE, # don't save the intermediate rds files
-  num_threads = opts$threads,
+  num_threads = opt$threads,
   ###### clustering settings
-  leiden_function = opts$leiden_function,
-  leiden_method = opts$leiden_method,
+  leiden_function = opt$leiden_function,
+  leiden_method = opt$leiden_method,
   leiden_resolution = resolution
 )
+
+message("infercnv run complete, saving results...")
 
 # Save final results -----------------------------------------------------------
 
 # create table with barcodes and CNVs for each chromosome
 infercnv::add_to_seurat(
   seurat_obj = NULL,
-  infercnv_output_path = scratch_dir
+  infercnv_output_path = temp_dir
 )
 
 # add reference information to metadata file and save to output directory
