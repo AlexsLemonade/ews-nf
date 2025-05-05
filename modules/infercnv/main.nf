@@ -11,14 +11,14 @@ process make_gene_order_file {
   output:
     path gene_order_file
   script:
-    def gene_order_file = "${gtf_file.name}.gene_order.txt"
+    gene_order_file = "${gtf_file.name.replaceFirst(/\.gtf(\.gz)?$/, '')}.gene_order.txt"
     """
     01-make-gene-order-file.R \
       --gtf_file ${gtf_file} \
       --output_file ${gene_order_file}
     """
   stub:
-    def gene_order_file = "${gtf_file.name}.gene_order.txt"
+    gene_order_file = "${gtf_file.name.replaceFirst(/\.gtf(\.gz)?$/, '')}.gene_order.txt"
     """
     touch ${gene_order_file}
     """
@@ -72,15 +72,18 @@ workflow infercnv {
     ref_ch // [ref_sce, ref_annotations]
   main:
 
+    // extract ref sce from channel 
+    ref_sce = ref_ch.map{ ref_sce, ref_annotations -> ref_sce }
+
     // create gene order file to use with inferCNV
     make_gene_order_file(
-      file(params.gene_order_file)
+      file(params.gtf_file)
     )
-
+    
     // run infercnv using a normal reference 
     run_infercnv(
       library_ch,
-      ref_ch[0], // ref sce 
+      ref_sce, 
       make_gene_order_file.out
     )
 

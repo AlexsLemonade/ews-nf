@@ -86,7 +86,7 @@
         "gtf_file": {
           "type": "string",
           "default": "s3://scpca-references/homo_sapiens/ensembl-104/annotation/Homo_sapiens.GRCh38.104.gtf.gz",
-          "pattern": "\\.tsv$",
+          "pattern": "\\.gtf.gz$",
           "format": "file-path",
           "mimetype": "text/tab-separated-values",
           "description": "Path to GTF reference file used for mapping in scpca-nf"
