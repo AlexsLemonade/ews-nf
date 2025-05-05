@@ -81,7 +81,7 @@ ref_sce <- sce[, ref_cells]
 
 # reconstruct an SCE with just counts and consensus cell type 
 small_ref_sce <- SingleCellExperiment(
-  assays = counts(ref_sce), 
+  assays = list(counts = counts(ref_sce)), 
   colData = ref_celltype_df
 )
 
