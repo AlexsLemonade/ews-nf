@@ -81,6 +81,11 @@ option_list <- list(
     help = "Path to file to save inferCNV heatmap as a PNG file"
   ),
   make_option(
+    opt_str = c("--temp_dir"),
+    type = "character",
+    help = "Temp directory to store intermediate files when running inferCNV"
+  ),
+  make_option(
     opt_str = c("-t", "--threads"),
     type = "integer",
     default = 4,
@@ -133,11 +138,9 @@ ref_sce <- readr::read_rds(opt$reference_file)
 # get library id and construct scratch directory
 library_id <- metadata(sce)$library_id
 
-temp_dir <- tempdir()
-
 # define path to output files in scratch directory that will be copied and saved as output from script 
-scratch_metadata_file <- file.path(temp_dir, "map_metadata_from_infercnv.txt")
-scratch_png <- file.path(temp_dir, "infercnv.png")
+scratch_metadata_file <- file.path(opt$temp_dir, "map_metadata_from_infercnv.txt")
+scratch_png <- file.path(opt$temp_dir, "infercnv.png")
 
 message("files read in")
 
@@ -166,7 +169,7 @@ reference_group_name <- "reference"
 
 # Create and export annotation table for inferCNV:
 # "unknown" cells are uncharacterized, and "reference" cells are in the reference
-annotations_file <- file.path(temp_dir, "infercnv_annotations.txt")
+annotations_file <- file.path(opt$temp_dir, "infercnv_annotations.txt")
 data.frame(cell_id = colnames(raw_counts_matrix)) |>
   dplyr::mutate(annotations = dplyr::if_else(cell_id %in% colnames(sce), "unknown", reference_group_name)) |>
   readr::write_tsv(annotations_file, col_names = FALSE)
@@ -189,8 +192,8 @@ message("infercnv object created")
 infercnv_obj <- infercnv::run(
   infercnv_obj,
   cutoff = 0.1, # use 1 for smart-seq, 0.1 for 10x-genomics
-  out_dir = temp_dir,
-  denoise = TRUE,
+  out_dir = opt$temp_dir,
+  denoise = TRUE, 
   HMM = TRUE,
   HMM_type = opt$hmm_model, # specifies i3 or i6
   save_rds = FALSE, # don't save the intermediate rds files
@@ -208,7 +211,7 @@ message("infercnv run complete, saving results...")
 # create table with barcodes and CNVs for each chromosome
 infercnv::add_to_seurat(
   seurat_obj = NULL,
-  infercnv_output_path = temp_dir
+  infercnv_output_path = opt$temp_dir
 )
 
 # add reference information to metadata file and save to output directory

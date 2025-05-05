@@ -28,7 +28,7 @@ process run_infercnv {
   container params.ews_nf_container
   tag "${sample_id}-${library_id}"
   label 'mem_24'
-  cpus 2
+  cpus 4
   time '6h'
   publishDir "${params.outdir}/infercnv/${sample_id}", mode: 'copy'
   input:
@@ -52,6 +52,7 @@ process run_infercnv {
       --gene_order_file ${gene_order_file} \
       --output_metadata_file ${infercnv_metadata} \
       --output_heatmap_file ${infercnv_heatmap} \
+      --temp_dir \$PWD \
       --threads ${task.cpus} \
       --seed ${params.seed}
     """
