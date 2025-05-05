@@ -29,7 +29,7 @@ process run_infercnv {
   tag "${sample_id}-${library_id}"
   label 'mem_24'
   cpus 2
-  time '2h'
+  time '6h'
   publishDir "${params.outdir}/infercnv/${sample_id}", mode: 'copy'
   input:
     tuple val(sample_id),
@@ -79,7 +79,7 @@ workflow infercnv {
     make_gene_order_file(
       file(params.gtf_file)
     )
-    
+
     // run infercnv using a normal reference 
     run_infercnv(
       library_ch,
