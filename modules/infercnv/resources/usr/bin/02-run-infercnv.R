@@ -9,11 +9,11 @@
 #   --sce_file <input sce file> \
 #   --reference_file <input normal reference file> \
 #   --output_dir <output directory for infercnv results> \
-#   --hmm_type <i3 or i6>
+#   --temp_dir <temp directory to store output files> 
 #
 # For information on additional arguments, run:
 #
-# Rscript 01-run-infercnv.R --help
+# Rscript 02-run-infercnv.R --help
 #
 
 suppressPackageStartupMessages({
