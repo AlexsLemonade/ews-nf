@@ -82,6 +82,14 @@
           "format": "file-path",
           "mimetype": "text/tab-separated-values",
           "description": "Table of consensus cell type annotations to include when building the normal reference"
+        },
+        "gtf_file": {
+          "type": "string",
+          "default": "s3://scpca-references/homo_sapiens/ensembl-104/annotation/Homo_sapiens.GRCh38.104.gtf.gz",
+          "pattern": "\\.gtf.gz$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Path to GTF reference file used for mapping in scpca-nf"
         }
       }
     }

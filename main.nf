@@ -3,6 +3,7 @@
 // **** Included workflows and processes from modules ****
 include { aucell } from './modules/aucell'
 include { build_ref } from './modules/build-reference'
+include { infercnv } from './modules/infercnv'
 
 // **** Parameter checks ****
 include { validateParameters; paramsSummaryLog } from 'plugin/nf-schema'
@@ -33,5 +34,8 @@ workflow {
 
   // build reference of normal cells
   build_ref(library_ch)
+  
+  // run infercnv 
+  infercnv(library_ch, build_ref.out)
   
 }
