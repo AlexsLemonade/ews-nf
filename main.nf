@@ -24,7 +24,7 @@ workflow {
   library_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed.rds", type: 'file')
     .map{ file -> tuple(
       file.parent.name, // extract sample id from file path
-      file.name.replace("_processed.rds", ""), // extract library id
+      file.name.replace("_processed.rds", ""), // extract unique id which will be either library_id or <library_id>-<sample_id>
       file // full path to file
     )}
     .filter{ run_all || (it[0] in sample_ids) } // filter to only specified samples
