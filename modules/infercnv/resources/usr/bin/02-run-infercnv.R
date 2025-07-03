@@ -135,8 +135,10 @@ sce <- readr::read_rds(opt$sce_file)
 # Read in reference SCE file
 ref_sce <- readr::read_rds(opt$reference_file)
 
-# get library id and construct scratch directory
+# get unique id and construct scratch directory
 library_id <- metadata(sce)$library_id
+sample_id <- metadata(sce)$sample_id
+unique_id <- glue::glue("{library_id}-}{sample_id}")
 
 # define path to output files in scratch directory that will be copied and saved as output from script 
 scratch_metadata_file <- file.path(opt$temp_dir, "map_metadata_from_infercnv.txt")
@@ -146,8 +148,8 @@ message("files read in")
 
 # Prepare input data  ---------------------------------------------
 
-# Update SCE column names to always prefix with library for downstream bookkeeping
-colnames(sce) <- glue::glue("{library_id}-{colnames(sce)}")
+# Update SCE column names to always prefix with unique id for downstream bookkeeping
+colnames(sce) <- glue::glue("{unique_id}-{colnames(sce)}")
 
 # Remove any reference cells which also appear in this library
 duplicated_cells <- intersect(colnames(ref_sce), colnames(sce))

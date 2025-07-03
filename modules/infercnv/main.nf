@@ -26,25 +26,25 @@ process make_gene_order_file {
 
 process run_infercnv {
   container params.ews_nf_container
-  tag "${sample_id}-${library_id}"
+  tag "${unique_id}"
   label 'mem_48'
   cpus 4
   time '6h'
   publishDir "${params.outdir}/infercnv/${sample_id}", mode: 'copy'
   input:
     tuple val(sample_id),
-          val(library_id),
+          val(unique_id),
           path(sce_file)
     path reference_cells_file
     path gene_order_file
   output:
     tuple val(sample_id),
-          val(library_id),
+          val(unique_id),
           path(infercnv_metadata),
           path(infercnv_heatmap)
   script:
-    infercnv_metadata = "${library_id}_infercnv-metadata.tsv"
-    infercnv_heatmap = "${library_id}_infercnv-heatmap.png"
+    infercnv_metadata = "${unique_id}_infercnv-metadata.tsv"
+    infercnv_heatmap = "${unique_id}_infercnv-heatmap.png"
     """
     02-run-infercnv.R \
       --sce_file ${sce_file} \
@@ -58,8 +58,8 @@ process run_infercnv {
     """
 
   stub:
-    infercnv_metadata = "${library_id}_infercnv-metadata.tsv"
-    infercnv_heatmap = "${library_id}_infercnv-heatmap.png"
+    infercnv_metadata = "${unique_id}_infercnv-metadata.tsv"
+    infercnv_heatmap = "${unique_id}_infercnv-heatmap.png"
     """
     touch ${infercnv_metadata}
     touch ${infercnv_heatmap}
@@ -69,7 +69,7 @@ process run_infercnv {
 
 workflow infercnv {
   take:
-    library_ch  // [sample id, library_id, path to processed SCE file]
+    library_ch  // [sample id, unique_id, path to processed SCE file]
     ref_ch // [ref_sce, ref_annotations]
   main:
 
@@ -89,5 +89,5 @@ workflow infercnv {
     )
 
   emit:
-    run_infercnv.out // [sample_id, project_id, infercnv metadata, infercnv heatmap]
+    run_infercnv.out // [sample_id, unique_id, infercnv metadata, infercnv heatmap]
 }

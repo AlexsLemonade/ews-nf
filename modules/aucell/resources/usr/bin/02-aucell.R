@@ -5,7 +5,7 @@
 # gene sets should be provided as a GeneSetCollection object (as created by 01-build-genesetcollection.R)
 
 # the results are exported as a single TSV file with the following columns:
-# `gene_set`, `barcodes`, `auc`, and `auc_threshold`
+# `gene_set`, `barcodes`, `auc`, `auc_threshold`, and `unique_id`
 
 library(optparse)
 
@@ -83,6 +83,10 @@ fs::dir_create(output_dir)
 
 # read in SCE
 sce <- readr::read_rds(opt$sce_file)
+
+# grab library and sample ID to save to results file in a unique_id column 
+library_id <- metadata(sce)$library_id
+sample_id <- metadata(sce)$sample_id
 
 # remove genes that are not detected from SCE object
 genes_to_keep <- rowData(sce)$detected > 0
@@ -165,7 +169,10 @@ auc_df <- auc_results@assays@data$AUC |>
   ) |>
   # add in threshold column
   dplyr::left_join(threshold_df, by = "gene_set") |>
-  dplyr::relocate(gene_set, .after = barcodes)
+  dplyr::relocate(gene_set, .after = barcodes) |>
+  dplyr::mutate(
+    unique_id = glue::glue("{library_id}-{sample_id}")
+  )
 
 # export results as table
 readr::write_tsv(auc_df, opt$output_file)

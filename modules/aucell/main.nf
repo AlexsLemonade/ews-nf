@@ -28,23 +28,23 @@ process create_geneset_collection {
 
 process run_aucell {
   container params.ews_nf_container
-  tag "${sample_id}-${library_id}"
+  tag "${unique_id}"
   label 'mem_24'
   cpus 2
   time '2h'
   publishDir "${params.outdir}/aucell/${sample_id}", mode: 'copy'
   input:
     tuple val(sample_id),
-          val(library_id),
+          val(unique_id),
           path(sce_file)
     path geneset_collection_file
     val aucell_max_rank_threshold
   output:
     tuple val(sample_id),
-          val(library_id),
+          val(unique_id),
           path(aucell_output_file)
   script:
-    aucell_output_file = "${library_id}_aucell-results.tsv"
+    aucell_output_file = "${unique_id}_aucell-results.tsv"
     """
     02-aucell.R \
       --sce_file ${sce_file} \
@@ -56,7 +56,7 @@ process run_aucell {
     """
 
   stub:
-    aucell_output_file = "${library_id}_aucell-results.tsv"
+    aucell_output_file = "${unique_id}_aucell-results.tsv"
     """
     touch ${aucell_output_file}
     """
@@ -65,7 +65,7 @@ process run_aucell {
 
 workflow aucell {
   take:
-    library_ch  // [sample id, library_id, path to processed SCE file]
+    library_ch  // [sample id, unique_id, path to processed SCE file]
   main:
 
     // create gene set collection to use with AUCell
@@ -82,5 +82,5 @@ workflow aucell {
     )
 
   emit:
-    run_aucell.out // [sample_id, project_id, aucell output file]
+    run_aucell.out // [sample_id, unique_id, aucell output file]
 }

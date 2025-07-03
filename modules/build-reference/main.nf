@@ -8,13 +8,13 @@ process save_normal_ref {
   time '2h'
   input:
     tuple val(sample_id),
-          val(library_id),
+          val(unique_id),
           path(sce_file)
     path ref_celltypes_file
   output:
     path ref_rds
   script:
-    ref_rds = "${library_id}_ref.rds"
+    ref_rds = "${unique_id}_ref.rds"
     """
     01-save-reference-cells.R \
       --sce_file ${sce_file} \
@@ -22,7 +22,7 @@ process save_normal_ref {
       --output_file ${ref_rds}
     """
   stub:
-    ref_rds = "${library_id}_ref.rds"
+    ref_rds = "${unique_id}_ref.rds"
     """
     touch ${ref_rds}
     """
@@ -61,7 +61,7 @@ process combine_normal_ref {
 
 workflow build_ref {
   take:
-    library_ch  // [sample id, library_id, path to processed SCE file]
+    library_ch  // [sample id, unique_id, path to processed SCE file]
   main:
 
     // save ref rds 
