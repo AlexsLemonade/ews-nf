@@ -62,10 +62,38 @@ process run_aucell {
     """
 }
 
+process aucell_zscore {
+  container params.ews_nf_container
+  tag "aucell-zscore"
+  label 'mem_24'
+  cpus 2
+  time '2h'
+  publishDir "${params.outdir}/aucell", mode: 'copy'
+  input:
+    path results_files
+    path ref_annotations
+  output:
+    path "**/*_aucell-zscores.tsv"
+  script:
+    def aucell_results_files = results_files.join(',')
+    """
+    03-calculate-zscore.R \
+      --aucell_results_files ${aucell_results_files} \
+      --reference_cells_file ${ref_annotations}
+    """
+
+  stub:
+    """
+    mkdir stub_sample_id
+    touch stub_sample_id/stub_aucell-zscores.tsv
+    """
+}
+
 
 workflow aucell {
   take:
     library_ch  // [sample id, unique_id, path to processed SCE file]
+    ref_ch // [ref_sce, ref_annotations]
   main:
 
     // create gene set collection to use with AUCell
@@ -81,6 +109,20 @@ workflow aucell {
       params.aucell_max_rank_threshold
     )
 
+    // extract ref annotations from channel to use for zscores
+    ref_annotations = ref_ch.map{ ref_sce, ref_annotations -> ref_annotations}
+
+    // grab aucell output files
+    zscore_ch = run_aucell.out.map{ sample_id, unique_id, output_file -> output_file }
+      .collect()
+
+    // calculate z-scores 
+    aucell_zscore(
+      zscore_ch,
+      ref_annotations
+    )
+
   emit:
-    run_aucell.out // [sample_id, unique_id, aucell output file]
+    aucell = run_aucell.out // [sample_id, unique_id, aucell output file]
+    zscores = aucell_zscore.out // [zscore_tsv]
 }

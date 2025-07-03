@@ -29,11 +29,11 @@ workflow {
     )}
     .filter{ run_all || (it[0] in sample_ids) } // filter to only specified samples
 
-  // run aucell 
-  aucell(library_ch)
-
   // build reference of normal cells
   build_ref(library_ch)
+
+  // run aucell 
+  aucell(library_ch, build_ref.out)
   
   // run infercnv 
   infercnv(library_ch, build_ref.out)
