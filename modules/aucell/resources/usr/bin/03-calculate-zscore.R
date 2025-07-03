@@ -33,14 +33,10 @@ opt <- parse_args(OptionParser(option_list = option_list))
 # Set up -----------------------------------------------------------------------
 
 # make sure input files exist
-stopifnot(
-  "Reference cells file must be specified using `--reference_cells_file`" = !is.null(opt$reference_cells_file),
-  "Output file must end in .tsv" = stringr::str_detect(opt$output_file, "\\.tsv$")
-)
-
 aucell_files <- stringr::str_split_1(opt$aucell_results_files, ",")
 stopifnot(
-  "`aucell_results_files` do not exist" = all(file.exists(aucell_files))
+  "`aucell_results_files` do not exist" = all(file.exists(aucell_files)),
+  "Reference cells file must be specified using `--reference_cells_file`" = !is.null(opt$reference_cells_file)
 )
 
 # Grab refs and prep AUC df ----------------------------------------------------
