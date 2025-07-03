@@ -79,8 +79,7 @@ process aucell_zscore {
     """
     03-calculate-zscore.R \
       --aucell_results_files ${aucell_results_files} \
-      --reference_cells_file ${ref_annotations} \
-      --output_dir \$(pwd)
+      --reference_cells_file ${ref_annotations}
     """
 
   stub:

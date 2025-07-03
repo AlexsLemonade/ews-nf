@@ -18,12 +18,6 @@ option_list <- list(
     opt_str = c("--reference_cells_file"),
     type = "character",
     help = "Path to TSV with all cells to be included in the reference cells."
-  ),
-  make_option(
-    opt_str = c("--output_dir"),
-    type = "character",
-    help = "Path to directory to save output files.
-      TSV files will be organized by <sample_id>/<library_id>-<sample_id>_aucell-zscores-results.tsv"
   )
 )
 
@@ -95,8 +89,7 @@ zscore_df |>
   purrr::walk(\(df) {
     unique_id <- unique(df$unique_id)
     # name output directory by sample ID
-    sample_id <- stringr::word(unique_id, -1, sep = "-")
-    out_dir <- file.path(opt$output_dir, sample_id)
+    out_dir <- stringr::word(unique_id, -1, sep = "-")
     dir.create(out_dir)
     
     out_file <- file.path(out_dir, glue::glue("{unique_id}_aucell-zscores.tsv"))
