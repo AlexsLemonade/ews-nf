@@ -12,6 +12,7 @@ option_list <- list(
   make_option(
     opt_str = c("--aucell_results_files"),
     type = "character",
+    default = "",
     help = "A comma separated list of TSV files containing the results from AUCell"
   ),
   make_option(
