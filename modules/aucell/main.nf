@@ -85,7 +85,8 @@ process aucell_zscore {
 
   stub:
     """
-    touch aucell-zscore-results.tsv
+    mkdir stub_sample_id
+    touch stub_sample_id/stub_aucell-zscores.tsv
     """
 }
 
