@@ -26,7 +26,7 @@ process make_gene_order_file {
 
 process run_infercnv {
   container params.ews_nf_container
-  tag "${sample_id}-${unique_id}"
+  tag "${unique_id}"
   label 'mem_48'
   cpus 4
   time '6h'
