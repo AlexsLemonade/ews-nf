@@ -30,6 +30,7 @@ The mean and standard deviation of the background distribution are used to obtai
 * `infercnv`: [`inferCNV`](https://github.com/broadinstitute/inferCNV/wiki) is used to infer copy number variations in all non-reference cells. 
 All cells that are classified as reference cells using the `build-reference` module are used as a normal reference to run `inferCNV` on each library. 
 A TSV file containing the estimated CNV profile for each cell along with a heatmap displaying the output from `inferCNV` are saved for each library. 
+* `summary-report`: This module generates a HTML report summarizing the results from the workflow for each sample. 
 
 
 ## Running the workflow 

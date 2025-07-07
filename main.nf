@@ -4,6 +4,7 @@
 include { aucell } from './modules/aucell'
 include { build_ref } from './modules/build-reference'
 include { infercnv } from './modules/infercnv'
+include { summary_report } from './modules/summary-report'
 
 // **** Parameter checks ****
 include { validateParameters; paramsSummaryLog } from 'plugin/nf-schema'
@@ -37,5 +38,8 @@ workflow {
   
   // run infercnv 
   infercnv(library_ch, build_ref.out)
+
+  // generate report 
+  summary_report(library_ch)
   
 }
