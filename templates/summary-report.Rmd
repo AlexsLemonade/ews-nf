@@ -25,15 +25,6 @@ knitr::opts_chunk$set(
 library(SingleCellExperiment)
 library(ggplot2)
 
-# Set default ggplot theme
-theme_set(
-  theme_bw() +
-    theme(
-      plot.margin = margin(rep(20, 4)),
-      strip.background = element_rect(fill = "transparent")
-    )
-)
-
 # Set seed
 set.seed(params$seed)
 ```
