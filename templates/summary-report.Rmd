@@ -1,0 +1,55 @@
+---
+params:
+  unique_id: "SCPCL000822-SCPCS000490"
+  sce_file: "../scpca-nf-out/SCPCP000015/SCPCS000490/SCPCL000822_processed.rds"
+  seed: 2025
+
+title: "`r glue::glue('ews-nf summary report for {params$unique_id}')`"
+author: "Childhood Cancer Data Lab"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+    number_sections: false
+    code_download: true
+---
+
+```{r setup, message = FALSE, echo = FALSE}
+# knitr options
+knitr::opts_chunk$set(
+  echo = FALSE
+)
+
+library(SingleCellExperiment)
+library(ggplot2)
+
+# Set default ggplot theme
+theme_set(
+  theme_bw() +
+    theme(
+      plot.margin = margin(rep(20, 4)),
+      strip.background = element_rect(fill = "transparent")
+    )
+)
+
+# Set seed
+set.seed(params$seed)
+```
+
+```{r}
+sce <- readr::read_rds(params$sce_file)
+```
+
+# Session Info
+<details>
+<summary>R session information</summary>
+```{r session_info}
+if (requireNamespace("sessioninfo", quietly = TRUE)) {
+  sessioninfo::session_info()
+} else {
+  sessionInfo()
+}
+```
+</details>
