@@ -362,8 +362,7 @@ All marker genes shown were specific to a single cell type, with the exception o
 
 We expect that each cell type group should show high expression of marker genes associated with that cell type compared to all other cells in the dataset. 
 
-Note that only cell types with at least 10 assigned cells are shown in the plot. 
-Dots are only shown if the gene has mean expression > 0 and is expressed in at least 10% of the cells in the given cell type. 
+Note that dots are only shown if the gene has mean expression > 0 and is expressed in at least 10% of the cells in the given cell type. 
 
 ```{r}
 # extract gene expression for marker genes from SCE 
@@ -402,12 +401,13 @@ all_info_df <- coldata_df |>
 ```
 
 
-```{r, fig.height=7, fig.width=10}
+```{r, fig.height=7, fig.width=15}
 marker_gene_dotplot(
   consensus_df = all_info_df,
   validation_groups_df = validation_groups_df,
   markers_df = markers_df,
-  celltype_colors = celltype_colors
+  celltype_colors = celltype_colors,
+  min_cells = 0 #TODO: Update this if need be to remove some cell types
 )
 ```
 
