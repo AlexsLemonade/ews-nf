@@ -73,7 +73,7 @@ faceted_umap <- function(umap_df,
       data = dplyr::select(
         umap_df, -{{ annotation_column }}
       ),
-      color = "gray100",
+      color = "gray90",
       alpha = 0.5,
       size = point_size
     ) +
@@ -87,8 +87,9 @@ faceted_umap <- function(umap_df,
     # remove axis numbers and background grid
     scale_x_continuous(labels = NULL, breaks = NULL) +
     scale_y_continuous(labels = NULL, breaks = NULL) +
+    theme_bw() +
     theme(legend.position = "none",
-          aspect.ratio = 1)
+          aspect.ratio = 1) 
 
 
   return(faceted_umap)
