@@ -89,7 +89,8 @@ faceted_umap <- function(umap_df,
     scale_y_continuous(labels = NULL, breaks = NULL) +
     theme_bw() +
     theme(legend.position = "none",
-          aspect.ratio = 1) 
+          aspect.ratio = 1,
+          strip.background = element_rect(fill = "transparent")) 
 
 
   return(faceted_umap)
