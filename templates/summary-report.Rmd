@@ -1,10 +1,12 @@
 ---
 params:
-  unique_id: "SCPCL000822-SCPCS000490"
+  unique_id: "SCPCL000822"
   sce_file: "../scpca-nf-out/SCPCP000015/SCPCS000490/SCPCL000822_processed.rds"
   validation_groups_file: "../references/consensus-validation-groups.tsv"
   marker_genes_file: "../references/validation-markers.tsv"
   color_palette_file: "../palettes/validation-group-palette.tsv"
+  aucell_results_file: "../ews-nf-out/aucell/SCPCS000490/SCPCL000822_aucell-zscores.tsv"
+  ref_aucell_file: "../ews-nf-out/aucell/aucell-reference-zscores.tsv"
   seed: 2025
 
 title: "`r glue::glue('ews-nf summary report for {params$unique_id}')`"
@@ -41,7 +43,9 @@ stopifnot(
   "sce file does not exist" = file.exists(params$sce_file),
   "validation groups file does not exist" = file.exists(params$validation_groups_file),
   "marker genes file does not exist" = file.exists(params$marker_genes_file),
-  "color palette file does not exist" = file.exists(params$color_palette_file)
+  "color palette file does not exist" = file.exists(params$color_palette_file),
+  "aucell results file does not exist" = file.exists(params$aucell_results_file), 
+  "aucell reference file does not exist" = file.exists(params$ref_aucell_file)
 )
 ```
 
@@ -259,6 +263,10 @@ celltype_colors <- readr::read_tsv(params$color_palette_file) |>
 # add greys for unknown and other 
 celltype_colors[["unknown"]] <- "gray60"
 celltype_colors[["other"]] <- "black"
+
+# read in aucell results 
+aucell_df <- readr::read_tsv(params$aucell_results_file)
+ref_aucell_df <- readr::read_tsv(params$ref_aucell_file)
 ```
 
 ```{r}

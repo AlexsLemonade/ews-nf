@@ -30,7 +30,9 @@ process render_report {
                     sce_file = '${sce_file}', \
                     validation_groups_file = '${validation_groups_file}', \
                     marker_genes_file = '${marker_genes_file}', \
-                    color_palette_file = '${color_palette_file}'))"
+                    color_palette_file = '${color_palette_file}', \
+                    aucell_results_file = '${aucell_file}', \
+                    ref_aucell_file = '${ref_aucell_file}'))"
     """
   stub:
     summary_report_html = "${unique_id}_summary-report.html"
