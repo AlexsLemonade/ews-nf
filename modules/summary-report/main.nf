@@ -12,6 +12,9 @@ process render_report {
           val(unique_id),
           path(sce_file)
     path template_file
+    path validation_groups_file
+    path marker_genes_file
+    path color_palette_file
   output:
     tuple val(sample_id),
           val(unique_id),
@@ -22,7 +25,10 @@ process render_report {
     Rscript -e "rmarkdown::render('${template_file}', \
       output_file = '${summary_report_html}',\
       params = list(unique_id = '${unique_id}', \
-                    sce_file = '${sce_file}'))"
+                    sce_file = '${sce_file}', \
+                    validation_groups_file = '${validation_groups_file}', \
+                    marker_genes_file = '${marker_genes_file}', \
+                    color_palette_file = '${color_palette_file}'))"
     """
   stub:
     summary_report_html = "${unique_id}_summary-report.html"
@@ -37,10 +43,16 @@ workflow summary_report {
     library_ch  // [sample id, unique_id, path to processed SCE file]
   main:
 
+    // define path to template report 
+    report_template_file = "${projectDir}/templates/summary-report.Rmd" 
+
     // render report 
     render_report(
       library_ch,
-      file(params.report_template_file)
+      file(report_template_file),
+      file(params.validation_groups_file),
+      file(params.marker_genes_file),
+      file(params.color_palette_file)
     )
 
   emit:

@@ -90,7 +90,32 @@
           "format": "file-path",
           "mimetype": "text/tab-separated-values",
           "description": "Path to GTF reference file used for mapping in scpca-nf"
+        },
+        "validation_groups_file": {
+          "type": "string",
+          "default": "${projectDir}/references/consensus-validation-groups.tsv",
+          "pattern": "\\.tsv$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Path to TSV file mapping consensus cell type groups to broad validation groups"
+        },
+        "marker_genes_file": {
+          "type": "string",
+          "default": "${projectDir}/references/validation-markers.tsv",
+          "pattern": "\\.tsv$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Path to TSV file containing marker genes for all consensus cell type validation groups"
+        },
+        "color_palette_file": {
+          "type": "string",
+          "default": "${projectDir}/palettes/validation-group-palette.tsv",
+          "pattern": "\\.tsv$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Path to TSV file containing hex codes to use for coloring each consensus cell type validation group"
         }
+
       }
     }
   },
