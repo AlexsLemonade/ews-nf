@@ -283,10 +283,10 @@ coldata_df <- scuttle::makePerCellDF(
 
 # Normal cell types
 
-This section shows the normal cell types in this sample based on their consensus cell type output by `scpca-nf`. 
+This section shows the normal cell types in this sample based on their consensus cell type annotations output by `scpca-nf`. 
 Consensus cell types are defined by first annotating cells using two different methods, `SingleR` with the `BlueprintEncodeData` reference from `celldex` and `CellAssign` using marker genes for bone and soft tissue from `PanglaoDB`. 
-Cells that map to related cell type ontology terms using both methods are given a consensus cell type. 
-Any cells with disagreement between the two annotation methods are labeled as `unknown` and likely to be tumor cells. 
+Cells that map to related cell type ontology terms using both methods are assigned a consensus cell type. 
+Any cells with disagreement between the two annotation methods are labeled as `unknown` and may be more likely to be tumor cells. 
 
 Cell types are then grouped into broader cell type groups, e.g., all T cell types will be grouped together as T cells for the plots shown in this report. 
 
