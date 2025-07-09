@@ -130,6 +130,7 @@ workflow aucell {
 
     // pull out individual zscore files to a channel of [unique id, aucell results]
     zscores_ch = aucell_zscore.out.query_zscores
+      .flatten()
       .map{ file -> 
         def unique_id = file.name.replace("_aucell-zscores.tsv", "") // pull out unique id from filename
         def sample_id = file.parent.name // sample id is folder name
