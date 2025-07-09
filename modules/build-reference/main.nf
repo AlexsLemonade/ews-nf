@@ -7,8 +7,8 @@ process save_normal_ref {
   label 'mem_8'
   time '2h'
   input:
-    tuple val(sample_id),
-          val(unique_id),
+    tuple val(unique_id),
+          val(sample_id),
           path(sce_file)
     path ref_celltypes_file
   output:
@@ -61,7 +61,7 @@ process combine_normal_ref {
 
 workflow build_ref {
   take:
-    library_ch  // [sample id, unique_id, path to processed SCE file]
+    library_ch  // [unique_id, sample_id, path to processed SCE file]
   main:
 
     // save ref rds 

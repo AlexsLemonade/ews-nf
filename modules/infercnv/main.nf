@@ -32,14 +32,14 @@ process run_infercnv {
   time '6h'
   publishDir "${params.outdir}/infercnv/${sample_id}", mode: 'copy'
   input:
-    tuple val(sample_id),
-          val(unique_id),
+    tuple val(unique_id),
+          val(sample_id),
           path(sce_file)
     path reference_cells_file
     path gene_order_file
   output:
-    tuple val(sample_id),
-          val(unique_id),
+    tuple val(unique_id),
+          val(sample_id),
           path(infercnv_metadata),
           path(infercnv_heatmap)
   script:
@@ -69,7 +69,7 @@ process run_infercnv {
 
 workflow infercnv {
   take:
-    library_ch  // [sample id, unique_id, path to processed SCE file]
+    library_ch  // [unique_id, sample_id, path to processed SCE file]
     ref_ch // [ref_sce, ref_annotations]
   main:
 
@@ -89,5 +89,5 @@ workflow infercnv {
     )
 
   emit:
-    run_infercnv.out // [sample_id, unique_id, infercnv metadata, infercnv heatmap]
+    run_infercnv.out // [unique_id, sample_id, infercnv metadata, infercnv heatmap]
 }
