@@ -98,7 +98,7 @@ zscore_df |>
   purrr::walk(\(df) {
     unique_id <- unique(df$unique_id)
     # name output directory by sample ID
-    out_dir <- stringr::word(unique_id, -1, sep = "-")
+    out_dir <- unique(df$sample_id)
     dir.create(out_dir)
     
     out_file <- file.path(out_dir, glue::glue("{unique_id}_aucell-zscores.tsv"))

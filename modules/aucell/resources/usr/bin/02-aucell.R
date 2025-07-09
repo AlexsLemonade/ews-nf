@@ -84,9 +84,8 @@ fs::dir_create(output_dir)
 # read in SCE
 sce <- readr::read_rds(opt$sce_file)
 
-# grab library and sample ID to save to results file in a unique_id column 
-library_id <- metadata(sce)$library_id
-sample_id <- metadata(sce)$sample_id
+# extract unique id to save to results file from sce file name 
+unique_id <- stringr::word(basename(opt$sce_file), sep = "_", 1)
 
 # remove genes that are not detected from SCE object
 genes_to_keep <- rowData(sce)$detected > 0
@@ -170,8 +169,10 @@ auc_df <- auc_results@assays@data$AUC |>
   # add in threshold column
   dplyr::left_join(threshold_df, by = "gene_set") |>
   dplyr::relocate(gene_set, .after = barcodes) |>
+  # add ids to use when joining everything for zscore calculation
   dplyr::mutate(
-    unique_id = glue::glue("{library_id}-{sample_id}")
+    sample_id = metadata(sce)$sample_id,
+    unique_id = unique_id
   )
 
 # export results as table
