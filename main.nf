@@ -21,7 +21,7 @@ workflow {
   sample_ids = params.sample_ids?.tokenize(';, ') ?: []
   run_all = sample_ids[0] == "All"
 
-  // create a channel of [sample id, unique_id, path to processed SCE file]
+  // create a channel of [unique_id, sample id, path to processed SCE file]
   library_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed.rds", type: 'file')
     .map{ file -> tuple(
       file.name.replace("_processed.rds", ""), // extract unique id which will be either library_id or <library_id>-<sample_id>

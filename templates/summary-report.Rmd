@@ -407,7 +407,7 @@ marker_gene_dotplot(
   validation_groups_df = validation_groups_df,
   markers_df = markers_df,
   celltype_colors = celltype_colors,
-  min_cells = 0 #TODO: Update this if need be to remove some cell types
+  min_cells = 0 #TODO: Update this if needed to remove some cell types
 )
 ```
 
