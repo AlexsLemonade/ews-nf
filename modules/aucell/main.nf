@@ -119,7 +119,7 @@ workflow aucell {
     ref_annotations = ref_ch.map{ ref_sce, ref_annotations -> ref_annotations}
 
     // grab aucell output files
-    zscore_ch = run_aucell.out.map{ sample_id, unique_id, output_file -> output_file }
+    zscore_ch = run_aucell.out.map{ unique_id, sample_id, output_file -> output_file }
       .collect()
 
     // calculate z-scores 
