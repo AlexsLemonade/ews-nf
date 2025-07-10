@@ -63,16 +63,17 @@ ref_celltypes <- readr::read_tsv(opt$reference_celltypes_file) |>
 
 # Extract reference cells ------------------------------------------------------
 
-# get library id and sample id to save as unique id
-library_id <- metadata(sce)$library_id
+# extract unique id to save to tsv file based on sce file name 
+unique_id <- stringr::word(basename(opt$sce_file), sep = "_", 1)
+# save sample id as column
 sample_id <- metadata(sce)$sample_id
-unique_id <- glue::glue("{library_id}-{sample_id}")
 
 # make df with barcodes and consensus cell types for all ref cells 
 ref_celltype_df <- colData(sce) |> 
   as.data.frame() |> 
   dplyr::select(barcodes, consensus_celltype_annotation, consensus_celltype_ontology) |> 
-  dplyr::mutate(unique_id = unique_id) |> 
+  dplyr::mutate(unique_id = unique_id,
+                sample_id = sample_id) |> 
   dplyr::filter(consensus_celltype_annotation %in% ref_celltypes) 
 
 # subset reference cells 

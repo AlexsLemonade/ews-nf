@@ -34,14 +34,14 @@ process run_aucell {
   time '2h'
   publishDir "${params.outdir}/aucell/${sample_id}", mode: 'copy'
   input:
-    tuple val(sample_id),
-          val(unique_id),
+    tuple val(unique_id),
+          val(sample_id),
           path(sce_file)
     path geneset_collection_file
     val aucell_max_rank_threshold
   output:
-    tuple val(sample_id),
-          val(unique_id),
+    tuple val(unique_id),
+          val(sample_id),
           path(aucell_output_file)
   script:
     aucell_output_file = "${unique_id}_aucell-results.tsv"
@@ -73,26 +73,32 @@ process aucell_zscore {
     path results_files
     path ref_annotations
   output:
-    path "**/*_aucell-zscores.tsv"
+    path "**/*_aucell-zscores.tsv", emit: query_zscores
+    path ref_zscores, emit: ref_zscores 
   script:
     def aucell_results_files = results_files.join(',')
+    ref_zscores = "aucell-reference-zscores.tsv"
     """
     03-calculate-zscore.R \
       --aucell_results_files ${aucell_results_files} \
-      --reference_cells_file ${ref_annotations}
+      --reference_cells_file ${ref_annotations} \
+      --reference_output_file ${ref_zscores}
     """
 
   stub:
+    ref_zscores = "aucell-reference-zscores.tsv"
     """
-    mkdir stub_sample_id
-    touch stub_sample_id/stub_aucell-zscores.tsv
+    # use stub sample/library ids
+    mkdir SCPCS999999
+    touch SCPCS999999/SCPCL999999_aucell-zscores.tsv
+    touch ${ref_zscores}
     """
 }
 
 
 workflow aucell {
   take:
-    library_ch  // [sample id, unique_id, path to processed SCE file]
+    library_ch  // [unique_id, sample_id, path to processed SCE file]
     ref_ch // [ref_sce, ref_annotations]
   main:
 
@@ -113,7 +119,7 @@ workflow aucell {
     ref_annotations = ref_ch.map{ ref_sce, ref_annotations -> ref_annotations}
 
     // grab aucell output files
-    zscore_ch = run_aucell.out.map{ sample_id, unique_id, output_file -> output_file }
+    zscore_ch = run_aucell.out.map{ unique_id, sample_id, output_file -> output_file }
       .collect()
 
     // calculate z-scores 
@@ -122,7 +128,16 @@ workflow aucell {
       ref_annotations
     )
 
+    // pull out individual zscore files to a channel of [unique id, aucell results]
+    zscores_ch = aucell_zscore.out.query_zscores
+      .flatten()
+      .map{ file -> 
+        def unique_id = file.name.replace("_aucell-zscores.tsv", "") // pull out unique id from filename
+        def sample_id = file.parent.name // sample id is folder name
+        tuple(unique_id, sample_id, file)
+      }
+
   emit:
-    aucell = run_aucell.out // [sample_id, unique_id, aucell output file]
-    zscores = aucell_zscore.out // [zscore_tsv]
+    query = zscores_ch // [unique id, sample_id, aucell zscore output]
+    ref = aucell_zscore.out.ref_zscores // [ref_zscore_tsv]
 }

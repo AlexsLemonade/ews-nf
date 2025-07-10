@@ -1,10 +1,12 @@
 ---
 params:
-  unique_id: "SCPCL000822-SCPCS000490"
+  unique_id: "SCPCL000822"
   sce_file: "../scpca-nf-out/SCPCP000015/SCPCS000490/SCPCL000822_processed.rds"
   validation_groups_file: "../references/consensus-validation-groups.tsv"
   marker_genes_file: "../references/validation-markers.tsv"
   color_palette_file: "../palettes/validation-group-palette.tsv"
+  aucell_results_file: "../ews-nf-out/aucell/SCPCS000490/SCPCL000822_aucell-zscores.tsv"
+  ref_aucell_file: "../ews-nf-out/aucell/aucell-reference-zscores.tsv"
   seed: 2025
 
 title: "`r glue::glue('ews-nf summary report for {params$unique_id}')`"
@@ -41,7 +43,9 @@ stopifnot(
   "sce file does not exist" = file.exists(params$sce_file),
   "validation groups file does not exist" = file.exists(params$validation_groups_file),
   "marker genes file does not exist" = file.exists(params$marker_genes_file),
-  "color palette file does not exist" = file.exists(params$color_palette_file)
+  "color palette file does not exist" = file.exists(params$color_palette_file),
+  "aucell results file does not exist" = file.exists(params$aucell_results_file), 
+  "aucell reference file does not exist" = file.exists(params$ref_aucell_file)
 )
 ```
 
@@ -259,6 +263,10 @@ celltype_colors <- readr::read_tsv(params$color_palette_file) |>
 # add greys for unknown and other 
 celltype_colors[["unknown"]] <- "gray60"
 celltype_colors[["other"]] <- "black"
+
+# read in aucell results 
+aucell_df <- readr::read_tsv(params$aucell_results_file)
+ref_aucell_df <- readr::read_tsv(params$ref_aucell_file)
 ```
 
 ```{r}
@@ -354,8 +362,7 @@ All marker genes shown were specific to a single cell type, with the exception o
 
 We expect that each cell type group should show high expression of marker genes associated with that cell type compared to all other cells in the dataset. 
 
-Note that only cell types with at least 10 assigned cells are shown in the plot. 
-Dots are only shown if the gene has mean expression > 0 and is expressed in at least 10% of the cells in the given cell type. 
+Note that dots are only shown if the gene has mean expression > 0 and is expressed in at least 10% of the cells in the given cell type. 
 
 ```{r}
 # extract gene expression for marker genes from SCE 
@@ -394,12 +401,13 @@ all_info_df <- coldata_df |>
 ```
 
 
-```{r, fig.height=7, fig.width=10}
+```{r, fig.height=7, fig.width=15}
 marker_gene_dotplot(
   consensus_df = all_info_df,
   validation_groups_df = validation_groups_df,
   markers_df = markers_df,
-  celltype_colors = celltype_colors
+  celltype_colors = celltype_colors,
+  min_cells = 0 #TODO: Update this if needed to remove some cell types
 )
 ```
 

@@ -6,6 +6,8 @@
 # The output is a TSV file for each unique ID with the AUC value and z-score for each cell and each unique gene set
 # An additional column is included to indicate if the cell is a reference or query cell 
 
+# Results for all cells provided in the reference will be saved to a separate file 
+
 library(optparse)
 
 option_list <- list(
@@ -19,6 +21,11 @@ option_list <- list(
     opt_str = c("--reference_cells_file"),
     type = "character",
     help = "Path to TSV with all cells to be included in the reference cells."
+  ),
+  make_option(
+    opt_str = c("--reference_output_file"),
+    type = "character",
+    help = "Path to TSV file to save the results from AUCell and z-scores for all reference cells"
   )
 )
 
@@ -84,15 +91,21 @@ zscore_df <- gene_set_names |>
   dplyr::bind_rows()
 
 # Export results ---------------------------------------------------------------
-# Save z-scores split by unique_id
+
+# save z-scores split by unique_id
 zscore_df |> 
   dplyr::group_split(unique_id, .keep = TRUE) |> 
   purrr::walk(\(df) {
     unique_id <- unique(df$unique_id)
     # name output directory by sample ID
-    out_dir <- stringr::word(unique_id, -1, sep = "-")
+    out_dir <- unique(df$sample_id)
     dir.create(out_dir)
     
     out_file <- file.path(out_dir, glue::glue("{unique_id}_aucell-zscores.tsv"))
     readr::write_tsv(df, out_file)
   })
+
+# export all reference cells to a separate file 
+zscore_df |> 
+  dplyr::filter(ref_or_query == "reference") |> 
+  readr::write_tsv(opt$reference_output_file)
