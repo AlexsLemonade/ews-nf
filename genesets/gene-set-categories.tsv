@@ -1,0 +1,15 @@
+geneset_name	geneset_category
+staege	EF_up
+miyagawa_up	EF_up
+miyagawa_down	EF_down
+zhang	EF_up
+riggi_up	EF_up
+riggi_down	EF_down
+kinsey_up	EF_up
+kinsey_down	EF_down
+hallmark_EMT	EMT_ECM
+gobp_ECM	EMT_ECM
+aynaud_ews_targets	EF_up
+wrenn_nt5e_targets	EMT_ECM
+grohar_ews_repressed	EF_down
+grohar_ews_activated	EF_up
