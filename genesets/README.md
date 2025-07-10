@@ -41,7 +41,7 @@ The original gene list sent by Patrick Grohar can be found in `Grohar_BESTLIST_f
 The `gene-set-categories.tsv` file assigns an overall category to all gene sets (both from `MSigDB` and custom) that are used with `AUCell`. 
 The categories are described below: 
 
-* `EF_up`: These gene sets contain genes that are activated by the fusion gene, `EWS-FLI1`. 
-* `EF_down`: These gene sets contain genes that are repressed by the fusion gene, `EWS-FLI1`. 
-* `EMT_ECM`: These gene sets contain genes that are found to be highly expressed in tumor cells with low expression of `EWS-FLI`.
+* `EF-activated`: These gene sets contain genes that are activated by the fusion gene, `EWS-FLI1`. 
+* `EF-repressed`: These gene sets contain genes that are repressed by the fusion gene, `EWS-FLI1`. 
+* `EMT-ECM`: These gene sets contain genes that are found to be highly expressed in tumor cells with low expression of `EWS-FLI`.
  
