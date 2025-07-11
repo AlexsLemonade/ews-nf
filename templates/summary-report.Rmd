@@ -442,12 +442,12 @@ celltype_counts_df <- grouped_aucell_df |>
   # add in y label 
   dplyr::mutate(
     y_label = glue::glue("{broad_celltype_group} ({n})")
-  )
+  ) |> 
+  dplyr::select(broad_celltype_group, y_label, n) |> 
+  dplyr::distinct()
 
 # grab order of broad cell types based on cell type categories 
 celltype_levels <- celltype_counts_df |> 
-  dplyr::select(broad_celltype_group, y_label, n) |> 
-  dplyr::distinct() |> 
   dplyr::left_join(ref_annotation_df) |> 
   dplyr::arrange(cell_category) |> 
   dplyr::pull(y_label) |>
