@@ -396,22 +396,23 @@ ComplexHeatmap::Heatmap(
 The below density plot shows the distribution of z-scores for each gene set.
 Cells are grouped based on if they are part of the reference or query, where query is broken up into "unknown" and normal non-malignant cell types based on consensus cell type labels. 
 
-```{r, fig.height=12, fig.width=8}
-# density plot faceted by geneset within each category
+```{r, fig.height=12, fig.width=8, message=FALSE}
+# ridge plot faceted by geneset within each category
 levels(all_aucell_df$geneset_category) |> 
   purrr::map(\(category){
     
     all_aucell_df |> 
       dplyr::filter(geneset_category == category) |> 
-      ggplot(aes(x = auc_zscore, color = cell_category)) +
-      geom_density(bw = 0.5) +
+      ggplot(aes(x = auc_zscore, y = cell_category, fill = cell_category)) +
+      ggridges::geom_density_ridges(alpha = 0.5) +
       facet_wrap(vars(gene_set), ncol = 3) +
-      scale_color_manual(values = cell_category_colors) +
+      scale_fill_manual(values = cell_category_colors) +
       labs(
         title = category,
         x = "z-score",
-        color = "Cell type \ncategory"
-      )
+        y = "Cell type category"
+      ) +
+      theme(legend.position = "none")
     
   }) |>
   patchwork::wrap_plots(ncol = 1, guides = "collect") +
@@ -453,21 +454,28 @@ celltype_levels <- celltype_counts_df |>
   dplyr::pull(y_label) |>
   as.character()
 
-# prep for density plot 
-density_plot_df <- grouped_aucell_df |> 
-  # expand geneset category columns
-  tidyr::pivot_wider(
-    names_from = geneset_category,
-    values_from = mean_category_zscore
-  ) |> 
-  # add in cell type counts
+# prep for ridge plot 
+ridges_plot_df <- grouped_aucell_df |> 
   dplyr::left_join(celltype_counts_df) |> 
-  dplyr::filter(n >= 2) |> # no density plot if only one cell
-  # set the order for cell type group
-  # TODO: figure out why this isn't working? I want all cell types that are part of reference to appear together
+  dplyr::filter(n >= 3) |> 
   dplyr::mutate(
-    y_label = factor(y_label, levels = celltype_levels)
-  ) 
+    y_label = factor(y_label, levels = rev(celltype_levels))
+  )
+```
+
+
+```{r, fig.width=8, fig.height=10}
+ggplot(ridges_plot_df, aes(x = mean_category_zscore, y = y_label, fill = cell_category)) +
+  ggridges::geom_density_ridges(alpha = 0.5) +
+  facet_wrap(vars(geneset_category),
+             ncol = 1,
+             scales = "free_x") +
+  scale_fill_manual(values = cell_category_colors) +
+  labs(
+    x = "Mean z-score",
+    y = "Broad cell type group",
+    fill = "Cell type \ncategory"
+  )
 ```
 
 
