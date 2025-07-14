@@ -114,6 +114,14 @@
           "format": "file-path",
           "mimetype": "text/tab-separated-values",
           "description": "Path to TSV file containing hex codes to use for coloring each consensus cell type validation group"
+        },
+        "gene_set_category_file": {
+          "type": "string",
+          "default": "${projectDir}/genesets/gene-set-categories.tsv",
+          "pattern": "\\.tsv$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Path to TSV file containing categories for each gene set used with AUCell"
         }
 
       }

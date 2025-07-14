@@ -7,6 +7,9 @@ params:
   color_palette_file: "../palettes/validation-group-palette.tsv"
   aucell_results_file: "../ews-nf-out/aucell/SCPCS000490/SCPCL000822_aucell-zscores.tsv"
   ref_aucell_file: "../ews-nf-out/aucell/aucell-reference-zscores.tsv"
+  ref_annotations_file: "../ews-nf-out/build-reference/all-ref-annotations.tsv"
+  gene_set_category_file: "../genesets/gene-set-categories.tsv"
+  plotting_functions_file: "utils/plotting-functions.Rmd"
   seed: 2025
 
 title: "`r glue::glue('ews-nf summary report for {params$unique_id}')`"
@@ -32,10 +35,31 @@ knitr::opts_chunk$set(
 library(SingleCellExperiment)
 library(ggplot2)
 library(patchwork)
+library(RColorBrewer)
+
+# Set default ggplot theme
+theme_set(
+  theme_bw() +
+    theme(
+      plot.margin = margin(rep(20, 4)),
+      strip.background = element_rect(fill = "transparent")
+    )
+)
+
 
 # Set seed
 set.seed(params$seed)
 ```
+
+<!--Source functions used for plotting: 
+faceted_umap()
+marker_gene_dotplot()
+plot_density()
+-->
+```{r, child=params$plotting_functions_file}
+
+```
+
 
 ```{r}
 # file checks 
@@ -45,199 +69,10 @@ stopifnot(
   "marker genes file does not exist" = file.exists(params$marker_genes_file),
   "color palette file does not exist" = file.exists(params$color_palette_file),
   "aucell results file does not exist" = file.exists(params$aucell_results_file), 
-  "aucell reference file does not exist" = file.exists(params$ref_aucell_file)
+  "aucell reference file does not exist" = file.exists(params$ref_aucell_file),
+  "reference annotation file does not exist" = file.exists(params$ref_annotations_file),
+  "gene set category file does not exist" = file.exists(params$gene_set_category_file)
 )
-```
-
-```{r, plotting_functions}
-# Adapted from scpca-nf 
-# https://github.com/AlexsLemonade/scpca-nf/blob/4bb82aa635b572a62f2028dbec587fcfd2155e26/templates/qc_report/celltypes_qc.rmd#L134-L221
-
-#' Create a faceted UMAP panel where each panel has only one cell type colored
-#'
-#' @param umap_df Data frame with UMAP1 and UMAP2 columns
-#' @param annotation_column Column containing broad cell type annotation
-#' @param celltype_colors Named vector of colors to use for each broader validation group
-#' @param point_size Point size. Default is 1
-#'
-#' @return ggplot object containing a faceted UMAP where each cell type is a facet.
-#'   In each panel, the cell type of interest is colored red and all other cells are grey.
-faceted_umap <- function(umap_df,
-                         annotation_column,
-                         celltype_colors, 
-                         point_size = 1) {
-
-  # color by the annotation column but only color one cell type at a time
-  faceted_umap <- ggplot(
-    umap_df,
-    aes(x = UMAP1, y = UMAP2, color = {{ annotation_column }})
-  ) +
-    # set points for all "other" points
-    geom_point(
-      data = dplyr::select(
-        umap_df, -{{ annotation_column }}
-      ),
-      color = "gray90",
-      alpha = 0.5,
-      size = point_size
-    ) +
-    scale_color_manual(values = celltype_colors) + 
-    # set points for desired cell type
-    geom_point(size = point_size, alpha = 0.5) +
-    facet_wrap(
-      vars({{ annotation_column }}),
-      ncol = 3
-    ) +
-    # remove axis numbers and background grid
-    scale_x_continuous(labels = NULL, breaks = NULL) +
-    scale_y_continuous(labels = NULL, breaks = NULL) +
-    theme_bw() +
-    theme(legend.position = "none",
-          aspect.ratio = 1,
-          strip.background = element_rect(fill = "transparent")) 
-
-
-  return(faceted_umap)
-}
-
-# Function adapted from scpca-paper-figures 
-# https://github.com/AlexsLemonade/scpca-paper-figures/blob/a457408323495b6ecee0c63ccdd74b41e88ab703/scripts/utils/consensus-celltype-plotting-functions.R#L9-L191
-
-#' Dot plot showing expression of marker genes across assigned cell types
-#'
-#' @param consensus_df Data frame with consensus cell types and marker gene expression for each cell and all marker genes 
-#' @param validation_groups_df Data frame assigning consensus cell types to broader validation groups
-#' @param markers_df Data frame with marker genes for each cell type of interest
-#' @param celltype_colors Named vector of colors to use for each broader validation group
-#' 
-#' @returns Dot plot with summarized expression of marker genes for consensus cell types
-marker_gene_dotplot <- function(
-    consensus_df,
-    validation_groups_df,
-    markers_df,
-    celltype_colors, 
-    min_cells = 10) {
-  
-  # prep for plots
-  # get total number of cells per final annotation group
-  total_cells_df <- consensus_df |>
-    dplyr::select(unique_id, barcodes, broad_celltype_group) |>
-    dplyr::distinct() |>
-    dplyr::count(broad_celltype_group, name = "total_cells")
-
-  # table with one row per unique broad cell type/ marker gene combination
-  # first all cells in with the same broad_celltype_group (determined based on consensus_annotation) are grouped together
-  # then get the mean gene expression and total percentage of cells that express each marker gene across all cells in that group
-  # do this for every possible marker gene/ validation group assignment
-  # second we calculate the mean expression and mean percentage of all marker genes in a given validation group (this value is used only in the second section of the report)
-  group_stats_df <- consensus_df |>
-    # for each assigned cell type/marker gene combo get total detected and mean expression
-    # group by both broad group and validation group to account for genes that are expressed in more than one cell type
-    dplyr::summarize(
-      .by = c("broad_celltype_group", "ensembl_gene_id", "validation_group_annotation"),
-      detected_count = sum(detected),
-      mean_exp = mean(logcounts)
-    ) |>
-    # add in validation group for marker genes
-    # this includes all possible marker genes and all possible validation group assignments
-    dplyr::left_join(markers_df, by = c("ensembl_gene_id", "validation_group_annotation"), relationship = "many-to-many") |> # add total cells
-    dplyr::left_join(total_cells_df, by = c("broad_celltype_group")) |>
-    # only show cells that have above the minimum total number
-    dplyr::filter(total_cells > min_cells) |>
-    dplyr::mutate(
-      # get total percent expressed
-      percent_exp = (detected_count / total_cells) * 100,
-      # account for NA/unknowns and set axes order
-      broad_celltype_group = factor(broad_celltype_group, levels = c(names(celltype_colors)))
-    )
-
-  # get list of celltypes to keep and assign colors
-  celltype_groups <- group_stats_df |>
-    dplyr::pull(broad_celltype_group) |>
-    unique() |>
-    as.character()
-
-  # filter markers to those that are actually relevant
-  # we will only plot the marker genes for cell types that are part of the assigned broad validation group for this group of samples
-  # we don't care about plotting marker genes for cell types that aren't present here
-  filtered_markers_df <- markers_df |>
-    dplyr::filter(
-      validation_group_annotation %in% celltype_groups,
-      gene_symbol %in% group_stats_df$gene_symbol
-    ) |> 
-    # ensure order matches the order of the legend
-    dplyr::mutate(
-      validation_group_annotation = factor(validation_group_annotation, levels = names(celltype_colors))
-    ) |> 
-    dplyr::arrange(validation_group_annotation)
-
-  # specify x axis order for dotplot
-  marker_gene_order <- filtered_markers_df |>
-    dplyr::pull(gene_symbol)
-
-  # set order for cell types
-  celltype_order <- unique(filtered_markers_df$validation_group_annotation)
-
-  # filter out low expressed genes
-  dotplot_df <- group_stats_df |>
-    dplyr::filter(mean_exp > 0, percent_exp > 10) |>
-    dplyr::arrange(broad_celltype_group) |>
-    # add a label for the plot
-    dplyr::mutate(y_label = glue::glue("{broad_celltype_group} ({total_cells})")) |>
-    # remove marker genes that aren't present in final annotations and set x axis order
-    dplyr::filter(gene_symbol %in% marker_gene_order) |>
-    dplyr::mutate(
-      # set orders of gene symbol and validation groups
-      y_label = factor(y_label, levels = rev(unique(y_label))),
-      gene_symbol = factor(gene_symbol, levels = marker_gene_order),
-      validation_group_annotation = factor(validation_group_annotation, levels = celltype_order)
-    )
-
-
-  # make dotplot with marker gene exp
-  dotplot <- ggplot(dotplot_df, aes(y = y_label, x = gene_symbol, color = mean_exp, size = percent_exp)) +
-    geom_point() +
-    scale_color_viridis_c(option = "magma") +
-    facet_grid(cols = vars(validation_group_annotation), scales = "free", space = "free") +
-    theme_classic() +
-    theme(
-      strip.background = element_rect(fill = "transparent", color = NA),
-      strip.placement = "outside",
-      strip.text.x = element_blank(),
-      axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
-      axis.ticks.x = element_blank(),
-      text = element_text(size = 14),
-      panel.spacing = unit(0.5, "lines") # adjust spacing and match with annotation bar
-    ) +
-    labs(
-      x = "",
-      y = "Broad cell type annotation",
-      color = "Mean gene expression",
-      size = "Percent cells expressed"
-    )
-
-
-  # add annotation bar aligning marker genes with validation group
-  color_bar <- ggplot(dotplot_df, aes(x = gene_symbol, y = 1, fill = validation_group_annotation)) +
-    geom_tile() +
-    facet_grid(cols = vars(validation_group_annotation), scales = "free", space = "free") +
-    scale_fill_manual(values = celltype_colors, breaks = levels(dotplot_df$validation_group_annotation)) +
-    ggmap::theme_nothing() +
-    theme(
-      strip.background = element_rect(fill = "transparent", color = NA),
-      strip.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5, size = 12),
-      strip.placement = "outside",
-      legend.position = "none",
-      panel.spacing = unit(0.5, "lines"),
-      strip.clip = "off"
-    ) +
-    labs(fill = "")
-
-  combined_plot <- color_bar / dotplot +
-    patchwork::plot_layout(ncol = 1, heights = c(0.1, 4))
-
-  return(combined_plot)
-}
 ```
 
 
@@ -267,6 +102,12 @@ celltype_colors[["other"]] <- "black"
 # read in aucell results 
 aucell_df <- readr::read_tsv(params$aucell_results_file)
 ref_aucell_df <- readr::read_tsv(params$ref_aucell_file)
+
+# read in reference annotations and gene set info 
+ref_celltypes_df <- readr::read_tsv(params$ref_annotations_file) |>
+  # only using the annotations from this file
+  dplyr::select(barcodes, unique_id, consensus_celltype_annotation)
+geneset_df <- readr::read_tsv(params$gene_set_category_file)
 ```
 
 ```{r}
@@ -342,6 +183,7 @@ ggplot(coldata_df, aes(x = UMAP1, y = UMAP2, color = broad_group_lumped)) +
   guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
   labs(color = "Broad cell type group")
 ```
+
 ```{r, fig.height=7, fig.width=7}
 faceted_umap(
   coldata_df,
@@ -410,6 +252,269 @@ marker_gene_dotplot(
   min_cells = 0 #TODO: Update this if needed to remove some cell types
 )
 ```
+
+# `AUCell` summary 
+
+The plots in this section will look at the results from running [`AUCell`](https://bioconductor.org/packages/release/bioc/html/AUCell.html) across a set of gene sets obtained from `MSigDB` and custom gene lists. 
+Information about the gene sets used here can be found in [`ews-nf/genesets`](https://github.com/AlexsLemonade/ews-nf/tree/main/genesets). 
+
+Plots here show the z-score calculated from the AUC reported by `AUCell`. 
+For each gene set, the mean and standard deviation of the AUC values for all reference cells was used to contain a z-score for all cells. 
+Cell types are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types (labeled as "normal non-reference") based on consensus cell type labels. 
+If any unknown or normal non-malignant cell types show gene expression patterns expected to be observed in tumor cells, it's likely that those cells are mis-classified and are in fact tumor cells. 
+
+Gene sets can be divided into three groups to help distinguish tumor cells from normal cells:  
+
+* `EF-activated`: These gene sets contain genes that are activated by the fusion gene, `EWS::FLI1`. 
+We expect any cells with high z-scores relative to reference cells to be tumor cells. 
+* `EF-repressed`: These gene sets contain genes that are repressed by the fusion gene, `EWS::FLI1`. 
+We expect any cells with low z-scores relative to reference cells to be tumor cells.
+* `EMT-ECM`: These gene sets contain genes that are found to be highly expressed in tumor cells with low expression of `EWS::FLI1`.
+
+We expect tumor cells to have high expression of genes that are activated by `EWS::FLI1` and low expression of genes that are repressed by `EWS::FLI1`, indicating high activity of the `EWS::FLI1` fusion. 
+It's likely there could also be a population of tumor cells that are `EWS::FLI1` "low". 
+We expect those cells to have lower expression of the activated genes and higher expression of the repressed genes along with an EMT-like phenotype. 
+
+
+```{r, message=FALSE}
+# assign broad cell type categories to all reference cells
+ref_celltypes_df <- ref_celltypes_df |> 
+  dplyr::select(barcodes, unique_id, consensus_celltype_annotation) |> 
+  dplyr::left_join(validation_groups_df, by = c("consensus_celltype_annotation" = "consensus_annotation")) |> 
+  dplyr::mutate(
+    broad_celltype_group = dplyr::if_else(
+      is.na(broad_celltype_group),
+      "unknown",
+      broad_celltype_group
+    )
+  )
+
+# combine infor for all cells for the given library with the reference cells 
+celltype_df <- coldata_df |> 
+  dplyr::select(
+    barcodes, unique_id, consensus_celltype_annotation, broad_celltype_group
+  ) |>
+  dplyr::full_join(ref_celltypes_df)
+
+# combine all aucell results
+all_aucell_df <- aucell_df |> 
+  # add zscores for reference cells
+  dplyr::full_join(ref_aucell_df) |> 
+  # add gene set categories
+  dplyr::left_join(geneset_df, by = c("gene_set" = "geneset_name")) |> 
+  # include consensus and broad cell types 
+  dplyr::left_join(celltype_df, by = c("barcodes", "unique_id")) |> 
+  dplyr::mutate(
+    # add cell category and set levels for cell and gene set categories
+    cell_category = dplyr::case_when(
+      ref_or_query == "reference" ~ "reference",
+      broad_celltype_group == "unknown" ~ "unknown",
+      .default = "normal non-reference"
+    ) |> 
+      forcats::fct_relevel("unknown", after = 0),
+    geneset_category = factor(geneset_category, levels = c("EF-activated", "EF-repressed", "EMT-ECM"))
+  )
+
+# define color palettes for AUCell and inferCNV plots 
+cell_category_colors <- brewer.pal(n = 3, name = "Dark2")
+names(cell_category_colors) <- unique(all_aucell_df$cell_category)
+geneset_colors <- c("#00274C",  "#FFCB05", "gray80")
+names(geneset_colors) <- unique(all_aucell_df$geneset_category)
+```
+
+## AUC Heatmap 
+
+The heatmap below shows the mean z-score for each gene set across all cell types. 
+As with the previous section, the broad cell type group is shown instead of the full consensus cell type. 
+
+The annotation bar on the bottom indicates the gene set category (e.g., `EF-activated` and `EF-repressed`) and the annotation bar on the right indicates the cell type category (e.g., reference, unknown, or normal non-reference). 
+
+```{r, message=FALSE}
+# create mtx with mean zscore for heatmap 
+auc_mtx <- all_aucell_df |> 
+  dplyr::group_by(broad_celltype_group, gene_set) |> 
+  dplyr::summarize(
+    mean_zscore = mean(auc_zscore)
+  ) |> 
+  tidyr::pivot_wider(names_from = gene_set, 
+                     values_from = mean_zscore) |> 
+  tidyr::drop_na() |> 
+  tibble::column_to_rownames("broad_celltype_group") |>
+  as.matrix()
+
+
+# add ref or query annotation bars
+ref_annotation_df <- all_aucell_df |> 
+  dplyr::distinct(broad_celltype_group, cell_category) |>
+  tidyr::drop_na() |> 
+  dplyr::mutate(broad_celltype_group = factor(broad_celltype_group, levels = rownames(auc_mtx))) |> 
+  dplyr::arrange(broad_celltype_group)
+
+ref_annotation <- ComplexHeatmap::rowAnnotation(
+    cell_category = ref_annotation_df$cell_category,
+    col = list(cell_category = cell_category_colors),
+    annotation_label = c(cell_category = "Cell category"),
+    show_annotation_name = FALSE
+  )
+
+# add gene set category annotation bars 
+geneset_annotation_df <- all_aucell_df |> 
+  dplyr::distinct(gene_set, geneset_category) |>
+  tidyr::drop_na() |> 
+  dplyr::mutate(gene_set = factor(gene_set, levels = colnames(auc_mtx))) |> 
+  dplyr::arrange(gene_set)
+
+geneset_annotation <- ComplexHeatmap::columnAnnotation(
+  geneset_category = geneset_annotation_df$geneset_category,
+  col = list(geneset_category = geneset_colors),
+  annotation_label = c(geneset_category = "Gene set \ncategory"),
+  show_annotation_name = FALSE
+)
+```
+
+
+```{r, fig.height=8, fig.width=10}
+ComplexHeatmap::Heatmap(
+    auc_mtx,
+    # set the color scale based on min and max values
+    col = circlize::colorRamp2(seq(min(auc_mtx), max(auc_mtx), length = 2), colors = c("white", "#00274C")),
+    border = TRUE,
+    ## Row parameters
+    cluster_rows = TRUE,
+    row_title = "Broad cell type group",
+    row_title_side = "left",
+    row_names_side = "left",
+    row_dend_side = "right",
+    row_names_gp = grid::gpar(fontsize = 10),
+    ## Column parameters
+    column_title = "Gene set",
+    cluster_columns = TRUE,
+    show_column_names = TRUE,
+    column_names_gp = grid::gpar(fontsize = 8),
+    bottom_annotation = geneset_annotation,
+    right_annotation = ref_annotation,
+    heatmap_legend_param = list(
+      title = "Mean z-score"
+    )
+)
+  
+```
+
+## Ridge plots 
+
+The below ridge plot shows the distribution of z-scores for each gene set.
+Cells are grouped based on if they are part of the reference or query, where query is broken up into "unknown" and normal non-malignant cell types based on consensus cell type labels. 
+
+```{r, fig.height=12, fig.width=8, message=FALSE}
+# ridge plot faceted by geneset within each category
+levels(all_aucell_df$geneset_category) |> 
+  purrr::map(\(category){
+    
+    all_aucell_df |> 
+      dplyr::filter(geneset_category == category) |> 
+      ggplot(aes(x = auc_zscore, y = forcats::fct_rev(cell_category), fill = cell_category)) +
+      ggridges::geom_density_ridges(alpha = 0.5, scale = 1.5) +
+      facet_wrap(vars(gene_set), ncol = 3) +
+      scale_fill_manual(values = cell_category_colors) +
+      labs(
+        title = category,
+        x = "z-score",
+        y = "Cell type category"
+      ) +
+      theme(legend.position = "none")
+    
+  }) |>
+  patchwork::wrap_plots(ncol = 1, guides = "collect") +
+  patchwork::plot_layout(heights = c(6, 4, 2))
+```
+
+
+Below we calculated the mean z-score for all gene sets in a given gene set category (e.g., all gene sets that are part of `EF-activated`). 
+We then look at the distribution of those mean z-scores across all cell types. 
+Ridge plots for each cell type are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types based on consensus cell type labels. 
+Any cell type with less than 3 cells will not be included in the plot. 
+
+```{r, message=FALSE}
+# get the mean zscore for each gene set category 
+grouped_aucell_df <- all_aucell_df |> 
+  dplyr::group_by(cell_id, broad_celltype_group, geneset_category, cell_category) |> 
+  dplyr::summarize(
+    mean_category_zscore = mean(auc_zscore)
+  ) 
+
+# get total number of cells for each cell type
+# need this to both label the axes and filter out any cell types that have too few cells
+celltype_counts_df <- grouped_aucell_df |>
+  dplyr::ungroup() |> 
+  dplyr::select(cell_id, broad_celltype_group) |> 
+  dplyr::distinct() |> 
+  dplyr::add_count(broad_celltype_group) |> 
+  # add in y label 
+  dplyr::mutate(
+    y_label = glue::glue("{broad_celltype_group} ({n})")
+  ) |> 
+  dplyr::select(broad_celltype_group, y_label, n) |> 
+  dplyr::distinct()
+
+# grab order of broad cell types based on cell type categories 
+celltype_levels <- celltype_counts_df |> 
+  dplyr::left_join(ref_annotation_df) |> 
+  dplyr::arrange(cell_category) |> 
+  dplyr::pull(y_label) |>
+  as.character()
+
+# prep for ridge plot 
+ridges_plot_df <- grouped_aucell_df |> 
+  dplyr::left_join(celltype_counts_df) |> 
+  dplyr::filter(n >= 3) |> 
+  dplyr::mutate(
+    y_label = factor(y_label, levels = rev(celltype_levels))
+  )
+```
+
+
+```{r, fig.width=8, fig.height=15, message=FALSE}
+ggplot(ridges_plot_df, aes(x = mean_category_zscore, y = y_label, fill = cell_category)) +
+  ggridges::geom_density_ridges(alpha = 0.5) +
+  facet_wrap(vars(geneset_category),
+             ncol = 1,
+             scales = "free_x") +
+  scale_fill_manual(values = cell_category_colors) +
+  labs(
+    x = "Mean z-score",
+    y = "Broad cell type group",
+    fill = "Cell type \ncategory"
+  )
+```
+
+## UMAPs
+
+Here we show UMAPs colored by the mean z-score for each gene set category. 
+The UMAP is faceted by cell type category so that only cells from that category are included in the panel. 
+
+```{r}
+# combine with umap_df and create faceted umap by mean auc for each geneset 
+auc_umap_df <- coldata_df |> 
+  dplyr::mutate(cell_id = glue::glue("{unique_id}-{barcodes}")) |> 
+  dplyr::left_join(grouped_aucell_df, by = c("cell_id", "broad_celltype_group"))
+
+
+ggplot(auc_umap_df, aes(x = UMAP1, y = UMAP2, color = mean_category_zscore)) +
+  geom_point(alpha = 0.5, size = 0.2) +
+  facet_grid(rows = vars(geneset_category),
+             cols = vars(cell_category)) +
+  scale_color_viridis_c(option = "turbo") +
+  theme(
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid = element_blank(),
+      panel.spacing = unit(0.02, "in"),
+      aspect.ratio = 1
+    ) +
+  labs(color = "Mean z-score")
+
+```
+
 
 # Session Info
 <details>

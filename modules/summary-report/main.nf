@@ -14,9 +14,11 @@ process render_report {
           path(aucell_file)
     path ref_aucell_file
     path template_file
+    path plotting_functions_file
     path validation_groups_file
     path marker_genes_file
     path color_palette_file
+    path gene_set_category_file
   output:
     tuple val(unique_id),
           val(sample_id),
@@ -32,7 +34,9 @@ process render_report {
                     marker_genes_file = '${marker_genes_file}', \
                     color_palette_file = '${color_palette_file}', \
                     aucell_results_file = '${aucell_file}', \
-                    ref_aucell_file = '${ref_aucell_file}'))"
+                    ref_aucell_file = '${ref_aucell_file}', \
+                    gene_set_category_file = '${gene_set_category_file}',
+                    plotting_functions_file = '${plotting_functions_file}'))"
     """
   stub:
     summary_report_html = "${unique_id}_summary-report.html"
@@ -51,6 +55,7 @@ workflow summary_report {
 
     // define path to template report 
     report_template_file = "${projectDir}/templates/summary-report.Rmd" 
+    plotting_functions_file = "${projectDir}/templates/utils/plotting-functions.Rmd"
 
     // join sce file with aucell results 
     report_ch = library_ch
@@ -68,9 +73,11 @@ workflow summary_report {
       report_ch, 
       aucell_ref,
       file(report_template_file),
+      file(plotting_functions_file),
       file(params.validation_groups_file),
       file(params.marker_genes_file),
-      file(params.color_palette_file)
+      file(params.color_palette_file),
+      file(params.gene_set_category_file)
     )
 
   emit:
