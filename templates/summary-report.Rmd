@@ -257,14 +257,24 @@ marker_gene_dotplot(
 
 The plots in this section will look at the results from running [`AUCell`](https://bioconductor.org/packages/release/bioc/html/AUCell.html) across a set of gene sets obtained from `MSigDB` and custom gene lists. 
 Information about the gene sets used here can be found in [`ews-nf/genesets`](https://github.com/AlexsLemonade/ews-nf/tree/main/genesets). 
-Gene sets can be divided into three groups: 
-
-* `EF-activated`: These gene sets contain genes that are activated by the fusion gene, `EWS-FLI1`. 
-* `EF-repressed`: These gene sets contain genes that are repressed by the fusion gene, `EWS-FLI1`. 
-* `EMT-ECM`: These gene sets contain genes that are found to be highly expressed in tumor cells with low expression of `EWS-FLI`.
 
 Plots here show the z-score calculated from the AUC reported by `AUCell`. 
 For each gene set, the mean and standard deviation of the AUC values for all reference cells was used to contain a z-score for all cells. 
+Cell types are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types based on consensus cell type labels. 
+If any unknown or normal non-malignant cell types show gene expression patterns expected to be observed in tumor cells, it's likely that those cells are mis-classified and are in fact tumor cells. 
+
+Gene sets can be divided into three groups to help distinguish tumor cells from normal cells:  
+
+* `EF-activated`: These gene sets contain genes that are activated by the fusion gene, `EWS::FLI1`. 
+We expect any cells with high z-scores relative to reference cells to be tumor cells. 
+* `EF-repressed`: These gene sets contain genes that are repressed by the fusion gene, `EWS::FLI1`. 
+We expect any cells with low z-scores relative to reference cells to be tumor cells.
+* `EMT-ECM`: These gene sets contain genes that are found to be highly expressed in tumor cells with low expression of `EWS::FLI1`.
+
+We expect tumor cells to have high expression of genes that are activated by `EWS::FLI1` and low expression of genes that are repressed by `EWS::FLI1`, indicating high activity of the `EWS::FLI1` fusion. 
+It's likely there could also be a population of tumor cells that are `EWS::FLI1` "low". 
+We expect those cells to have lower expression of the activated genes and higher expression of the repressed genes along with an EMT-like phenotype. 
+
 
 ```{r, message=FALSE}
 # assign broad cell type categories to all reference cells
@@ -391,9 +401,9 @@ ComplexHeatmap::Heatmap(
   
 ```
 
-## Density plots 
+## Ridge plots 
 
-The below density plot shows the distribution of z-scores for each gene set.
+The below ridge plot shows the distribution of z-scores for each gene set.
 Cells are grouped based on if they are part of the reference or query, where query is broken up into "unknown" and normal non-malignant cell types based on consensus cell type labels. 
 
 ```{r, fig.height=12, fig.width=8, message=FALSE}
@@ -422,8 +432,8 @@ levels(all_aucell_df$geneset_category) |>
 
 Here we calculated the mean z-score for all gene sets in a given gene set category (e.g., all gene sets that are part of `EF-activated`). 
 We then look at the distribution of those mean z-scores across all cell types. 
-Density plots for each cell type are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types based on consensus cell type labels. 
-Any cell type with just 1 cell will not be included in the plot. 
+Ridge plots for each cell type are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types based on consensus cell type labels. 
+Any cell type with less than 3 cells will not be included in the plot. 
 
 ```{r, message=FALSE}
 # get the mean zscore for each gene set category 
@@ -464,7 +474,7 @@ ridges_plot_df <- grouped_aucell_df |>
 ```
 
 
-```{r, fig.width=8, fig.height=10}
+```{r, fig.width=8, fig.height=10, message=FALSE}
 ggplot(ridges_plot_df, aes(x = mean_category_zscore, y = y_label, fill = cell_category)) +
   ggridges::geom_density_ridges(alpha = 0.5) +
   facet_wrap(vars(geneset_category),
@@ -476,27 +486,6 @@ ggplot(ridges_plot_df, aes(x = mean_category_zscore, y = y_label, fill = cell_ca
     y = "Broad cell type group",
     fill = "Cell type \ncategory"
   )
-```
-
-
-```{r, fig.height=12, fig.width=8}
-# pull out the columns that we want to use for each individual density plot 
-zscore_columns <- levels(all_aucell_df$geneset_category)
-
-# make the density plot
-# one plot per gene set category with facets for cell types 
-zscore_columns |>
-    purrr::map(\(column){
-      plot_density(
-        density_plot_df,
-        column,
-        "y_label"
-      ) +
-        labs(x = "mean z-score",
-             fill = "Cell type \ncategory") 
-    }) |>
-    patchwork::wrap_plots(ncol = 1, guides = "collect")
-
 ```
 
 ## UMAPs
