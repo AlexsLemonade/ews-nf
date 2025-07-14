@@ -522,12 +522,24 @@ ggplot(auc_umap_df, aes(x = UMAP1, y = UMAP2, color = mean_category_zscore)) +
 
 # InferCNV 
 
+[`inferCNV`](https://github.com/broadinstitute/inferCNV/wiki) was run using all normal cell types that are listed in [`references/reference-celltype.tsv`](https://github.com/AlexsLemonade/ews-nf/blob/main/references/reference-celltypes.tsv) as a reference. 
+We expect tumor cells to have higher numbers of CNVs than reference cells. 
+
 ## Heatmap 
+
+Below is the heatmap showing chromosome gains and losses as output by `inferCNV`. 
 
 ![](`r params$infercnv_heatmap_file`)
 
 
 ## All CNVs
+
+Below we look at the distribution of total CNVs detected per cell. 
+The number of chromosomes with a detectable CNV is totaled and then the mean and standard deviation of the total CNV sum for all reference cells are used to calculate a z-score for all cells in the dataset. 
+
+As with the `AUCell` results, cells are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types (labeled as "normal non-reference") based on consensus cell type labels. 
+
+The first plot shows all cell type groups (unknown, normal non-reference, and unknown) and then the second plot shows each broad cell type category. 
 
 ### Ridge plots
 
@@ -619,6 +631,8 @@ ggplot(filtered_cnv_df, aes(x = cnv_zscore, y = y_label, fill = cell_category)) 
 
 ### UMAPs
 
+Below is a UMAP where all cells are colored by the z-score determined using the sum of the total CNVs in each cell. 
+
 ```{r}
 # facet umap by cell category 
 ggplot(all_cnv_df, aes(x = UMAP1, y = UMAP2, color = cnv_zscore)) +
@@ -635,8 +649,21 @@ ggplot(all_cnv_df, aes(x = UMAP1, y = UMAP2, color = cnv_zscore)) +
   labs(color = "CNV z-score")
 ```
 
-
 ## Ewing-specific CNVs
+
+There are a few known copy number variations in Ewing's sarcoma: 
+
+- Gain of Chr8
+- Gain of Chr12
+- Gain of Chr1p
+- Loss of Chr16q
+
+Although these are the most frequent, there are patients who do not have any of these alterations and patients that only have some of these alterations. 
+See [Tirode et al.,](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4264969/) and [Crompton et al.](https://doi.org/10.1158/2159-8290.CD-13-1037)
+
+Below we look at the presence of these specific CNVs by showing the proportion of each chromosome that is part of any of the CNV events.
+For each chromsome we show the proportions for three categories, `cnv` indicating the total proportion for gains and losses, `dupli` indicating CNV amplification, and `loss` indicating CNV loss.  
+
 
 ```{r, message=FALSE}
 # define the chromosomes typically affected in Ews
