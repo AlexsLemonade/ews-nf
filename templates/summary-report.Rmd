@@ -260,7 +260,7 @@ Information about the gene sets used here can be found in [`ews-nf/genesets`](ht
 
 Plots here show the z-score calculated from the AUC reported by `AUCell`. 
 For each gene set, the mean and standard deviation of the AUC values for all reference cells was used to contain a z-score for all cells. 
-Cell types are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types based on consensus cell type labels. 
+Cell types are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types (labeled as "normal non-reference") based on consensus cell type labels. 
 If any unknown or normal non-malignant cell types show gene expression patterns expected to be observed in tumor cells, it's likely that those cells are mis-classified and are in fact tumor cells. 
 
 Gene sets can be divided into three groups to help distinguish tumor cells from normal cells:  
@@ -369,7 +369,6 @@ geneset_annotation <- ComplexHeatmap::columnAnnotation(
   col = list(geneset_category = geneset_colors),
   annotation_label = c(geneset_category = "Gene set \ncategory"),
   show_annotation_name = FALSE
-  
 )
 ```
 
@@ -413,8 +412,8 @@ levels(all_aucell_df$geneset_category) |>
     
     all_aucell_df |> 
       dplyr::filter(geneset_category == category) |> 
-      ggplot(aes(x = auc_zscore, y = cell_category, fill = cell_category)) +
-      ggridges::geom_density_ridges(alpha = 0.5) +
+      ggplot(aes(x = auc_zscore, y = forcats::fct_rev(cell_category), fill = cell_category)) +
+      ggridges::geom_density_ridges(alpha = 0.5, scale = 1.5) +
       facet_wrap(vars(gene_set), ncol = 3) +
       scale_fill_manual(values = cell_category_colors) +
       labs(
@@ -430,7 +429,7 @@ levels(all_aucell_df$geneset_category) |>
 ```
 
 
-Here we calculated the mean z-score for all gene sets in a given gene set category (e.g., all gene sets that are part of `EF-activated`). 
+Below we calculated the mean z-score for all gene sets in a given gene set category (e.g., all gene sets that are part of `EF-activated`). 
 We then look at the distribution of those mean z-scores across all cell types. 
 Ridge plots for each cell type are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types based on consensus cell type labels. 
 Any cell type with less than 3 cells will not be included in the plot. 
@@ -444,7 +443,7 @@ grouped_aucell_df <- all_aucell_df |>
   ) 
 
 # get total number of cells for each cell type
-# need this to both label the axes and filter out any cell types that only have 1 cell
+# need this to both label the axes and filter out any cell types that have too few cells
 celltype_counts_df <- grouped_aucell_df |>
   dplyr::ungroup() |> 
   dplyr::select(cell_id, broad_celltype_group) |> 
@@ -474,7 +473,7 @@ ridges_plot_df <- grouped_aucell_df |>
 ```
 
 
-```{r, fig.width=8, fig.height=10, message=FALSE}
+```{r, fig.width=8, fig.height=15, message=FALSE}
 ggplot(ridges_plot_df, aes(x = mean_category_zscore, y = y_label, fill = cell_category)) +
   ggridges::geom_density_ridges(alpha = 0.5) +
   facet_wrap(vars(geneset_category),
