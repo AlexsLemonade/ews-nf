@@ -527,7 +527,9 @@ ggplot(auc_umap_df, aes(x = UMAP1, y = UMAP2, color = mean_category_zscore)) +
 ![](`r params$infercnv_heatmap_file`)
 
 
-## Total CNVs
+## All CNVs
+
+### Ridge plots
 
 ```{r}
 # read infercnv results
@@ -565,47 +567,36 @@ sum_cnv_df <- infercnv_df |>
   dplyr::summarize(total_cnv_per_cell = sum(cnv)) |>
   dplyr::ungroup() 
 
-# add back in to larger df with all cnv information and cell types 
-all_cnv_df <- infercnv_df |> 
-  dplyr::left_join(sum_cnv_df, by = c("unique_id", "barcodes"))
-```
-
-```{r}
-ggplot(all_cnv_df, aes(x = total_cnv_per_cell, y = cell_category, fill = cell_category)) +
-  ggridges::geom_density_ridges(alpha = 0.5) +
-  scale_fill_manual(values = cell_category_colors) +
-  labs(
-    y = "",
-    x = "Total CNV"
-  ) +
-  theme(legend.position = "none")
-```
-
-```{r}
-# cacluate a z-score for the total CNV using the reference cells as mean and sd
+# calculate a z-score for the total CNV using the reference cells as mean and sd
 ref_cnv_sums <- all_cnv_df |> 
   dplyr::filter(cell_category == "reference") |> 
   dplyr::pull(total_cnv_per_cell)
 ref_mean <- mean(ref_cnv_sums)
 ref_sd <- sd(ref_cnv_sums)
 
-# add in zscore
-all_cnv_df <- all_cnv_df |> 
+
+# add back in to larger df with all cnv information and cell types 
+all_cnv_df <- infercnv_df |> 
+  dplyr::left_join(sum_cnv_df, by = c("unique_id", "barcodes")) |> 
   dplyr::mutate(
     cnv_zscore = (total_cnv_per_cell - ref_mean)/ref_sd
   )
+```
 
+
+```{r, message = FALSE}
+# ridge plot showing z-score of cnv sum 
 ggplot(all_cnv_df, aes(x = cnv_zscore, y = cell_category, fill = cell_category)) +
   ggridges::geom_density_ridges(alpha = 0.5) +
   scale_fill_manual(values = cell_category_colors) +
   labs(
     y = "",
-    x = "z-score"
+    x = "CNV z-score"
   ) +
   theme(legend.position = "none")
 ```
 
-```{r}
+```{r, message = FALSE}
 # remove cell types with < 3 and set cell category levels
 filtered_cnv_df <- all_cnv_df |> 
   # add in a y label and celltype counts
@@ -626,9 +617,28 @@ ggplot(filtered_cnv_df, aes(x = cnv_zscore, y = y_label, fill = cell_category)) 
   )
 ```
 
-## Ewing-specific CNVs
+### UMAPs
 
 ```{r}
+# facet umap by cell category 
+ggplot(all_cnv_df, aes(x = UMAP1, y = UMAP2, color = cnv_zscore)) +
+  geom_point(alpha = 0.5, size = 0.2) +
+  facet_grid(cols = vars(cell_category)) +
+  scale_color_viridis_c(option = "turbo") +
+  theme(
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid = element_blank(),
+      panel.spacing = unit(0.02, "in"),
+      aspect.ratio = 1
+    ) +
+  labs(color = "CNV z-score")
+```
+
+
+## Ewing-specific CNVs
+
+```{r, message=FALSE}
 # define the chromosomes typically affected in Ews
 validation_chr <- c("chr1", "chr8", "chr12", "chr16")
 
@@ -675,24 +685,6 @@ ggplot(prop_cnv_df, aes(x = proportion, y = cell_category, fill = cell_category)
     y = ""
   ) +
   theme(legend.position = "none")
-```
-
-### UMAPs
-
-```{r}
-# facet umap by cell category 
-ggplot(all_cnv_df, aes(x = UMAP1, y = UMAP2, color = cnv_zscore)) +
-  geom_point(alpha = 0.5, size = 0.2) +
-  facet_grid(cols = vars(cell_category)) +
-  scale_color_viridis_c(option = "turbo") +
-  theme(
-      axis.text = element_blank(),
-      axis.ticks = element_blank(),
-      panel.grid = element_blank(),
-      panel.spacing = unit(0.02, "in"),
-      aspect.ratio = 1
-    ) +
-  labs(color = "CNV z-score")
 ```
 
 
