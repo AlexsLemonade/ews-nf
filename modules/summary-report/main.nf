@@ -12,8 +12,8 @@ process render_report {
           val(sample_id),
           path(sce_file), 
           path(aucell_file),
-          path(infercnv_heatmap), 
-          path(infercnv_metadata)
+          path(infercnv_metadata),
+          path(infercnv_heatmap)
     path ref_aucell_file
     path ref_annotations_file
     path template_file
@@ -73,13 +73,13 @@ workflow summary_report {
       .join(aucell_query, by: 0)
       .join(infercnv_ch, by: 0)
       // drop the extra sample id from joining 
-      .map{ unique_id, sample_id, sce, sample_id2, aucell_file, sample_id3, cnv_heatmap, cnv_metadata -> tuple(
+      .map{ unique_id, sample_id, sce, sample_id2, aucell_file, sample_id3, cnv_metadata, cnv_heatmap -> tuple(
         unique_id,
         sample_id,
         sce, 
         aucell_file,
-        cnv_heatmap,
-        cnv_metadata
+        cnv_metadata,
+        cnv_heatmap
       )}
 
     // render report 
