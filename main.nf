@@ -40,6 +40,6 @@ workflow {
   infercnv(library_ch, build_ref.out)
 
   // generate report 
-  summary_report(library_ch, aucell.out.query, aucell.out.ref, infercnv.out)
+  summary_report(library_ch, aucell.out.query, aucell.out.ref, infercnv.out, build_ref.out)
   
 }

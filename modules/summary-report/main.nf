@@ -15,6 +15,7 @@ process render_report {
           path(infercnv_heatmap), 
           path(infercnv_metadata)
     path ref_aucell_file
+    path ref_annotations_file
     path template_file
     path plotting_functions_file
     path validation_groups_file
@@ -37,6 +38,7 @@ process render_report {
                     color_palette_file = '${color_palette_file}', \
                     aucell_results_file = '${aucell_file}', \
                     ref_aucell_file = '${ref_aucell_file}', \
+                    ref_annotations_file = '${ref_annotations_file}', \
                     gene_set_category_file = '${gene_set_category_file}', \
                     infercnv_heatmap_file = '${infercnv_heatmap}', \
                     infercnv_results_file = '${infercnv_metadata}', \
@@ -56,11 +58,15 @@ workflow summary_report {
     aucell_query // [unique id, sample_id, path to aucell results]
     aucell_ref // path to file with all reference cell results from aucell 
     infercnv_ch // [unique id, sample_id, path to cnv heatmap, path to cnv metadata]
+    ref_ch // [ref_sce, ref_annotations]
   main:
 
     // define path to template report 
     report_template_file = "${projectDir}/templates/summary-report.Rmd" 
     plotting_functions_file = "${projectDir}/templates/utils/plotting-functions.Rmd"
+
+    // extract ref annotations from channel 
+    ref_annotations = ref_ch.map{ ref_sce, ref_annotations -> ref_annotations }
 
     // join sce file with aucell results 
     report_ch = library_ch
@@ -80,6 +86,7 @@ workflow summary_report {
     render_report(
       report_ch, 
       aucell_ref,
+      ref_annotations,
       file(report_template_file),
       file(plotting_functions_file),
       file(params.validation_groups_file),
