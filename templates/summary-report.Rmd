@@ -9,6 +9,8 @@ params:
   ref_aucell_file: "../ews-nf-out/aucell/aucell-reference-zscores.tsv"
   ref_annotations_file: "../ews-nf-out/build-reference/all-ref-annotations.tsv"
   gene_set_category_file: "../genesets/gene-set-categories.tsv"
+  infercnv_heatmap_file: "../ews-nf-out/infercnv/SCPCS000490/SCPCL000822_infercnv-heatmap.png"
+  infercnv_results_file: "../ews-nf-out/infercnv/SCPCS000490/SCPCL000822_infercnv-metadata.tsv"
   plotting_functions_file: "utils/plotting-functions.Rmd"
   seed: 2025
 
@@ -71,7 +73,9 @@ stopifnot(
   "aucell results file does not exist" = file.exists(params$aucell_results_file), 
   "aucell reference file does not exist" = file.exists(params$ref_aucell_file),
   "reference annotation file does not exist" = file.exists(params$ref_annotations_file),
-  "gene set category file does not exist" = file.exists(params$gene_set_category_file)
+  "gene set category file does not exist" = file.exists(params$gene_set_category_file),
+  "infercnv heatmap file does not exist" = file.exists(params$infercnv_heatmap_file), 
+  "infercnv results file does not exist" = file.exists(params$infercnv_results_file)
 )
 ```
 
@@ -108,6 +112,9 @@ ref_celltypes_df <- readr::read_tsv(params$ref_annotations_file) |>
   # only using the annotations from this file
   dplyr::select(barcodes, unique_id, consensus_celltype_annotation)
 geneset_df <- readr::read_tsv(params$gene_set_category_file)
+
+# read in infercnv results 
+infercnv_df <- readr::read_tsv(params$infercnv_results_file)
 ```
 
 ```{r}
@@ -290,10 +297,7 @@ ref_celltypes_df <- ref_celltypes_df |>
   )
 
 # combine infor for all cells for the given library with the reference cells 
-celltype_df <- coldata_df |> 
-  dplyr::select(
-    barcodes, unique_id, consensus_celltype_annotation, broad_celltype_group
-  ) |>
+celltype_df <- coldata_df |>
   dplyr::full_join(ref_celltypes_df)
 
 # combine all aucell results
@@ -513,6 +517,209 @@ ggplot(auc_umap_df, aes(x = UMAP1, y = UMAP2, color = mean_category_zscore)) +
     ) +
   labs(color = "Mean z-score")
 
+```
+
+
+# InferCNV 
+
+[`inferCNV`](https://github.com/broadinstitute/inferCNV/wiki) was run using all normal cell types that are listed in [`references/reference-celltype.tsv`](https://github.com/AlexsLemonade/ews-nf/blob/main/references/reference-celltypes.tsv) as a reference. 
+
+## Heatmap 
+
+Below is the heatmap showing chromosome gains and losses as output by `inferCNV`. 
+
+![](`r params$infercnv_heatmap_file`)
+
+
+## All CNVs
+
+Below we look at the distribution of total CNVs detected per cell. 
+The number of chromosomes with a detectable CNV is totaled and then the mean and standard deviation of the total CNV sum for all reference cells are used to calculate a z-score for all cells in the dataset. 
+
+As with the `AUCell` results, cells are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types (labeled as "normal non-reference") based on consensus cell type labels. 
+We expect tumor cells to have higher numbers of CNVs than reference cells. 
+
+The first plot shows all cell type groups (unknown, normal non-reference, and unknown) and then the second plot shows each broad cell type category. 
+Only cell types with at least 3 cells are shown. 
+
+### Ridge plots
+
+```{r}
+# read infercnv results
+infercnv_df <- infercnv_df |>
+  # indicator for reference vs query cell based on `subcluster` name
+  dplyr::mutate(cell_group = stringr::str_split_i(subcluster, "_", 1)) |>
+  # separate barcode and library
+  tidyr::separate(
+    cell_id,
+    sep = "-",
+    into = c("unique_id", "barcodes"),
+    remove = FALSE
+  ) |> 
+  dplyr::left_join(celltype_df, by = c("barcodes", "unique_id")) |> 
+  dplyr::mutate(
+    # add cell category 
+    cell_category = dplyr::case_when(
+      stringr::str_detect(subcluster, "reference") ~ "reference",
+      broad_celltype_group == "unknown" ~ "unknown",
+      .default = "normal non-reference"
+    ) |> 
+      forcats::fct_relevel("unknown", after = 0) |>
+      forcats::fct_rev()
+  )
+
+# calculate the total cnv sum for each cell 
+sum_cnv_df <- infercnv_df |> 
+  tidyr::pivot_longer(
+    starts_with("has_cnv_"),
+    names_to = "chr",
+    values_to = "cnv"
+  ) |>
+  # sum all values for each
+  dplyr::group_by(barcodes, unique_id) |>
+  dplyr::summarize(total_cnv_per_cell = sum(cnv)) |>
+  dplyr::ungroup() 
+
+
+# add back in to larger df with all cnv information and cell types 
+all_cnv_df <- infercnv_df |> 
+  dplyr::left_join(sum_cnv_df, by = c("unique_id", "barcodes"))
+
+# calculate a z-score for the total CNV using the reference cells as mean and sd
+ref_cnv_sums <- all_cnv_df |> 
+  dplyr::filter(cell_category == "reference") |> 
+  dplyr::pull(total_cnv_per_cell)
+ref_mean <- mean(ref_cnv_sums)
+ref_sd <- sd(ref_cnv_sums)
+
+# now add in zscore
+all_cnv_df <- all_cnv_df |> 
+  dplyr::mutate(
+    cnv_zscore = (total_cnv_per_cell - ref_mean)/ref_sd
+  )
+```
+
+
+```{r, message = FALSE}
+# ridge plot showing z-score of cnv sum 
+ggplot(all_cnv_df, aes(x = cnv_zscore, y = cell_category, fill = cell_category)) +
+  ggridges::geom_density_ridges(alpha = 0.5) +
+  scale_fill_manual(values = cell_category_colors) +
+  labs(
+    y = "",
+    x = "CNV z-score"
+  ) +
+  theme(legend.position = "none")
+```
+
+```{r, message = FALSE}
+# remove cell types with < 3 and set cell category levels
+filtered_cnv_df <- all_cnv_df |> 
+  # add in a y label and celltype counts
+  dplyr::left_join(celltype_counts_df) |> 
+  dplyr::filter(n >= 3) |> 
+  dplyr::mutate(
+    y_label = factor(y_label, levels = rev(celltype_levels))
+  )
+
+
+ggplot(filtered_cnv_df, aes(x = cnv_zscore, y = y_label, fill = forcats::fct_rev(cell_category))) +
+  ggridges::geom_density_ridges(alpha = 0.5) +
+  scale_fill_manual(values = cell_category_colors) +
+  labs(
+    x = "z-score",
+    y = "",
+    fill = "Cell type \ncategory"
+  )
+```
+
+### UMAPs
+
+Below is a UMAP where all cells are colored by their total CNV z-score.
+
+```{r}
+# facet umap by cell category 
+ggplot(all_cnv_df, aes(x = UMAP1, y = UMAP2, color = cnv_zscore)) +
+  geom_point(alpha = 0.5, size = 0.2) +
+  facet_grid(cols = vars(cell_category)) +
+  scale_color_viridis_c(option = "turbo") +
+  theme(
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid = element_blank(),
+      panel.spacing = unit(0.02, "in"),
+      aspect.ratio = 1
+    ) +
+  labs(color = "CNV z-score")
+```
+
+## Ewing-specific CNVs
+
+There are a few known copy number variations in Ewing's sarcoma: 
+
+- Gain of Chr8
+- Gain of Chr12
+- Gain of Chr1p
+- Loss of Chr16q
+
+Although these are the most frequent, there are patients who do not have any of these alterations and patients that only have some of these alterations. 
+See [Tirode _et al._ 2014](https://doi.org/10.1158/2159-8290.CD-14-0622) and [Crompton _et al._ 2014](https://doi.org/10.1158/2159-8290.CD-13-1037)
+
+Below we look at the presence of these specific CNVs by showing the proportion of each chromosome that is part of any of the CNV events.
+For each chromsome we show the proportions for gains, losses and total proportion. 
+
+```{r, message=FALSE}
+# define the chromosomes typically affected in Ews
+validation_chr <- c("chr1", "chr8", "chr12", "chr16")
+
+# get the proportion for each chromosome of interest split out by type (cnv, dupli, loss)
+prop_cnv_df <- infercnv_df |>
+  dplyr::select(
+    starts_with("proportion_scaled_"),
+    cell_id,
+    unique_id,
+    barcodes,
+    subcluster
+  ) |>
+  tidyr::pivot_longer(
+    starts_with("proportion_scaled_"),
+    names_to = "cnv_type_raw",
+    values_to = "proportion"
+  ) |>
+  # more tidying
+  dplyr::mutate(cnv_type_raw = stringr::str_remove(cnv_type_raw, "^proportion_scaled_")) |>
+  tidyr::separate(cnv_type_raw, sep = "_", into = c("cnv_type", "chr")) |>
+  # only care about validation chromosomes here 
+  dplyr::filter(chr %in% validation_chr) |> 
+  # set chr factors
+  dplyr::mutate(
+    chr = stringr::str_remove(chr, "^chr"),
+    chr = factor(chr, levels = 1:22),
+    cnv_type = dplyr::case_when(
+      cnv_type == "cnv" ~ "total",
+      cnv_type == "dupli" ~ "gain", 
+      .default = cnv_type
+    ),
+    # create unique label to use for faceting 
+    facet_label = glue::glue("chr{chr}-{cnv_type}")
+  ) |> 
+  dplyr::left_join(infercnv_df)
+```
+
+```{r, message = FALSE, fig.height=8, fig.width=8}
+ggplot(prop_cnv_df, aes(x = proportion, y = cell_category, fill = cell_category)) +
+  ggridges::geom_density_ridges(alpha = 0.5) +
+  facet_wrap(
+    vars(facet_label),
+    scales = "free_x",
+    ncol = 3
+  ) +
+  scale_fill_manual(values = cell_category_colors) +
+  labs(
+    x = "Proportion CNV",
+    y = ""
+  ) +
+  theme(legend.position = "none")
 ```
 
 
