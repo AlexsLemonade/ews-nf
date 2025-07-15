@@ -523,7 +523,6 @@ ggplot(auc_umap_df, aes(x = UMAP1, y = UMAP2, color = mean_category_zscore)) +
 # InferCNV 
 
 [`inferCNV`](https://github.com/broadinstitute/inferCNV/wiki) was run using all normal cell types that are listed in [`references/reference-celltype.tsv`](https://github.com/AlexsLemonade/ews-nf/blob/main/references/reference-celltypes.tsv) as a reference. 
-We expect tumor cells to have higher numbers of CNVs than reference cells. 
 
 ## Heatmap 
 
@@ -538,8 +537,10 @@ Below we look at the distribution of total CNVs detected per cell.
 The number of chromosomes with a detectable CNV is totaled and then the mean and standard deviation of the total CNV sum for all reference cells are used to calculate a z-score for all cells in the dataset. 
 
 As with the `AUCell` results, cells are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types (labeled as "normal non-reference") based on consensus cell type labels. 
+We expect tumor cells to have higher numbers of CNVs than reference cells. 
 
 The first plot shows all cell type groups (unknown, normal non-reference, and unknown) and then the second plot shows each broad cell type category. 
+Only cell types with at least 3 cells are shown. 
 
 ### Ridge plots
 
@@ -579,6 +580,11 @@ sum_cnv_df <- infercnv_df |>
   dplyr::summarize(total_cnv_per_cell = sum(cnv)) |>
   dplyr::ungroup() 
 
+
+# add back in to larger df with all cnv information and cell types 
+all_cnv_df <- infercnv_df |> 
+  dplyr::left_join(sum_cnv_df, by = c("unique_id", "barcodes"))
+
 # calculate a z-score for the total CNV using the reference cells as mean and sd
 ref_cnv_sums <- all_cnv_df |> 
   dplyr::filter(cell_category == "reference") |> 
@@ -586,10 +592,8 @@ ref_cnv_sums <- all_cnv_df |>
 ref_mean <- mean(ref_cnv_sums)
 ref_sd <- sd(ref_cnv_sums)
 
-
-# add back in to larger df with all cnv information and cell types 
-all_cnv_df <- infercnv_df |> 
-  dplyr::left_join(sum_cnv_df, by = c("unique_id", "barcodes")) |> 
+# now add in zscore
+all_cnv_df <- all_cnv_df |> 
   dplyr::mutate(
     cnv_zscore = (total_cnv_per_cell - ref_mean)/ref_sd
   )
@@ -619,7 +623,7 @@ filtered_cnv_df <- all_cnv_df |>
   )
 
 
-ggplot(filtered_cnv_df, aes(x = cnv_zscore, y = y_label, fill = cell_category)) +
+ggplot(filtered_cnv_df, aes(x = cnv_zscore, y = y_label, fill = forcats::fct_rev(cell_category))) +
   ggridges::geom_density_ridges(alpha = 0.5) +
   scale_fill_manual(values = cell_category_colors) +
   labs(
@@ -631,7 +635,7 @@ ggplot(filtered_cnv_df, aes(x = cnv_zscore, y = y_label, fill = cell_category)) 
 
 ### UMAPs
 
-Below is a UMAP where all cells are colored by the z-score determined using the sum of the total CNVs in each cell. 
+Below is a UMAP where all cells are colored by their total CNV z-score.
 
 ```{r}
 # facet umap by cell category 
@@ -659,11 +663,10 @@ There are a few known copy number variations in Ewing's sarcoma:
 - Loss of Chr16q
 
 Although these are the most frequent, there are patients who do not have any of these alterations and patients that only have some of these alterations. 
-See [Tirode et al.,](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4264969/) and [Crompton et al.](https://doi.org/10.1158/2159-8290.CD-13-1037)
+See [Tirode _et al._ 2014](https://doi.org/10.1158/2159-8290.CD-14-0622) and [Crompton _et al._ 2014](https://doi.org/10.1158/2159-8290.CD-13-1037)
 
 Below we look at the presence of these specific CNVs by showing the proportion of each chromosome that is part of any of the CNV events.
-For each chromsome we show the proportions for three categories, `cnv` indicating the total proportion for gains and losses, `dupli` indicating CNV amplification, and `loss` indicating CNV loss.  
-
+For each chromsome we show the proportions for gains, losses and total proportion. 
 
 ```{r, message=FALSE}
 # define the chromosomes typically affected in Ews
@@ -692,6 +695,11 @@ prop_cnv_df <- infercnv_df |>
   dplyr::mutate(
     chr = stringr::str_remove(chr, "^chr"),
     chr = factor(chr, levels = 1:22),
+    cnv_type = dplyr::case_when(
+      cnv_type == "cnv" ~ "total",
+      cnv_type == "dupli" ~ "gain", 
+      .default = cnv_type
+    ),
     # create unique label to use for faceting 
     facet_label = glue::glue("chr{chr}-{cnv_type}")
   ) |> 
