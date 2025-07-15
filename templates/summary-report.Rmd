@@ -491,34 +491,6 @@ ggplot(ridges_plot_df, aes(x = mean_category_zscore, y = y_label, fill = cell_ca
   )
 ```
 
-## UMAPs
-
-Here we show UMAPs colored by the mean z-score for each gene set category. 
-The UMAP is faceted by cell type category so that only cells from that category are included in the panel. 
-
-```{r}
-# combine with umap_df and create faceted umap by mean auc for each geneset 
-auc_umap_df <- coldata_df |> 
-  dplyr::mutate(cell_id = glue::glue("{unique_id}-{barcodes}")) |> 
-  dplyr::left_join(grouped_aucell_df, by = c("cell_id", "broad_celltype_group"))
-
-
-ggplot(auc_umap_df, aes(x = UMAP1, y = UMAP2, color = mean_category_zscore)) +
-  geom_point(alpha = 0.5, size = 0.2) +
-  facet_grid(rows = vars(geneset_category),
-             cols = vars(cell_category)) +
-  scale_color_viridis_c(option = "turbo") +
-  theme(
-      axis.text = element_blank(),
-      axis.ticks = element_blank(),
-      panel.grid = element_blank(),
-      panel.spacing = unit(0.02, "in"),
-      aspect.ratio = 1
-    ) +
-  labs(color = "Mean z-score")
-
-```
-
 
 # InferCNV 
 
@@ -633,25 +605,6 @@ ggplot(filtered_cnv_df, aes(x = cnv_zscore, y = y_label, fill = forcats::fct_rev
   )
 ```
 
-### UMAPs
-
-Below is a UMAP where all cells are colored by their total CNV z-score.
-
-```{r}
-# facet umap by cell category 
-ggplot(all_cnv_df, aes(x = UMAP1, y = UMAP2, color = cnv_zscore)) +
-  geom_point(alpha = 0.5, size = 0.2) +
-  facet_grid(cols = vars(cell_category)) +
-  scale_color_viridis_c(option = "turbo") +
-  theme(
-      axis.text = element_blank(),
-      axis.ticks = element_blank(),
-      panel.grid = element_blank(),
-      panel.spacing = unit(0.02, "in"),
-      aspect.ratio = 1
-    ) +
-  labs(color = "CNV z-score")
-```
 
 ## Ewing-specific CNVs
 
@@ -720,6 +673,197 @@ ggplot(prop_cnv_df, aes(x = proportion, y = cell_category, fill = cell_category)
     y = ""
   ) +
   theme(legend.position = "none")
+```
+
+# AUCell and CNV results 
+
+Here we show UMAPs colored by the mean z-score for either the gene set category or sum CNV.
+The UMAP is faceted by cell type category so that only cells from that category are included in the panel. 
+
+```{r, fig.height=6, fig.width=6}
+# combine with umap_df and create faceted umap by mean auc for each geneset 
+auc_umap_df <- grouped_aucell_df |> 
+  dplyr::rename(
+    method_category = geneset_category,
+    zscore = mean_category_zscore
+  )
+
+cnv_umap_df <- all_cnv_df |> 
+  dplyr::select(cell_id, broad_celltype_group, cell_category, zscore = cnv_zscore) |> 
+  dplyr::mutate(
+    method_category = "Total CNV"
+  )
+
+zscore_df <- dplyr::bind_rows(list(auc_umap_df, cnv_umap_df))
+
+umap_df <- coldata_df |> 
+  dplyr::mutate(
+    cell_id = glue::glue("{unique_id}-{barcodes}") 
+  ) |> 
+  dplyr::left_join(zscore_df, by = c("cell_id", "broad_celltype_group"))
+
+ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = zscore)) +
+  geom_point(alpha = 0.5, size = 0.2) +
+  facet_grid(rows = vars(method_category),
+             cols = vars(cell_category)) +
+  scale_color_viridis_c(option = "turbo") +
+  theme(
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid = element_blank(),
+      panel.spacing = unit(0.02, "in"),
+      aspect.ratio = 1
+    ) +
+  labs(color = "Mean z-score")
+
+```
+
+```{r}
+combined_df <- all_cnv_df |> 
+  dplyr::left_join(grouped_aucell_df) |> 
+  dplyr::select(barcodes, unique_id, UMAP1, UMAP2, geneset_category, cell_category, broad_celltype_group, broad_group_lumped, consensus_celltype_annotation, cnv_zscore, mean_category_zscore) |> 
+  dplyr::mutate(
+    geneset_category = glue::glue("auc-zscore_{geneset_category}")
+  ) |> 
+  tidyr::pivot_wider(
+    names_from = geneset_category,
+    values_from = mean_category_zscore
+  )
+```
+
+```{r}
+ggplot(combined_df, aes(x = `auc-zscore_EF-activated`, y = cnv_zscore, color = broad_group_lumped)) +
+  geom_point(alpha = 0.5) +
+  scale_color_manual(values = celltype_colors) +
+  labs(
+    x = "EF-activated z-score",
+    y = "Total CNV z-score",
+    color = "Cell type \ncategory"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
+  geom_hline(yintercept = 2, lty = 2) +
+  geom_vline(xintercept = 2, lty = 2)
+```
+```{r}
+ggplot(combined_df, aes(x = `auc-zscore_EMT-ECM`, y = cnv_zscore, color = cell_category)) +
+  geom_point(alpha = 0.5) +
+  scale_color_manual(values = cell_category_colors) +
+  labs(
+    x = "EMT-ECM z-score",
+    y = "Total CNV z-score",
+    color = "Cell type \ncategory"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
+  geom_hline(yintercept = 2, lty = 2) +
+  geom_vline(xintercept = 2, lty = 2)
+```
+
+
+```{r}
+ggplot(combined_df, aes(x = `auc-zscore_EF-activated`, y = `auc-zscore_EMT-ECM`, color = cnv_zscore)) +
+  geom_point(alpha = 0.5) +
+  scale_color_viridis_c() +
+  labs(
+    x = "EF-activated z-score",
+    y = "EMT-ECM z-score",
+    color = "Total CNV"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
+  geom_hline(yintercept = 2, lty = 2) +
+  geom_vline(xintercept = 2, lty = 2)
+```
+
+```{r}
+ggplot(combined_df, aes(x = `auc-zscore_EF-activated`, y = `auc-zscore_EF-repressed`, color = cnv_zscore)) +
+  geom_point(alpha = 0.5) +
+  scale_color_viridis_c() +
+  labs(
+    x = "EF-activated z-score",
+    y = "EF-repressed z-score",
+    color = "Total CNV"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
+  geom_hline(yintercept = 2, lty = 2) +
+  geom_vline(xintercept = 2, lty = 2)
+```
+
+# Tumor cell assignment
+
+
+Confident tumor cells - EF-activated > 2 + CNV > 2 
+cnv tumor - CNV > 2 
+low cells - CNV > 2 & EMT-ECM > 2 
+
+```{r}
+combined_df <- combined_df |> 
+  dplyr::mutate(
+    combined_annotation = dplyr::case_when(
+      cnv_zscore > 2 & `auc-zscore_EF-activated` > 2 ~ "tumor-combined",
+      cnv_zscore > 2 & `auc-zscore_EMT-ECM` > 2 ~ "tumor-low",
+      cnv_zscore > 2 ~ "tumor-cnv",
+      `auc-zscore_EF-activated` > 2 & `auc-zscore_EF-repressed` < -1 ~ "tumor-aucell",
+      .default = consensus_celltype_annotation
+    ),
+    tumor_annotation = dplyr::if_else(stringr::str_detect(tumor_annotation, "tumor"), "tumor", "non-malignant")
+  )
+
+table(combined_df$tumor_annotation, useNA = "ifany")
+```
+
+
+```{r}
+tumor_annotation_colors <- unique(combined_df$combined_annotation)
+colors <- palette.colors(n = length(tumor_annotation_colors), palette = "alphabet") |> 
+  purrr::set_names(tumor_annotation_colors)
+
+ggplot(combined_df, aes(x = UMAP1, y = UMAP2, color = combined_annotation)) +
+  geom_point(alpha = 0.5, size = 0.5) +
+  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
+  scale_color_manual(values = colors)
+```
+
+
+```{r, fig.height=10, fig.width=10}
+faceted_umap(
+  combined_df,
+  annotation_column = combined_annotation,
+  celltype_colors = colors,
+  point_size = 0.2
+)
+```
+
+```{r}
+total_counts_df <- combined_df |> 
+  dplyr::count(combined_annotation) |> 
+  dplyr::arrange(desc(n)) |> 
+  dplyr::mutate(
+    y_label = glue::glue("{combined_annotation} ({n})"),
+    y_label = factor(y_label, levels = rev(unique(y_label)))
+  )
+
+filtered_annotations_df <- combined_df |> 
+  dplyr::left_join(total_counts_df) |> 
+  dplyr::filter(n >=3 )
+```
+
+
+```{r, fig.height=15, fig.width=10}
+geneset_columns <- colnames(filtered_annotations_df)[stringr::str_detect(colnames(filtered_annotations_df), "auc-zscore")]
+
+
+c(geneset_columns, "cnv_zscore") |> 
+  purrr::map(\(column){
+    
+    ggplot(filtered_annotations_df, aes(x = !!sym(column), y = y_label, fill = tumor_annotation)) +
+      ggridges::geom_density_ridges(alpha = 0.5) +
+      #scale_fill_manual(values = cell_category_colors) +
+      labs(
+        y = "",
+        fill = ""
+      )
+    
+  }) |> 
+  patchwork::wrap_plots(guides = "collect", ncol = 1)
 ```
 
 
