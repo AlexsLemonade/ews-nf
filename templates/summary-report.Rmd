@@ -677,6 +677,11 @@ ggplot(prop_cnv_df, aes(x = proportion, y = cell_category, fill = cell_category)
 
 # AUCell and CNV results 
 
+The below section compares the results from `AUCell` and `inferCNV`. 
+We expect that tumor cells have both high CNV scores and high expression of `EWS::FLI1` marker genes. 
+
+## UMAP
+
 Here we show UMAPs colored by the mean z-score for either the gene set category or sum CNV.
 The UMAP is faceted by cell type category so that only cells from that category are included in the panel. 
 
@@ -718,7 +723,7 @@ ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = zscore)) +
 
 ```
 
-```{r}
+```{r, message=FALSE}
 combined_df <- all_cnv_df |> 
   dplyr::left_join(grouped_aucell_df) |> 
   dplyr::select(barcodes, unique_id, UMAP1, UMAP2, geneset_category, cell_category, broad_celltype_group, broad_group_lumped, consensus_celltype_annotation, cnv_zscore, mean_category_zscore) |> 
@@ -731,47 +736,19 @@ combined_df <- all_cnv_df |>
   )
 ```
 
-```{r}
-ggplot(combined_df, aes(x = `auc-zscore_EF-activated`, y = cnv_zscore, color = broad_group_lumped)) +
-  geom_point(alpha = 0.5) +
-  scale_color_manual(values = celltype_colors) +
-  labs(
-    x = "EF-activated z-score",
-    y = "Total CNV z-score",
-    color = "Cell type \ncategory"
-  ) +
-  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
-  geom_hline(yintercept = 2, lty = 2) +
-  geom_vline(xintercept = 2, lty = 2)
-```
-```{r}
-ggplot(combined_df, aes(x = `auc-zscore_EMT-ECM`, y = cnv_zscore, color = cell_category)) +
-  geom_point(alpha = 0.5) +
-  scale_color_manual(values = cell_category_colors) +
-  labs(
-    x = "EMT-ECM z-score",
-    y = "Total CNV z-score",
-    color = "Cell type \ncategory"
-  ) +
-  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
-  geom_hline(yintercept = 2, lty = 2) +
-  geom_vline(xintercept = 2, lty = 2)
-```
+## Scatter plots
 
+The scatter plots below aim to look at the relationship between CNV scores and gene set expression scores for `EWS::FLI1` activated and repressed gene sets in every cell. 
 
-```{r}
-ggplot(combined_df, aes(x = `auc-zscore_EF-activated`, y = `auc-zscore_EMT-ECM`, color = cnv_zscore)) +
-  geom_point(alpha = 0.5) +
-  scale_color_viridis_c() +
-  labs(
-    x = "EF-activated z-score",
-    y = "EMT-ECM z-score",
-    color = "Total CNV"
-  ) +
-  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
-  geom_hline(yintercept = 2, lty = 2) +
-  geom_vline(xintercept = 2, lty = 2)
-```
+The top plot shows the z-score for activated and repressed gene sets in each cell. 
+The bottom plot shows the z-score for the repressed and EMT gene sets in each cell.
+The points are then colored by the total CNV score. 
+
+We expect tumor cells to have high CNV scores and high expression of `EWS::FLI1` targets. 
+Tumor cells should either show increased expression of activated targets and decreased expression of repressed targets or increased expression of repressed targets and an EMT-like signature. 
+
+The dotted lines in the plots indicate 2 standard deviations above the mean or a z-score of 2. 
+It's likely that any cells with a z-score greater than 2 has a high CNV score or gene set score relative to the reference distribution. 
 
 ```{r}
 ggplot(combined_df, aes(x = `auc-zscore_EF-activated`, y = `auc-zscore_EF-repressed`, color = cnv_zscore)) +
@@ -782,83 +759,186 @@ ggplot(combined_df, aes(x = `auc-zscore_EF-activated`, y = `auc-zscore_EF-repres
     y = "EF-repressed z-score",
     color = "Total CNV"
   ) +
-  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
   geom_hline(yintercept = 2, lty = 2) +
   geom_vline(xintercept = 2, lty = 2)
 ```
 
-# Tumor cell assignment
-
-
-Confident tumor cells - EF-activated > 2 + CNV > 2 
-cnv tumor - CNV > 2 
-low cells - CNV > 2 & EMT-ECM > 2 
-
 ```{r}
-combined_df <- combined_df |> 
-  dplyr::mutate(
-    combined_annotation = dplyr::case_when(
-      cnv_zscore > 2 & `auc-zscore_EF-activated` > 2 ~ "tumor-combined",
-      cnv_zscore > 2 & `auc-zscore_EMT-ECM` > 2 ~ "tumor-low",
-      cnv_zscore > 2 ~ "tumor-cnv",
-      `auc-zscore_EF-activated` > 2 & `auc-zscore_EF-repressed` < -1 ~ "tumor-aucell",
-      .default = consensus_celltype_annotation
-    ),
-    tumor_annotation = dplyr::if_else(stringr::str_detect(tumor_annotation, "tumor"), "tumor", "non-malignant")
-  )
-
-table(combined_df$tumor_annotation, useNA = "ifany")
+ggplot(combined_df, aes(x = `auc-zscore_EF-repressed`, y = `auc-zscore_EMT-ECM`, color = cnv_zscore)) +
+  geom_point(alpha = 0.5) +
+  scale_color_viridis_c() +
+  labs(
+    x = "EF-repressed z-score",
+    y = "EMT-ECM z-score",
+    color = "Total CNV"
+  ) +
+  geom_hline(yintercept = 2, lty = 2) +
+  geom_vline(xintercept = 2, lty = 2)
 ```
 
 
-```{r}
-tumor_annotation_colors <- unique(combined_df$combined_annotation)
+Here we show the CNV score on the y-axis compared to either the score for the `EWS::FLI1` activated (top) or repressed (bottom) gene set. 
+We expect all tumor cells to have high CNV and either increased expression of `EWS::FLI1` activated or repressed targets. 
+
+
+```{r, fig.height=10, fig.width=8}
+EF_aucell_columns <- c("auc-zscore_EF-activated", "auc-zscore_EF-repressed") |> 
+  purrr::set_names(c("EF-activated z-score", "EF-repressed z-score"))
+
+EF_aucell_columns |> 
+  purrr::imap(\(column, x_label){
+    ggplot(combined_df, aes(x = !!sym(column), y = cnv_zscore, color = cell_category)) +
+      geom_point(alpha = 0.5) +
+      scale_color_manual(values = cell_category_colors) +
+      labs(
+        x = x_label,
+        y = "Total CNV z-score",
+        color = "Cell type \ncategory"
+      ) +
+      guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
+      geom_hline(yintercept = 2, lty = 2) +
+      geom_vline(xintercept = 2, lty = 2)
+    
+    
+  }) |> 
+  patchwork::wrap_plots(guides = "collect", ncol = 1) &
+  theme(legend.position = "top")
+
+```
+
+# Tumor cell assignment
+
+<!--TODO: 
+Move the classification to a separate module once we solidify how we actually will classify things and read in the results to show here. 
+-->
+
+Below we will classify tumor cells three different ways: 
+
+- `cnv_annotation`: Cells with CNV z-score > 2 will be labeled with `tumor`
+- `aucell_annotation`: Cells with `EF-activated` or `EF-repressed` z-score > 2 will be labeled with `tumor`
+- `combined_tumor_annotation`: Cells with CNV z-score > 2 and `EF-activated` z-score will be classified as `tumor-high`, while cells with CNV z-score > 2 and `EF-repressed` z-score > 2 will be classified as `tumor-low`
+
+Any cells that do not meet this criteria will be classified as `normal` and the consensus cell type annotation will be used as their final annotation. 
+
+Below is a table that summarizes the total cells assigned in each category: 
+
+```{r, warning=FALSE}
+# add classifications
+combined_df <- combined_df |> 
+  dplyr::mutate(
+    cnv_annotation = dplyr::if_else(cnv_zscore > 2, "tumor", "normal"),
+    aucell_annotation = dplyr::if_else(`auc-zscore_EF-activated` > 2 | `auc-zscore_EF-repressed` > 2, "tumor", "normal"),
+    combined_tumor_annotation = dplyr::case_when(
+      cnv_zscore > 2 & `auc-zscore_EF-activated` > 2 ~ "tumor-high",
+      cnv_zscore > 2 & `auc-zscore_EF-repressed` > 2 ~ "tumor-low",
+      .default = "normal"
+    ),
+    combined_consensus_annotation = dplyr::if_else(
+      stringr::str_detect(combined_tumor_annotation, "tumor"),
+      combined_tumor_annotation,
+      consensus_celltype_annotation
+    ),
+    broad_combined_annotation = dplyr::if_else(stringr::str_detect(combined_tumor_annotation, "tumor"), combined_tumor_annotation, broad_celltype_group)
+  )
+
+# print out a table 
+combined_df |> 
+  dplyr::count(cnv_annotation, aucell_annotation, combined_tumor_annotation, combined_consensus_annotation) |>
+  dplyr::arrange(desc(n)) |> 
+  knitr::kable()
+```
+
+## UMAPs 
+
+Now we will look at each of the annotations on a UMAP. 
+
+```{r, warning=FALSE, fig.height=6, fig.width=10}
+combined_df |> 
+  tidyr::pivot_longer(cols = c("cnv_annotation", "aucell_annotation", "combined_tumor_annotation"),
+                      names_to = "annotation_category",
+                      values_to = "annotation"
+  ) |> 
+  dplyr::mutate(annotation_category = stringr::str_remove(annotation_category, "_annotation") |> 
+                  stringr::str_replace_all("_", " ")) |> 
+  ggplot(aes(x = UMAP1, y = UMAP2, color = annotation)) +
+  geom_point(alpha = 0.5, size = 0.5) +
+  facet_wrap(vars(annotation_category)) +
+  scale_color_brewer(palette = "Set1") +
+  # remove axis numbers and background grid
+  scale_x_continuous(labels = NULL, breaks = NULL) +
+  scale_y_continuous(labels = NULL, breaks = NULL) +
+  theme(aspect.ratio = 1) +
+  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1)))
+```
+
+We will use the `combined_tumor_annotation` category moving forward. 
+
+The below UMAPs show the annotations for the `combined_tumor_annotation` with normal cells being assigned to their broad cell type group. 
+
+```{r, warning=FALSE}
+tumor_annotation_colors <- unique(combined_df$broad_combined_annotation)
 colors <- palette.colors(n = length(tumor_annotation_colors), palette = "alphabet") |> 
   purrr::set_names(tumor_annotation_colors)
 
-ggplot(combined_df, aes(x = UMAP1, y = UMAP2, color = combined_annotation)) +
+ggplot(combined_df, aes(x = UMAP1, y = UMAP2, color = broad_combined_annotation)) +
   geom_point(alpha = 0.5, size = 0.5) +
   guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
-  scale_color_manual(values = colors)
+  scale_color_manual(values = colors) +
+  labs(color = "Broad cell type group \nwith tumor annotation") +
+  # remove axis numbers and background grid
+  scale_x_continuous(labels = NULL, breaks = NULL) +
+  scale_y_continuous(labels = NULL, breaks = NULL)
 ```
 
 
-```{r, fig.height=10, fig.width=10}
+```{r, fig.height=10, fig.width=10, warning=FALSE}
 faceted_umap(
   combined_df,
-  annotation_column = combined_annotation,
+  annotation_column = broad_combined_annotation,
   celltype_colors = colors,
   point_size = 0.2
 )
 ```
 
+
+## Ridge plots
+
+Finally we will look at the distribution of z-scores for `AUCell` and `inferCNV` using the combined tumor annotation. 
+As with the UMAPs, the braod cell type group is shown for any cells that are classified as normal. 
+The ridge plots are colored by whether or not the cells are labeled tumor or normal. 
+
+
 ```{r}
 total_counts_df <- combined_df |> 
-  dplyr::count(combined_annotation) |> 
-  dplyr::arrange(desc(n)) |> 
+  dplyr::count(broad_combined_annotation) |> 
   dplyr::mutate(
-    y_label = glue::glue("{combined_annotation} ({n})"),
+    is_tumor = stringr::str_detect(broad_combined_annotation, "tumor")
+  ) |> 
+  dplyr::arrange(desc(is_tumor), desc(n)) |> 
+  dplyr::mutate(
+    y_label = glue::glue("{broad_combined_annotation} ({n})"),
     y_label = factor(y_label, levels = rev(unique(y_label)))
   )
 
 filtered_annotations_df <- combined_df |> 
   dplyr::left_join(total_counts_df) |> 
-  dplyr::filter(n >=3 )
+  dplyr::filter(n >=3 ) |> 
+  dplyr::mutate(is_tumor = factor(is_tumor, levels = c(FALSE, TRUE), labels = c("normal", "tumor")))
 ```
 
 
-```{r, fig.height=15, fig.width=10}
+```{r, fig.height=15, fig.width=10, message=FALSE}
 geneset_columns <- colnames(filtered_annotations_df)[stringr::str_detect(colnames(filtered_annotations_df), "auc-zscore")]
 
 
 c(geneset_columns, "cnv_zscore") |> 
   purrr::map(\(column){
     
-    ggplot(filtered_annotations_df, aes(x = !!sym(column), y = y_label, fill = tumor_annotation)) +
+    ggplot(filtered_annotations_df, aes(x = !!sym(column), y = y_label, fill = is_tumor)) +
       ggridges::geom_density_ridges(alpha = 0.5) +
-      #scale_fill_manual(values = cell_category_colors) +
+      scale_fill_brewer(palette = "Set1") +
       labs(
-        y = "",
+        y = "Combined CNV and \nAUCell annotation",
         fill = ""
       )
     
