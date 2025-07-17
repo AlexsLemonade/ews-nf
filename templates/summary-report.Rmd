@@ -699,7 +699,7 @@ cnv_umap_df <- all_cnv_df |>
     method_category = "Total CNV"
   )
 
-zscore_df <- dplyr::bind_rows(list(auc_umap_df, cnv_umap_df))
+zscore_df <- dplyr::bind_rows(auc_umap_df, cnv_umap_df)
 
 umap_df <- coldata_df |> 
   dplyr::mutate(
@@ -922,13 +922,13 @@ total_counts_df <- combined_df |>
 
 filtered_annotations_df <- combined_df |> 
   dplyr::left_join(total_counts_df) |> 
-  dplyr::filter(n >=3 ) |> 
+  dplyr::filter(n >=3) |> 
   dplyr::mutate(is_tumor = factor(is_tumor, levels = c(FALSE, TRUE), labels = c("normal", "tumor")))
 ```
 
 
 ```{r, fig.height=15, fig.width=10, message=FALSE}
-geneset_columns <- colnames(filtered_annotations_df)[stringr::str_detect(colnames(filtered_annotations_df), "auc-zscore")]
+geneset_columns <- grep("auc-zscore", colnames(filtered_annotations_df), value = TRUE)
 
 
 c(geneset_columns, "cnv_zscore") |> 
