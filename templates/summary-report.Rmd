@@ -755,14 +755,14 @@ combined_df <- all_cnv_df |>
 
 The scatter plots below aim to look at the relationship between CNV scores and gene set expression scores for `EWS::FLI1` activated and repressed gene sets in every cell. 
 
-The top plot shows the z-score for activated and repressed gene sets in each cell. 
-The bottom plot shows the z-score for the repressed and EMT gene sets in each cell.
+The top plot shows the z-score for the repressed vs. activated gene sets in each cell. 
+The bottom plot shows the z-score for the EMT vs. repressed gene sets in each cell.
 The points are then colored by the total CNV score. 
 
 We expect tumor cells to have high CNV scores and high expression of `EWS::FLI1` targets. 
 Tumor cells should either show increased expression of activated targets and decreased expression of repressed targets or increased expression of repressed targets and an EMT-like signature. 
 
-The dotted lines in the plots indicate `r zscore_cutoff` standard deviations above the mean or a z-score of `r zscore_cutoff`. 
+The dotted lines in the plots indicate a z-score of `r zscore_cutoff`, i.e. `r zscore_cutoff` standard deviations above the mean. 
 It's likely that any cells with a z-score greater than `r zscore_cutoff`, indicating a high CNV score or gene set score relative to the reference distribution, are tumor cells. 
 
 ```{r}
@@ -802,7 +802,7 @@ EF_aucell_columns <- c("auc-zscore_EF-activated", "auc-zscore_EF-repressed") |>
 
 EF_aucell_columns |> 
   purrr::imap(\(column, x_label){
-    ggplot(combined_df, aes(x = !!sym(column), y = cnv_zscore, color = cell_category)) +
+    ggplot(combined_df, aes(x = !!sym(column), y = cnv_zscore, color = forcats::fct_rev(cell_category))) +
       geom_point(alpha = 0.5) +
       scale_color_manual(values = cell_category_colors) +
       labs(
@@ -892,7 +892,8 @@ combined_df |>
 
 We will use the `combined_tumor_annotation` category moving forward. 
 
-The below UMAPs show the annotations for the `combined_tumor_annotation` with normal cells being assigned to their broad cell type group. 
+The below UMAPs show the annotations for the `combined_tumor_annotation` with normal cells colored by their broad cell type group. 
+The full UMAP is first shown, followed by a faceted UMAP to highlight each cell type with other cells in gray.
 
 ```{r, warning=FALSE}
 tumor_annotation_colors <- unique(combined_df$broad_combined_annotation)
