@@ -876,6 +876,8 @@ combined_df |>
 ## UMAPs 
 
 Now we will look at each of the annotations on a UMAP. 
+In this UMAP, the first two panels showing the annotation using `AUCell` or `inferCNV` alone only labels cells as either `tumor` or `normal`. 
+The third panel showing the combined annotation will break up tumor cells into `tumor-high` and `tumor-low` dependent on the expression of activated (`tumor-high`) and repressed (`tumor-low`) gene sets. 
 
 ```{r, warning=FALSE, fig.height=6, fig.width=10}
 combined_df |> 
@@ -888,7 +890,7 @@ combined_df |>
   ggplot(aes(x = UMAP1, y = UMAP2, color = annotation)) +
   geom_point(alpha = 0.3, size = 0.5) +
   facet_wrap(vars(annotation_category)) +
-  scale_color_brewer(palette = "Dark2") +
+  scale_color_brewer(palette = "Set1") +
   umap_theme() +
   guides(color = guide_legend(override.aes = list(size = 2, alpha = 1)))
 ```
@@ -897,7 +899,7 @@ We will use the `combined_tumor_annotation` category moving forward.
 
 The below UMAPs show the annotations for the `combined_tumor_annotation` with normal cells colored by their broad cell type group. 
 The full UMAP is first shown, followed by a faceted UMAP to highlight each cell type with other cells in gray.
-Only cell types with at least 3 cells are shown in the UMAPs. 
+Only cell types with at least 10 cells are shown in the UMAPs. 
 
 ```{r, warning=FALSE}
 # get total counts for each cell
@@ -916,7 +918,7 @@ total_counts_df <- combined_df |>
 # filter to having at least three cells
 filtered_annotations_df <- combined_df |> 
   dplyr::left_join(total_counts_df) |> 
-  dplyr::filter(n >=3) |> 
+  dplyr::filter(n >=10) |> 
   dplyr::mutate(is_tumor = factor(is_tumor, levels = c(FALSE, TRUE), labels = c("normal", "tumor")))
 ```
 
