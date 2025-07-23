@@ -896,8 +896,11 @@ In this UMAP, the first two panels showing the annotation using `AUCell` or `inf
 The third panel showing the combined annotation will break up tumor cells into `tumor-high`, `tumor-low`, and `tumor-cnv-only`, dependent on the expression of activated (`tumor-high`) and repressed (`tumor-low`) gene sets. 
 
 ```{r, warning=FALSE, fig.height=6, fig.width=10}
+# define order for tumor cell types to show up in plots
+tumor_order <- c("tumor-high", "tumor-low", "tumor-cnv-only")
+
 colors <- c(brewer.pal(n=5, "Set1"), "gray60")
-names(colors) <- c("normal", "tumor", "tumor-high", "tumor-low", "tumor-cnv-only", "unknown")
+names(colors) <- c("normal", "tumor", tumor_order, "unknown")
 
 combined_df |> 
   tidyr::pivot_longer(cols = c("cnv_annotation", "aucell_annotation", "combined_tumor_annotation"),
@@ -920,14 +923,19 @@ The below UMAPs show the annotations for the `combined_tumor_annotation` with no
 The full UMAP is first shown, followed by a faceted UMAP to highlight each cell type with other cells in gray.
 Only cell types with at least 10 cells are shown in the UMAPs. 
 
-```{r, warning=FALSE}
+```{r, warning=FALSE, message=FALSE}
 # get total counts for each cell
 total_counts_df <- combined_df |> 
   dplyr::count(broad_combined_annotation) |> 
+  # add column to indicate if tumor or not tumor (used in plots later)
+  # use both columns is_tumor and tumor_rank to order labels first by tumor order and then by total number of cells 
   dplyr::mutate(
-    is_tumor = stringr::str_detect(broad_combined_annotation, "tumor")
+    is_tumor = stringr::str_detect(broad_combined_annotation, "tumor"),
+    tumor_rank = match(broad_combined_annotation, tumor_order)
   ) |> 
-  dplyr::arrange(desc(is_tumor), desc(n)) |> 
+  dplyr::arrange(desc(is_tumor), 
+                 dplyr::if_else(is_tumor, tumor_rank, Inf),
+                 desc(n)) |> 
   # add a label to use in the ridge plots 
   dplyr::mutate(
     y_label = glue::glue("{broad_combined_annotation} ({n})"),
@@ -937,7 +945,12 @@ total_counts_df <- combined_df |>
 # add total counts and tumor indication
 annotations_df <- combined_df |> 
   dplyr::left_join(total_counts_df) |> 
-  dplyr::mutate(is_tumor = factor(is_tumor, levels = c(FALSE, TRUE), labels = c("normal", "tumor")))
+  # set factor order for plotting
+  dplyr::mutate(is_tumor = factor(is_tumor, levels = c(FALSE, TRUE), labels = c("normal", "tumor")),
+                combined_tumor_annotation = factor(combined_tumor_annotation, levels = c(tumor_order, "normal", "unknown")),
+                broad_combined_annotation = factor(broad_combined_annotation) |> 
+                  forcats::fct_relevel(tumor_order) |> 
+                  forcats::fct_relevel("unknown", after = Inf))
 
 # filter to 10 for umaps and 3 for ridge plots 
 umap_filtered_annotations_df <- annotations_df |> 
@@ -978,11 +991,6 @@ We will look at the total number of genes detected, total counts, and percentage
 The red bar indicates the median. 
 
 ```{r, fig.width=8}
-# set the factor order for plotting
-annotations_df <- annotations_df |> 
-  dplyr::mutate(
-    combined_tumor_annotation = factor(combined_tumor_annotation, levels = c("tumor-high", "tumor-low", "tumor-cnv-only", "normal", "unknown")))
-
 # get the qc columns and name by the label to use for the y axis
 qc_columns <- c(
   "Number of genes detected" = "genes_detected",
