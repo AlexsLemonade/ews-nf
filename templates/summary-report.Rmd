@@ -842,8 +842,10 @@ Below we will classify tumor cells three different ways:
 - `cnv_annotation`: Cells with CNV z-score > `r zscore_cutoff` will be labeled with `tumor`
 - `aucell_annotation`: Cells with `EF-activated` or `EF-repressed` z-score > `r zscore_cutoff` will be labeled with `tumor`
 - `combined_tumor_annotation`: Cells with CNV z-score > `r zscore_cutoff` and `EF-activated` z-score will be classified as `tumor-high`, while cells with CNV z-score > `r zscore_cutoff` and `EF-repressed` z-score > `r zscore_cutoff` will be classified as `tumor-low`
+Cells that have CNV z-score > `r zscore_cutoff` but do not have increased expression of marker gene sets (either `EF-activated` or `EF-repressed`) will be labeled with `tumor-cnv-only`.
 
-Any cells that do not meet this criteria will be classified as `normal` and the consensus cell type annotation will be used as their final annotation. 
+Any cells that do not meet this criteria and were labeled as `unknown` with consensus cell types will continue to be labeled as `unknown`. 
+All other cells will be classified as `normal` and the consensus cell type annotation will be used as their final annotation. 
 
 Below is a table that summarizes the total cells assigned in each category: 
 
@@ -864,6 +866,7 @@ combined_df <- combined_df |>
     combined_tumor_annotation = dplyr::case_when(
       cnv_zscore > zscore_cutoff & `auc-zscore_EF-activated` > zscore_cutoff ~ "tumor-high",
       cnv_zscore > zscore_cutoff & `auc-zscore_EF-repressed` > zscore_cutoff ~ "tumor-low",
+      cnv_zscore > 2 ~ "tumor-cnv-only",
       broad_celltype_group == "unknown" ~ "unknown",
       .default = "normal"
     ),
@@ -890,9 +893,12 @@ combined_df |>
 
 Now we will look at each of the annotations on a UMAP. 
 In this UMAP, the first two panels showing the annotation using `AUCell` or `inferCNV` alone only labels cells as either `tumor`, `unknown`, or `normal`. 
-The third panel showing the combined annotation will break up tumor cells into `tumor-high` and `tumor-low` dependent on the expression of activated (`tumor-high`) and repressed (`tumor-low`) gene sets. 
+The third panel showing the combined annotation will break up tumor cells into `tumor-high`, `tumor-low`, and `tumor-cnv-only`, dependent on the expression of activated (`tumor-high`) and repressed (`tumor-low`) gene sets. 
 
 ```{r, warning=FALSE, fig.height=6, fig.width=10}
+colors <- c(brewer.pal(n=5, "Set1"), "gray60")
+names(colors) <- c("normal", "tumor", "tumor-high", "tumor-low", "tumor-cnv-only", "unknown")
+
 combined_df |> 
   tidyr::pivot_longer(cols = c("cnv_annotation", "aucell_annotation", "combined_tumor_annotation"),
                       names_to = "annotation_category",
@@ -903,7 +909,7 @@ combined_df |>
   ggplot(aes(x = UMAP1, y = UMAP2, color = annotation)) +
   geom_point(alpha = 0.3, size = 0.5) +
   facet_wrap(vars(annotation_category)) +
-  scale_color_brewer(palette = "Set1") +
+  scale_color_manual(values = colors) +
   umap_theme() +
   guides(color = guide_legend(override.aes = list(size = 2, alpha = 1)))
 ```
@@ -945,6 +951,7 @@ ridge_filtered_annotations_df <- annotations_df |>
 tumor_annotation_colors <- unique(umap_filtered_annotations_df$broad_combined_annotation)
 colors <- palette.colors(n = length(tumor_annotation_colors), palette = "alphabet") |> 
   purrr::set_names(tumor_annotation_colors)
+colors[["unknown"]] <- "gray60"
 
 ggplot(umap_filtered_annotations_df, aes(x = UMAP1, y = UMAP2, color = broad_combined_annotation)) +
   geom_point(alpha = 0.5, size = 0.5) +
@@ -966,7 +973,7 @@ faceted_umap(
 ## QC plots
 
 The below plots will look at some quality control metrics across groups of cells. 
-In particular, we want to see if the `tumor-low` or `unknown` cells have an underlying technical difference that could be contributing to those cells having either lower CNV scores or lower marker gene expression. 
+In particular, we want to see if the `tumor-low`, `tumor-cnv-only`, or `unknown` cells have an underlying technical difference that could be contributing to those cells having either lower CNV scores or lower marker gene expression. 
 We will look at the total number of genes detected, total counts, and percentage of mitochondrial reads across the cell types using the `combined_tumor_annotation`. 
 The red bar indicates the median. 
 
@@ -974,7 +981,7 @@ The red bar indicates the median.
 # set the factor order for plotting
 annotations_df <- annotations_df |> 
   dplyr::mutate(
-    combined_tumor_annotation = factor(combined_tumor_annotation, levels = c("tumor-high", "tumor-low", "normal", "unknown")))
+    combined_tumor_annotation = factor(combined_tumor_annotation, levels = c("tumor-high", "tumor-low", "tumor-cnv-only", "normal", "unknown")))
 
 # get the qc columns and name by the label to use for the y axis
 qc_columns <- c(
