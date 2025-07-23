@@ -283,6 +283,9 @@ Information about the gene sets used here can be found in [`ews-nf/genesets`](ht
 
 Plots here show the z-score calculated from the AUC reported by `AUCell`. 
 For each gene set, the mean and standard deviation of the AUC values for all reference cells was used to contain a z-score for all cells. 
+The reference was created by pooling all cells across all samples of interest that were assigned a consensus cell type listed as a reference cell type (see [`references/reference-celltype.tsv`](https://github.com/AlexsLemonade/ews-nf/blob/main/references/reference-celltypes.tsv)). 
+For the plots below all reference cells across all samples are shown alongside all query cells from `r params$unique_id`. 
+
 Cell types are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types (labeled as "normal non-reference") based on consensus cell type labels. 
 If any unknown or normal non-malignant cell types show gene expression patterns expected to be observed in tumor cells, it's likely that those cells are mis-classified and are in fact tumor cells. 
 
@@ -529,6 +532,7 @@ We expect tumor cells to have higher numbers of CNVs than reference cells.
 
 The first plot shows all cell type groups (unknown, normal non-reference, and unknown) and then the second plot shows each broad cell type category. 
 Only cell types with at least 3 cells are shown. 
+All reference cells belonging to the pooled reference are shown in the plots below. 
 
 ### Ridge plots
 
@@ -736,6 +740,7 @@ ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = zscore)) +
 ```{r, message=FALSE}
 combined_df <- all_cnv_df |> 
   dplyr::left_join(grouped_aucell_df) |> 
+  dplyr::filter(unique_id == params$unique_id) |>
   dplyr::select(
     barcodes, 
     unique_id, 
@@ -847,7 +852,7 @@ Cells that have CNV z-score > `r zscore_cutoff` but do not have increased expres
 Any cells that do not meet this criteria and were labeled as `unknown` with consensus cell types will continue to be labeled as `unknown`. 
 All other cells will be classified as `normal` and the consensus cell type annotation will be used as their final annotation. 
 
-Below is a table that summarizes the total cells assigned in each category: 
+Below is a table that summarizes the total cells assigned in each category for this sample: 
 
 ```{r, warning=FALSE}
 # add classifications
