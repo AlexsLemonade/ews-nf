@@ -908,7 +908,8 @@ combined_df |>
                       values_to = "annotation"
   ) |> 
   dplyr::mutate(annotation_category = stringr::str_remove(annotation_category, "_annotation") |> 
-                  stringr::str_replace_all("_", " ")) |> 
+                  stringr::str_replace_all("_", " "),
+                annotation = factor(annotation, levels = names(colors))) |> 
   ggplot(aes(x = UMAP1, y = UMAP2, color = annotation)) +
   geom_point(alpha = 0.3, size = 0.5) +
   facet_wrap(vars(annotation_category)) +
