@@ -538,7 +538,7 @@ All reference cells belonging to the pooled reference are shown in the plots bel
 
 ```{r}
 # read infercnv results
-infercnv_df <- infercnv_df |>
+all_cnv_df <- infercnv_df |>
   # indicator for reference vs query cell based on `subcluster` name
   dplyr::mutate(cell_group = stringr::str_split_i(subcluster, "_", 1)) |>
   # separate barcode and library
@@ -558,36 +558,6 @@ infercnv_df <- infercnv_df |>
     ) |> 
       forcats::fct_relevel("unknown", after = 0) |>
       forcats::fct_rev()
-  )
-
-# calculate the total cnv sum for each cell 
-sum_cnv_df <- infercnv_df |> 
-  tidyr::pivot_longer(
-    starts_with("has_cnv_"),
-    names_to = "chr",
-    values_to = "cnv"
-  ) |>
-  # sum all values for each
-  dplyr::group_by(barcodes, unique_id) |>
-  dplyr::summarize(total_cnv_per_cell = sum(cnv)) |>
-  dplyr::ungroup() 
-
-
-# add back in to larger df with all cnv information and cell types 
-all_cnv_df <- infercnv_df |> 
-  dplyr::left_join(sum_cnv_df, by = c("unique_id", "barcodes"))
-
-# calculate a z-score for the total CNV using the reference cells as mean and sd
-ref_cnv_sums <- all_cnv_df |> 
-  dplyr::filter(cell_category == "reference") |> 
-  dplyr::pull(total_cnv_per_cell)
-ref_mean <- mean(ref_cnv_sums)
-ref_sd <- sd(ref_cnv_sums)
-
-# now add in zscore
-all_cnv_df <- all_cnv_df |> 
-  dplyr::mutate(
-    cnv_zscore = (total_cnv_per_cell - ref_mean)/ref_sd
   )
 ```
 
@@ -646,7 +616,7 @@ For each chromsome we show the proportions for gains, losses and total proportio
 validation_chr <- c("chr1", "chr8", "chr12", "chr16")
 
 # get the proportion for each chromosome of interest split out by type (cnv, dupli, loss)
-prop_cnv_df <- infercnv_df |>
+prop_cnv_df <- all_cnv_df |>
   dplyr::select(
     starts_with("proportion_scaled_"),
     cell_id,
@@ -676,7 +646,7 @@ prop_cnv_df <- infercnv_df |>
     # create unique label to use for faceting 
     facet_label = glue::glue("chr{chr}-{cnv_type}")
   ) |> 
-  dplyr::left_join(infercnv_df)
+  dplyr::left_join(all_cnv_df)
 ```
 
 ```{r, message = FALSE, fig.height=8, fig.width=8}

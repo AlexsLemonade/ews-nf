@@ -215,11 +215,42 @@ infercnv::add_to_seurat(
   infercnv_output_path = opt$temp_dir
 )
 
-# add reference information to metadata file and save to output directory
+# add reference information to metadata file and add sum cnv and z-scores
 # we have to read in with base R, since there are rownames
-read.table(scratch_metadata_file, header = TRUE, sep = "\t") |>
+cnv_df <- read.table(scratch_metadata_file, header = TRUE, sep = "\t") |>
   # pull out row names into cell_id column
-  tibble::rownames_to_column(var = "cell_id") |>
+  tibble::rownames_to_column(var = "cell_id") |> 
+  # indicator for reference vs query cell based on `subcluster` name
+  dplyr::mutate(cell_group = stringr::str_split_i(subcluster, "_", 1))
+
+# calculate the total cnv sum for each cell 
+sum_cnv_df <- cnv_df |> 
+  tidyr::pivot_longer(
+    starts_with("has_cnv_"),
+    names_to = "chr",
+    values_to = "cnv"
+  ) |>
+  # sum all values for each
+  dplyr::group_by(cell_id) |>
+  dplyr::summarize(total_cnv_per_cell = sum(cnv)) |>
+  dplyr::ungroup() 
+
+# add back in to larger df with all cnv information and cell types 
+all_cnv_df <- cnv_df |> 
+  dplyr::left_join(sum_cnv_df, by = "cell_id")
+
+# calculate a z-score for the total CNV using the reference cells as mean and sd
+ref_cnv_sums <- all_cnv_df |> 
+  dplyr::filter(cell_group == "reference") |> 
+  dplyr::pull(total_cnv_per_cell)
+ref_mean <- mean(ref_cnv_sums)
+ref_sd <- sd(ref_cnv_sums)
+
+# now add in zscore and export
+all_cnv_df |> 
+  dplyr::mutate(
+    cnv_zscore = (total_cnv_per_cell - ref_mean)/ref_sd
+  ) |>
   readr::write_tsv(opt$output_metadata_file)
 
 # copy png file to output directory
