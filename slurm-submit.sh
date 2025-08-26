@@ -29,9 +29,8 @@
 
 set -euo pipefail
 module load nextflow
-# modules for using singularity
+# module for using singularity
 module load singularity
-module load squashfs-tools
 
 # Define the project directory for nextflow
 project_dir=$HOME/ews-nf
