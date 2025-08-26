@@ -25,9 +25,11 @@ process render_report {
   output:
     tuple val(unique_id),
           val(sample_id),
-          path(summary_report_html)
+          path(summary_report_html),
+          path(output_annotations_file)
   script:
     summary_report_html = "${unique_id}_summary-report.html"
+    output_annotations_file = "${unique_id}_annotations.tsv"
     """
     Rscript -e "rmarkdown::render('${template_file}', \
       output_file = '${summary_report_html}',\
@@ -42,12 +44,15 @@ process render_report {
                     gene_set_category_file = '${gene_set_category_file}', \
                     infercnv_heatmap_file = '${infercnv_heatmap}', \
                     infercnv_results_file = '${infercnv_metadata}', \
-                    plotting_functions_file = '${plotting_functions_file}'))"
+                    plotting_functions_file = '${plotting_functions_file}',\
+                    output_annotations_file = '${output_annotations_file}'))"
     """
   stub:
     summary_report_html = "${unique_id}_summary-report.html"
+    output_annotations_file = "${unique_id}_annotations.tsv"
     """
     touch ${summary_report_html}
+    touch ${output_annotations_file}
     """
 }
 
@@ -96,5 +101,5 @@ workflow summary_report {
     )
 
   emit:
-    render_report.out // [unique_id, sample_id, report file]
+    render_report.out // [unique_id, sample_id, report file, annotations tsv]
 }

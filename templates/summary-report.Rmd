@@ -12,6 +12,7 @@ params:
   infercnv_heatmap_file: "../ews-nf-out/infercnv/SCPCS000490/SCPCL000822_infercnv-heatmap.png"
   infercnv_results_file: "../ews-nf-out/infercnv/SCPCS000490/SCPCL000822_infercnv-metadata.tsv"
   plotting_functions_file: "utils/plotting-functions.Rmd"
+  output_annotations_file: "SCPCL000822_annotations.tsv"
   zscore_cutoff: 2
   seed: 2025
 
@@ -1032,6 +1033,12 @@ c(geneset_columns, "cnv_zscore") |>
     
   }) |> 
   patchwork::wrap_plots(guides = "collect", ncol = 1)
+```
+
+
+```{r}
+# export the annotations df
+readr::write_tsv(combined_df, params$output_annotations_file)
 ```
 
 
