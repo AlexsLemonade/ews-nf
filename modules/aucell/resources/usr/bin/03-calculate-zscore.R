@@ -52,7 +52,7 @@ aucell_df <- aucell_files |>
   purrr::map(readr::read_tsv) |>
   dplyr::bind_rows() |> 
   # add ref/query column to aucell 
-  dplyr::mutate(cell_id = glue::glue("{unique_id}-{barcodes}"),
+  dplyr::mutate(cell_id = glue::glue("{unique_id}_{barcodes}"),
                 ref_or_query = dplyr::if_else(
                   cell_id %in% ref_cells,
                   "reference",

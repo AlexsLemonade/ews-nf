@@ -148,7 +148,7 @@ message("files read in")
 # Prepare input data  ---------------------------------------------
 
 # Update SCE column names to always prefix with unique id for downstream bookkeeping
-colnames(sce) <- glue::glue("{unique_id}-{colnames(sce)}")
+colnames(sce) <- glue::glue("{unique_id}_{colnames(sce)}")
 
 # Remove any reference cells which also appear in this library
 duplicated_cells <- intersect(colnames(ref_sce), colnames(sce))
