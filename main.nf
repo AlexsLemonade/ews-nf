@@ -29,6 +29,17 @@ workflow {
       file // full path to file
     )}
     .filter{ run_all || (it[0] in sample_ids) } // filter to only specified samples
+    .branch{
+      run_workflow: it[2].size() > 0 || it[2].name.startsWith("STUB")
+      skip_workflow: true
+    }
+
+  // send unique ids for all libraries that don't have enough cells to log 
+  library_ch.skip_workflow
+    .subscribe{
+      log.error("There are no cells found in the processed object for ${it[0]}.")
+    }
+
 
   // build reference of normal cells
   build_ref(library_ch)
