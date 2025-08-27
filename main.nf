@@ -29,17 +29,29 @@ workflow {
       file // full path to file
     )}
     .filter{ run_all || (it[0] in sample_ids) } // filter to only specified samples
+    .branch{
+      run_workflow: it[2].size() > 0 || it[2].name.startsWith("STUB")
+      skip_workflow: true
+    }
+
+  // send unique ids for all libraries that don't have enough cells to log 
+  library_ch.skip_workflow
+    .subscribe{
+      log.error("There are no cells found in the processed object for ${it[0]}.")
+    }
+
+  run_ch = library_ch.run_workflow
 
   // build reference of normal cells
-  build_ref(library_ch)
+  build_ref(run_ch)
 
   // run aucell 
-  aucell(library_ch, build_ref.out)
+  aucell(run_ch, build_ref.out)
   
   // run infercnv 
-  infercnv(library_ch, build_ref.out)
+  infercnv(run_ch, build_ref.out)
 
   // generate report 
-  summary_report(library_ch, aucell.out.query, aucell.out.ref, infercnv.out, build_ref.out)
+  summary_report(run_ch, aucell.out.query, aucell.out.ref, infercnv.out, build_ref.out)
   
 }
