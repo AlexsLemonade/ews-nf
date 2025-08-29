@@ -123,6 +123,20 @@ marker_gene_dotplot <- function(
       validation_group_annotation = factor(validation_group_annotation, levels = names(celltype_colors))
     ) |> 
     dplyr::arrange(validation_group_annotation)
+  
+  if(nrow(filtered_markers_df) == 0){
+    return(
+      glue::glue("
+      <div class=\"alert alert-info\">
+
+      This library does not express any marker genes for the identified normal cell types.
+      No dotplot will be shown.
+
+      </div>
+    "
+      )
+    )
+  }
 
   # specify x axis order for dotplot
   marker_gene_order <- filtered_markers_df |>
