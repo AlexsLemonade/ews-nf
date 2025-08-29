@@ -1,18 +1,18 @@
 ---
 params:
-  unique_id: "SCPCL000822"
-  sce_file: "../scpca-nf-out/SCPCP000015/SCPCS000490/SCPCL000822_processed.rds"
+  unique_id: "SCPCL001229-SCPCS000849"
+  sce_file: "../scpca-nf-out/SCPCP000026/SCPCS000849/SCPCL001229-SCPCS000849_processed.rds"
   validation_groups_file: "../references/consensus-validation-groups.tsv"
   marker_genes_file: "../references/validation-markers.tsv"
   color_palette_file: "../palettes/validation-group-palette.tsv"
-  aucell_results_file: "../ews-nf-out/aucell/SCPCS000490/SCPCL000822_aucell-zscores.tsv"
+  aucell_results_file: "../ews-nf-out/aucell/SCPCS000849/SCPCL001229-SCPCS000849_aucell-zscores.tsv"
   ref_aucell_file: "../ews-nf-out/aucell/aucell-reference-zscores.tsv"
   ref_annotations_file: "../ews-nf-out/build-reference/all-ref-annotations.tsv"
   gene_set_category_file: "../genesets/gene-set-categories.tsv"
-  infercnv_heatmap_file: "../ews-nf-out/infercnv/SCPCS000490/SCPCL000822_infercnv-heatmap.png"
-  infercnv_results_file: "../ews-nf-out/infercnv/SCPCS000490/SCPCL000822_infercnv-metadata.tsv"
+  infercnv_heatmap_file: "../ews-nf-out/infercnv/SCPCS000849/SCPCL001229-SCPCS000849_infercnv-heatmap.png"
+  infercnv_results_file: "../ews-nf-out/infercnv/SCPCS000849/SCPCL001229-SCPCS000849_infercnv-metadata.tsv"
   plotting_functions_file: "utils/plotting-functions.Rmd"
-  output_annotations_file: "SCPCL000822_annotations.tsv"
+  output_annotations_file: "SCPCL000849_annotations.tsv"
   zscore_cutoff: 2
   seed: 2025
 
@@ -545,7 +545,7 @@ all_cnv_df <- infercnv_df |>
   # separate barcode and library
   tidyr::separate(
     cell_id,
-    sep = "-",
+    sep = "_",
     into = c("unique_id", "barcodes"),
     remove = FALSE
   ) |> 
@@ -694,7 +694,7 @@ zscore_df <- dplyr::bind_rows(auc_umap_df, cnv_umap_df)
 
 umap_df <- coldata_df |> 
   dplyr::mutate(
-    cell_id = glue::glue("{unique_id}-{barcodes}") 
+    cell_id = glue::glue("{unique_id}_{barcodes}") 
   ) |> 
   dplyr::left_join(zscore_df, by = c("cell_id", "broad_celltype_group"))
 
