@@ -343,12 +343,8 @@ all_aucell_df <- aucell_df |>
 # make sure we only pull out colors for the categories that are present which at minimum should be ref and query 
 categories <- unique(all_aucell_df$cell_category)
 num_categories <- length(categories)
-# brewer.pal requires more than 2 as n so if only 2 just manually set to the first two colors in Dark2
-if(num_categories > 2){
-  cell_category_colors <- brewer.pal(n = num_categories, name = "Dark2")
-} else {
-  cell_category_colors <- c("#1B9E77", "#D95F02")
-}
+# set to n=8, the max number of categories in this palette
+cell_category_colors <- RColorBrewer::brewer.pal(n = 8, name = "Dark2")[1:num_categories]
 names(cell_category_colors) <- categories
 geneset_colors <- c("#00274C",  "#FFCB05", "gray80")
 names(geneset_colors) <- unique(all_aucell_df$geneset_category)
