@@ -267,7 +267,7 @@ all_info_df <- coldata_df |>
 ```
 
 
-```{r, fig.height=7, fig.width=15}
+```{r, fig.height=7, fig.width=15, results='asis'}
 marker_gene_dotplot(
   consensus_df = all_info_df,
   validation_groups_df = validation_groups_df,
@@ -340,8 +340,12 @@ all_aucell_df <- aucell_df |>
   )
 
 # define color palettes for AUCell and inferCNV plots 
-cell_category_colors <- brewer.pal(n = 3, name = "Dark2")
-names(cell_category_colors) <- unique(all_aucell_df$cell_category)
+# make sure we only pull out colors for the categories that are present which at minimum should be ref and query 
+categories <- unique(all_aucell_df$cell_category)
+num_categories <- length(categories)
+# set to n=8, the max number of categories in this palette
+cell_category_colors <- RColorBrewer::brewer.pal(n = 8, name = "Dark2")[1:num_categories]
+names(cell_category_colors) <- categories
 geneset_colors <- c("#00274C",  "#FFCB05", "gray80")
 names(geneset_colors) <- unique(all_aucell_df$geneset_category)
 ```

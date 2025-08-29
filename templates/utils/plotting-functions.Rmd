@@ -57,6 +57,7 @@ faceted_umap <- function(umap_df,
 # https://github.com/AlexsLemonade/scpca-paper-figures/blob/a457408323495b6ecee0c63ccdd74b41e88ab703/scripts/utils/consensus-celltype-plotting-functions.R#L9-L191
 
 #' Dot plot showing expression of marker genes across assigned cell types
+#' Note that this function requires running in a chunk with `results='asis'` to print out warning messages if no marker genes are present
 #'
 #' @param consensus_df Data frame with consensus cell types and marker gene expression for each cell and all marker genes 
 #' @param validation_groups_df Data frame assigning consensus cell types to broader validation groups
@@ -123,6 +124,20 @@ marker_gene_dotplot <- function(
       validation_group_annotation = factor(validation_group_annotation, levels = names(celltype_colors))
     ) |> 
     dplyr::arrange(validation_group_annotation)
+  
+  if(nrow(filtered_markers_df) == 0){
+    return(
+      glue::glue("
+      <div class=\"alert alert-info\">
+
+      This library does not express any marker genes for the identified normal cell types.
+      No dotplot will be shown.
+
+      </div>
+    "
+      )
+    )
+  }
 
   # specify x axis order for dotplot
   marker_gene_order <- filtered_markers_df |>
