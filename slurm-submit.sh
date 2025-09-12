@@ -9,8 +9,6 @@
 #SBATCH --cluster=htc
 #SBATCH --partition=htc
 
-#TODO: ADD IN RUNNING SUBSET OF SAMPLE IDS#
-
 #####################################################
 # This script is used to run the nextflow ews-nf workflow on a slurm cluster
 # It assumes that you have cloned the workflow into your home directory, use the `--project_dir` argument to specify a different location
@@ -36,6 +34,7 @@ module load singularity
 project_dir=$HOME/ews-nf
 
 # set defaults for all arguments
+sample_ids=""
 scpca_nf_dir="$project_dir/scpca-nf-out"
 outdir="$project_dir/ews-nf-out"
 tower_pat=${TOWER_ACCESS_TOKEN:-0}
@@ -57,10 +56,18 @@ if [[ $tower_pat == 0 ]]; then
     tower_flag=""
 fi
 
+# set flags for running specific samples
+if [ -n "$sample_ids" ]; then
+    sample_flag="--sample_ids $sample_ids"
+else
+    sample_flag=""
+fi
+
 
 # run ews-nf workflow with specified parameters
 nextflow run $project_dir/main.nf \
   -profile "pitt_htc" \
   --scpca_nf_dir "$scpca_nf_dir" \
   --outdir "$outdir" \
+  $sample_flag \
   $tower_flag
