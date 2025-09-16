@@ -89,8 +89,8 @@ process aucell_zscore {
     ref_zscores = "aucell-reference-zscores.tsv"
     """
     # use stub sample/library ids
-    mkdir SCPCS999999
-    touch SCPCS999999/SCPCL999999_aucell-zscores.tsv
+    mkdir STUBS999999
+    touch STUBS999999/STUBL999999_aucell-zscores.tsv
     touch ${ref_zscores}
     """
 }
@@ -99,7 +99,6 @@ process aucell_zscore {
 workflow aucell {
   take:
     library_ch  // [unique_id, sample_id, path to processed SCE file]
-    ref_ch // [ref_sce, ref_annotations]
   main:
 
     // create gene set collection to use with AUCell
@@ -115,9 +114,6 @@ workflow aucell {
       params.aucell_max_rank_threshold
     )
 
-    // extract ref annotations from channel to use for zscores
-    ref_annotations = ref_ch.map{ ref_sce, ref_annotations -> ref_annotations}
-
     // grab aucell output files
     zscore_ch = run_aucell.out.map{ unique_id, sample_id, output_file -> output_file }
       .collect()
@@ -125,7 +121,7 @@ workflow aucell {
     // calculate z-scores 
     aucell_zscore(
       zscore_ch,
-      ref_annotations
+      file(params.ref_annotations_file, checkIfExists: true)
     )
 
     // pull out individual zscore files to a channel of [unique id, aucell results]

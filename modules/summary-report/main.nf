@@ -63,15 +63,11 @@ workflow summary_report {
     aucell_query // [unique id, sample_id, path to aucell results]
     aucell_ref // path to file with all reference cell results from aucell 
     infercnv_ch // [unique id, sample_id, path to cnv heatmap, path to cnv metadata]
-    ref_ch // [ref_sce, ref_annotations]
   main:
 
     // define path to template report 
     report_template_file = "${projectDir}/templates/summary-report.Rmd" 
     plotting_functions_file = "${projectDir}/templates/utils/plotting-functions.Rmd"
-
-    // extract ref annotations from channel 
-    ref_annotations = ref_ch.map{ ref_sce, ref_annotations -> ref_annotations }
 
     // join sce file with aucell results 
     report_ch = library_ch
@@ -91,7 +87,7 @@ workflow summary_report {
     render_report(
       report_ch, 
       aucell_ref,
-      ref_annotations,
+      file(params.ref_annotations_file, checkIfExists: true),
       file(report_template_file),
       file(plotting_functions_file),
       file(params.validation_groups_file),

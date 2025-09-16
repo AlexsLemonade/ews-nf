@@ -6,19 +6,21 @@ process make_gene_order_file {
   container params.ews_nf_container
   label 'mem_8'
   time '2h'
+  publishDir "${params.outdir}/reference", mode: 'copy'
   input:
     path gtf_file
+    val gene_order_file
   output:
     path gene_order_file
   script:
-    gene_order_file = "${gtf_file.name.replaceFirst(/\.gtf(\.gz)?$/, '')}.gene_order.txt"
+    gene_order_file = file(gene_order_file).name
     """
     01-make-gene-order-file.R \
       --gtf_file ${gtf_file} \
       --output_file ${gene_order_file}
     """
   stub:
-    gene_order_file = "${gtf_file.name.replaceFirst(/\.gtf(\.gz)?$/, '')}.gene_order.txt"
+    gene_order_file = file(gene_order_file).name
     """
     touch ${gene_order_file}
     """
@@ -70,22 +72,13 @@ process run_infercnv {
 workflow infercnv {
   take:
     library_ch  // [unique_id, sample_id, path to processed SCE file]
-    ref_ch // [ref_sce, ref_annotations]
   main:
-
-    // extract ref sce from channel 
-    ref_sce = ref_ch.map{ ref_sce, ref_annotations -> ref_sce }
-
-    // create gene order file to use with inferCNV
-    make_gene_order_file(
-      file(params.gtf_file)
-    )
 
     // run infercnv using a normal reference 
     run_infercnv(
       library_ch,
-      ref_sce, 
-      make_gene_order_file.out
+      file(params.ref_sce_file, checkIfExists: true), 
+      file(params.gene_order_file, checkIfExists: true)
     )
 
   emit:

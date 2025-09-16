@@ -30,31 +30,33 @@ process save_normal_ref {
 
 process combine_normal_ref {
   container params.ews_nf_container
-  publishDir "${params.outdir}/build-reference"
+  publishDir "${params.outdir}/reference"
   // TODO: Bump memory here once we have more samples to work with
   label 'mem_8'
   time '2h'
   input:
     path ref_rds_list
+    tuple val(ref_sce_file),
+          val(ref_annotations_file)
   output:
-    tuple path(combined_ref_rds),
-          path(ref_annotations)
+    tuple path(ref_sce_file),
+          path(ref_annotations_file)
   script:
-    combined_ref_rds = "all-ref-sce.rds"
-    ref_annotations = "all-ref-annotations.tsv"
+    ref_sce_file = file(ref_sce_file).name
+    ref_annotations_file = file(ref_annotations_file).name
     def ref_files = ref_rds_list.join(',')
     """
     02-combine-reference-cells.R \
       --ref_file_list ${ref_files} \
-      --output_sce_file ${combined_ref_rds} \
-      --output_annotation_file ${ref_annotations}
+      --output_sce_file ${ref_sce_file} \
+      --output_annotation_file ${ref_annotations_file}
     """
   stub:
-    combined_ref_rds = "all-ref-sce.rds"
-    ref_annotations = "all-ref-annotations.tsv"
+    ref_sce_file = file(ref_sce_file).name
+    ref_annotations_file = file(ref_annotations_file).name
     """
-    touch ${combined_ref_rds}
-    touch ${ref_annotations}
+    touch ${ref_sce_file}
+    touch ${ref_annotations_file}
     """
 }
 
@@ -62,6 +64,7 @@ process combine_normal_ref {
 workflow build_ref {
   take:
     library_ch  // [unique_id, sample_id, path to processed SCE file]
+    ref_files // [ref_sce_file, ref_annotations_file]
   main:
 
     // save ref rds 
@@ -71,7 +74,7 @@ workflow build_ref {
     )
 
     // combine into one rds 
-    combine_normal_ref(save_normal_ref.out.collect())
+    combine_normal_ref(save_normal_ref.out.collect(), ref_files)
 
   emit:
     combine_normal_ref.out // [ref_sce, ref_annotations]
