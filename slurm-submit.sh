@@ -43,7 +43,7 @@ project_dir=$HOME/ews-nf
 sample_ids=""
 scpca_nf_dir="$project_dir/scpca-nf-out"
 outdir="$project_dir/ews-nf-out"
-overwrite_reference=${TOWER_ACCESS_TOKEN:-0}
+overwrite_reference=${overwrite_reference:-0}
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
