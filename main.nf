@@ -17,7 +17,7 @@ validateParameters()
 // Print summary of supplied parameters
 log.info paramsSummaryLog(workflow)
 
-// build 
+// use to build all reference files 
 workflow reference {
 
   // create a channel of [unique_id, sample id, path to processed SCE file]
