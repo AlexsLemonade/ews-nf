@@ -40,10 +40,24 @@ In order to run the workflow you will first need to clone the repository.
 Prior to running this worklow, quantified gene expression data must be obtained by running [`scpca-nf`](https://github.com/AlexsLemonade/scpca-nf). 
 The processed `SingleCellExperiment` objects output from that workflow are then used as input to `ews-nf`. 
 
-The following command can be run from within the cloned repository and will run the workflow locally with all default parameters (see more below):
+### Building the normal reference
+
+Prior to annotating the cells in individual samples, the `reference` entrypoint should be used to build the necessary reference files. 
+This includes the pooled normal cell reference files and the gene order file to be used with `InferCNV`. 
+The pooled reference will include cells from all samples present in the specified `scpca-nf` output directory (`scpca_nf_out` parameter). 
+
+The following command can be used to run the reference part of the workflow: 
 
 ```sh
-nextflow run AlexsLemonade/ews-nf
+nextflow run main.nf -entry reference
+```
+
+### Running the main annotation workflow
+
+After creating the refrence files with the `reference` entrypoint, the following command can be run from within the cloned repository and will run the workflow locally with all default parameters (see more below):
+
+```sh
+nextflow run main.nf
 ```
 
 ### Parameters
@@ -99,6 +113,8 @@ nextflow run main.nf -profile stub -stub
 ### Running the workflow on the Pittsburgh High Throughput Cluster
 
 The `slurm-submit.sh` script can be used to run `ews-nf` on the Pittsburgh High Throughput Cluster (HTC) using the `pitt_htc` profile. 
+This script runs the workflow with `-entry reference` to build the pooled reference for all samples and then runs the main annotation workflow. 
+
 You will need to clone the repository into your home directory and then use the following command to submit the workflow to the SLURM workload manager: 
 
 ```sh
@@ -108,7 +124,7 @@ sbatch slurm-submit.sh
 To modify any of the workflow parameters, specify them at the command line when submitting to SLURM: 
 
 ```sh
-sbatch slurm-submit.sh --scpca_nf_dir [full path to outputs from scpca-nf] 
+sbatch slurm-submit.sh --scpca_nf_dir [full path to results folder output from scpca-nf] 
 ```
 
 If the repository is not located in your home directory, be sure to provide the full path to the repo using the `--project_dir` argument: 
@@ -116,6 +132,20 @@ If the repository is not located in your home directory, be sure to provide the 
 ```sh
 sbatch slurm-submit.sh --project_dir [full path to cloned repository]
 ```
+
+The `--sample_ids` argument can be used to specify a subset of samples to annotate: 
+
+```sh
+sbatch slurm-submit.sh --sample_ids "SCPCSXXXXXX,SCPCSXXXXXX"
+```
+
+By default, if the reference files exist, the reference building (`-entry reference`) will not be re-run. 
+To overwrite an existing reference, use `--overwrite_reference 1`
+
+```sh
+sbatch slurm-submit.sh --overwrite_reference 1
+```
+
 
 ### Monitoring the workflow with Seqera 
 
@@ -133,12 +163,9 @@ To run the workflow using Seqera, use the following command:
 nextflow run main.nf -with-tower
 ```
 
-If you are running the workflow on the Pittsburgh HTC and you have saved your token in your `~/.bash_profile`, then `submit-slurm.sh` will submit the Nextflow run using the `-with-tower` flag. 
-Alternatively, to specify a token to use when running the workflow use: 
+Any runs of the workflow on the Pittsburgh HTC using the `pitt_htc` profile will appear on the Seqera Platform in the `ews-nf` workspace here: https://cloud.seqera.io/orgs/SeanKarlCohort/workspaces/ews-nf/watch 
 
-```sh
-sbatch slurm-submit.sh --tower_pat [Seqera Token] 
-```
+You must be a member of the `SeanKarlCohort` organization and have access to the `ews-nf` workspace to monitor runs.
 
 ## Output files 
 
