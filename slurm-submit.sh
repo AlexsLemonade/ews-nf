@@ -15,14 +15,20 @@
 
 # Any of the following paramaters can be invoked at the command line:
 
-# scpca_nf_dir : Path to directory with output from scpca-nf 
-# outdir: Path to the output directory where the results will be saved
+# sample_ids: Comma separated list of sample IDs to run the workflow on. 
+#  sample IDs can be just the sample ID (SCPCSXXXXXX) or the unique ID (SCPCLXXXXXX-SCPCSXXXXXX)
+#  By default, the worklfow will be run on all samples in `scpca_nf_dir`.
+# scpca_nf_dir : Path to `results` directory output from scpca-nf 
+# outdir: Path to the output directory where the ews-nf results will be saved
+# overwrite_reference: Used to re-create the normal reference if files already exist. 
+#  The reference will include any samples found in `scpca_nf_dir`. 
 # project_dir: Path to the ews-nf repo, default is $HOME/ews-nf
-# tower_pat : Personal access token used to track job submission on Nextflow tower
 
 # To submit this script use the following example:
-# sbatch run-main-slurm.sh
-# sbatch run-main-slurm.sh --scpca_nf_dir /path/to/scpca-nf-out --outdir /path/to/ews-nf-out
+# sbatch slurm-submit.sh
+# sbatch slurm-submit.sh --scpca_nf_dir /path/to/scpca-nf-out --outdir /path/to/ews-nf-out
+# sbatch slurm-submit.sh --sample_ids "SCPCS000001,SCPCS000002"
+# sbatch slurm-submit.sh --overwrite_reference 1
 ######################################################
 
 set -euo pipefail
@@ -37,7 +43,7 @@ project_dir=$HOME/ews-nf
 sample_ids=""
 scpca_nf_dir="$project_dir/scpca-nf-out"
 outdir="$project_dir/ews-nf-out"
-tower_pat=${TOWER_ACCESS_TOKEN:-0}
+overwrite_reference=${TOWER_ACCESS_TOKEN:-0}
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
@@ -48,14 +54,6 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-# set up nextflow tower
-export TOWER_ACCESS_TOKEN=$tower_pat
-
-tower_flag="-with-tower"
-if [[ $tower_pat == 0 ]]; then
-    tower_flag=""
-fi
-
 # set flags for running specific samples
 if [ -n "$sample_ids" ]; then
     sample_flag="--sample_ids $sample_ids"
@@ -63,11 +61,27 @@ else
     sample_flag=""
 fi
 
+# expected reference files 
+ref_annotations_file="${outdir}/reference/all-ref-annotations.tsv"
+ref_sce_file="${outdir}/reference/all-ref-sce.rds"
+gene_order_file="${outdir}/reference/Homo_sapiens.GRCh38.110.gene_order.txt"
+
+# if the ref files don't exist or we are overwriting the reference run the workflow with -entry reference
+if [[ ! -f $ref_annotations_file || ! -f $ref_sce_file || ! -f $gene_order_file || $overwrite_reference -eq 1 ]]; then 
+    nextflow run $project_dir/main.nf \
+      -entry reference \
+      -profile "pitt_htc" \
+      --scpca_nf_dir "$scpca_nf_dir" \
+      --outdir "$outdir" \
+      --ref_annotations_file "$ref_annotations_file" \
+      --ref_sce_file "$ref_sce_file" \
+      --gene_order_file "$gene_order_file"
+
+fi
 
 # run ews-nf workflow with specified parameters
 nextflow run $project_dir/main.nf \
   -profile "pitt_htc" \
   --scpca_nf_dir "$scpca_nf_dir" \
   --outdir "$outdir" \
-  $sample_flag \
-  $tower_flag
+  $sample_flag
