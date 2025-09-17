@@ -66,7 +66,9 @@ workflow {
       file.parent.name, // extract sample id from file path
       file // full path to file
     )}
-    .filter{ run_all || (it[1] in sample_ids) } // filter to only specified samples
+    // filter to only specified samples
+    // use either unique id or sample id for filtering
+    .filter{ run_all || (it[0] in sample_ids) || (it[1] in sample_ids) }
     .branch{
       run_workflow: it[2].size() > 0 || it[2].name.startsWith("STUB")
       skip_workflow: true
