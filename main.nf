@@ -36,7 +36,7 @@ workflow reference {
   // send unique ids for all libraries that don't have enough cells to log 
   library_ch.skip
     .subscribe{
-      log.error("There are no cells found in the processed object for ${it[0]}.")
+      log.error("There are no cells found in the processed object for ${it[0]} and will not be included when building the normal cell reference.")
     }
 
   // define tuple of output ref files 
@@ -54,6 +54,7 @@ workflow reference {
   )
 }
 
+// default entry point to run main workflow 
 workflow {
   sample_ids = params.sample_ids?.tokenize(';, ') ?: []
   run_all = sample_ids[0] == "All"
