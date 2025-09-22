@@ -13,11 +13,11 @@
 # This script is used to run the nextflow ews-nf workflow on a slurm cluster
 # It assumes that you have cloned the workflow into your home directory, use the `--project_dir` argument to specify a different location
 
-# Any of the following paramaters can be invoked at the command line:
+# Any of the following parameters can be invoked at the command line:
 
 # sample_ids: Comma separated list of sample IDs to run the workflow on. 
 #  sample IDs can be just the sample ID (SCPCSXXXXXX) or the unique ID (SCPCLXXXXXX-SCPCSXXXXXX)
-#  By default, the worklfow will be run on all samples in `scpca_nf_dir`.
+#  By default, the workflow will be run on all samples in `scpca_nf_dir`.
 # scpca_nf_dir : Path to `results` directory output from scpca-nf 
 # outdir: Path to the output directory where the ews-nf results will be saved
 # overwrite_reference: Used to re-create the normal reference if files already exist. 
@@ -68,7 +68,7 @@ gene_order_file="${outdir}/reference/Homo_sapiens.GRCh38.110.gene_order.txt"
 
 # if the ref files don't exist or we are overwriting the reference run the workflow with -entry reference
 if [[ ! -f $ref_annotations_file || ! -f $ref_sce_file || ! -f $gene_order_file || $overwrite_reference -eq 1 ]]; then 
-    nextflow run $project_dir/main.nf \
+    nextflow run "$project_dir/main.nf" \
       -entry reference \
       -profile "pitt_htc" \
       --scpca_nf_dir "$scpca_nf_dir" \
@@ -80,7 +80,7 @@ if [[ ! -f $ref_annotations_file || ! -f $ref_sce_file || ! -f $gene_order_file 
 fi
 
 # run ews-nf workflow with specified parameters
-nextflow run $project_dir/main.nf \
+nextflow run "$project_dir/main.nf" \
   -profile "pitt_htc" \
   --scpca_nf_dir "$scpca_nf_dir" \
   --outdir "$outdir" \

@@ -37,7 +37,7 @@ A TSV file containing the estimated CNV profile for each cell along with a heatm
 
 In order to run the workflow you will first need to clone the repository. 
 
-Prior to running this worklow, quantified gene expression data must be obtained by running [`scpca-nf`](https://github.com/AlexsLemonade/scpca-nf). 
+Prior to running this workflow, quantified gene expression data must be obtained by running [`scpca-nf`](https://github.com/AlexsLemonade/scpca-nf). 
 The processed `SingleCellExperiment` objects output from that workflow are then used as input to `ews-nf`. 
 
 ### Building the normal reference
@@ -54,7 +54,7 @@ nextflow run main.nf -entry reference
 
 ### Running the main annotation workflow
 
-After creating the refrence files with the `reference` entrypoint, the following command can be run from within the cloned repository and will run the workflow locally with all default parameters (see more below):
+After creating the reference files with the `reference` entrypoint, the following command can be run from within the cloned repository and will run the workflow locally with all default parameters (see more below):
 
 ```sh
 nextflow run main.nf
