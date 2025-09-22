@@ -30,7 +30,10 @@ jobs:
       - name: Setup Nextflow
         uses: nf-core/setup-nextflow@v2
 
-      - name: Check Nextflow workflow
+      - name: Check Nextflow workflow with reference building
+        run: nextflow -log stub-run.log run main.nf -entry reference -stub -profile stub -ansi-log false
+
+      - name: Check Nextflow workflow for main annotation
         run: nextflow -log stub-run.log run main.nf -stub -profile stub -ansi-log false
 
       - name: Upload nextflow log

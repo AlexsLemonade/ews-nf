@@ -83,6 +83,21 @@
           "mimetype": "text/tab-separated-values",
           "description": "Table of consensus cell type annotations to include when building the normal reference"
         },
+        "ref_sce_file": {
+          "type": "string",
+          "default": "${params.outdir}/reference/all-ref-sce.rds",
+          "pattern": "\\.rds$",
+          "format": "file-path",
+          "description": "Reference cells to use when running InferCNV saved as a SingleCellExperiment object."
+        },
+        "ref_annotations_file": {
+          "type": "string",
+          "default": "${params.outdir}/reference/all-ref-annotations.tsv",
+          "pattern": "\\.tsv$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Table of reference cells"
+        },
         "gtf_file": {
           "type": "string",
           "default": "s3://scpca-references/homo_sapiens/ensembl-110/annotation/Homo_sapiens.GRCh38.110.gtf.gz",
@@ -90,6 +105,14 @@
           "format": "file-path",
           "mimetype": "text/tab-separated-values",
           "description": "Path to GTF reference file used for mapping in scpca-nf"
+        },
+        "gene_order_file": {
+          "type": "string",
+          "default": "${params.outdir}/reference/Homo_sapiens.GRCh38.110.gene_order.txt",
+          "pattern": "\\.txt",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Path to gene order file for use with InferCNV"
         },
         "validation_groups_file": {
           "type": "string",
