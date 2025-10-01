@@ -5,6 +5,7 @@ include { aucell } from './modules/aucell'
 include { build_ref } from './modules/build-reference'
 include { make_gene_order_file } from './modules/infercnv'
 include { infercnv } from './modules/infercnv'
+include { annotate_tumor_cells } from './modules/annotate-tumor-cells'
 include { summary_report } from './modules/summary-report'
 
 // **** Parameter checks ****
@@ -88,7 +89,11 @@ workflow {
   // run infercnv 
   infercnv(run_ch)
 
+  // annotate tumor cells
+  annotate_tumor_cells(run_ch, aucell.out.query, aucell.out.ref, infercnv.out)
+
   // generate report 
+  // TODO: Update report to take in output from tumor cell annotation module
   summary_report(run_ch, aucell.out.query, aucell.out.ref, infercnv.out)
   
 }
