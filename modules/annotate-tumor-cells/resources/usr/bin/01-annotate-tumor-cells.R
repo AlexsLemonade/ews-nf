@@ -36,37 +36,37 @@ option_list <- list(
   make_option(
     opt_str = c("--unique_id"),
     type = "character",
-    default = "SCPCL001229-SCPCS000849",
+    default = "",
     help = "Unique ID"
   ),
   make_option(
     opt_str = c("--sce_file"),
     type = "character",
-    default = "../../sean-karl-cohort/SCPCP000026/SCPCS000849/SCPCL001229-SCPCS000849_processed.rds",
+    default = "",
     help = "Path to RDS file containing a processed SingleCellExperiment object."
   ),
   make_option(
     opt_str = c("--aucell_results_file"),
     type = "character",
-    default = "ews-nf-out/aucell/SCPCS000849/SCPCL001229-SCPCS000849_aucell-zscores.tsv",
+    default = "",
     help = "Path to TSV file with AUCell results for the given object"
   ),
   make_option(
     opt_str = c("--reference_aucell_file"),
     type = "character",
-    default = "ews-nf-out/aucell/aucell-reference-zscores.tsv",
+    default = "",
     help = "Path to TSV file with AUCell reference z-scores"
   ),
   make_option(
     opt_str = c("--gene_set_category_file"),
     type = "character",
-    default = "genesets/gene-set-categories.tsv",
+    default = "",
     help = "Path to TSV file assigning gene sets used with AUCell to categories object"
   ),
   make_option(
     opt_str = c("--infercnv_results_file"),
     type = "character",
-    default = "ews-nf-out/infercnv/SCPCS000849/SCPCL001229-SCPCS000849_infercnv-metadata.tsv",
+    default = "",
     help = "Path to TSV file with inferCNV metadata table"
   ),
   make_option(
