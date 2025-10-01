@@ -4,7 +4,7 @@
 
 # Tumor cells are first classified by whether or not they have a CNV score or Ewing specific CNV with z-score > 0, 1, or 2
 # Tumor cells are further classified by marker gene expression into high and low if they both pass the CNV threshold and have 
-# EF-activated > 0 (high) or EF-repressed > 0 (low)
+# EF-activated > opt$marker_gene_cutoff (high) or EF-repressed > opt$marker_gene_cutoff (low) where the default is 2
 
 # The output contains the following columns: 
 
@@ -68,6 +68,13 @@ option_list <- list(
     type = "character",
     default = "ews-nf-out/infercnv/SCPCS000849/SCPCL001229-SCPCS000849_infercnv-metadata.tsv",
     help = "Path to TSV file with inferCNV metadata table"
+  ),
+  make_option(
+    opt_str = c("--marker_gene_cutoff"),
+    type = "numeric",
+    default = 2,
+    help = "Mean z-score of EF-activated and EF-repressed gene sets to use for classifying cells into tumor-high or tumor-low. 
+      Any cells that have a mean z-score greater than this cutoff will be included in the classification."
   ),
   make_option(
     opt_str = c("--output_file"),
@@ -154,8 +161,8 @@ results_df <- coldata_df |>
     ),
     # column indicating if the cell expresses activated (high) or repressed (low) targets
     expression_class = dplyr::case_when(
-      `EF-activated` > 0 ~ "high",
-      `EF-repressed` > 0 ~ "low",
+      `EF-activated` > opt$marker_gene_cutoff ~ "high",
+      `EF-repressed` > opt$marker_gene_cutoff ~ "low",
       .default = NA
     ),
     # combine the annotation to get one column per final annotation per tier

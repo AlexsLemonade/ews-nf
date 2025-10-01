@@ -36,7 +36,7 @@ This same approach is used to calculate the z-score for all `proportion_scaled_*
   * Tumor cells are identified as those with a CNV z-score (total or Ewing specific CNV) > 2 (tier2), > 1 (tier1), or > 0 (tier0). 
   * Any cells that are tumor cells are further classified into `high` or `low` based on expression of `EF-activated` (high) or `EF-repressed` (low) gene sets as indicated by `AUCell`. 
   The z-score for each gene set is determined and the mean z-score for all gene sets categorized as either `EF-activated` or `EF-repressed` is calculated. 
-  Cells are classified if the mean z-score is greater than 0. 
+  Cells are classified if the mean z-score is greater than the specified `--marker_gene_cutoff`, which has a default of 2. 
 * `summary-report`: This module generates a HTML report summarizing the results from the workflow for each sample. 
 
 

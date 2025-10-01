@@ -29,6 +29,7 @@ process export_annotations {
       --reference_aucell_file "${ref_aucell_file}" \
       --gene_set_category_file "${gene_set_category_file}" \
       --infercnv_results_file "${infercnv_metadata}" \
+      --marker_gene_cutoff ${params.marker_gene_cutoff} \
       --output_file "${output_annotations_file}"
     """
   stub:
