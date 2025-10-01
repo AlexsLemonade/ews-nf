@@ -239,18 +239,65 @@ sum_cnv_df <- cnv_df |>
 all_cnv_df <- cnv_df |> 
   dplyr::left_join(sum_cnv_df, by = "cell_id")
 
-# calculate a z-score for the total CNV using the reference cells as mean and sd
-ref_cnv_sums <- all_cnv_df |> 
-  dplyr::filter(cell_group == "reference") |> 
-  dplyr::pull(total_cnv_per_cell)
-ref_mean <- mean(ref_cnv_sums)
-ref_sd <- sd(ref_cnv_sums)
+cnv_columns <- c(
+  "cnv_zscore" = "total_cnv_per_cell",
+  "chr1_zscore" = "proportion_scaled_dupli_chr1",
+  "chr8_zscore" = "proportion_scaled_dupli_chr8",
+  "chr12_zscore" = "proportion_scaled_dupli_chr12",
+  "chr16_zscore" = "proportion_scaled_loss_chr16"
+  )
+
+cnv_columns |> 
+  purrr::imap(
+    \(column, new_column_name){
+      
+      ref_cnv_sums <- all_cnv_df |> 
+        dplyr::filter(cell_group == "reference") |> 
+        dplyr::pull({{column}})
+      ref_mean <- mean(ref_cnv_sums)
+      ref_sd <- sd(ref_cnv_sums)
+      
+      z_scores <- (all_cnv_df[[column]] - ref_mean)/ref_sd
+      
+    }
+  ) |> 
+  dplyr::bind_cols() |> 
+  dplyr::mutate(cell_id = all_cnv_df$cell_id)
+
+# calculate a z-score for the total CNV and Ewing specific CNVS using the reference cells as mean and sd
+# list of all columns to calculate z score for 
+# names will eventually be the column names used in the output
+cnv_columns <- c(
+  "cnv_zscore" = "total_cnv_per_cell",
+  "chr1_gain_zscore" = "proportion_scaled_dupli_chr1",
+  "chr8_gain_zscore" = "proportion_scaled_dupli_chr8",
+  "chr12_gain_zscore" = "proportion_scaled_dupli_chr12",
+  "chr16_loss_zscore" = "proportion_scaled_loss_chr16"
+)
+
+# make df with cnv zscores 
+zscore_df <- cnv_columns |> 
+  # for each column calculate the z-score for each cell 
+  purrr::imap(
+    \(column, new_column_name){
+      
+      ref_cnv_sums <- all_cnv_df |> 
+        dplyr::filter(cell_group == "reference") |> 
+        dplyr::pull({{column}})
+      ref_mean <- mean(ref_cnv_sums)
+      ref_sd <- sd(ref_cnv_sums)
+      
+      z_scores <- (all_cnv_df[[column]] - ref_mean)/ref_sd
+      
+    }
+  ) |> 
+  # combine into a df with cell id and one column for each zscore (total, chr1, chr8, chr12, and chr16)
+  dplyr::bind_cols() |> 
+  dplyr::mutate(cell_id = all_cnv_df$cell_id)
 
 # now add in zscore and export
 all_cnv_df |> 
-  dplyr::mutate(
-    cnv_zscore = (total_cnv_per_cell - ref_mean)/ref_sd
-  ) |>
+  dplyr::left_join(zscore_df, by = "cell_id") |> 
   readr::write_tsv(opt$output_metadata_file)
 
 # copy png file to output directory
