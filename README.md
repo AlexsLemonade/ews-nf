@@ -30,6 +30,13 @@ The mean and standard deviation of the background distribution are used to obtai
 * `infercnv`: [`inferCNV`](https://github.com/broadinstitute/inferCNV/wiki) is used to infer copy number variations in all non-reference cells. 
 All cells that are classified as reference cells using the `build-reference` module are used as a normal reference to run `inferCNV` on each library. 
 A TSV file containing the estimated CNV profile for each cell along with a heatmap displaying the output from `inferCNV` are saved for each library. 
+In addition, the total CNVs are summed and the mean and standard deviation of the reference cells are used to obtain a z-score for the total CNVs from all cells in each sample. 
+This same approach is used to calculate the z-score for all `proportion_scaled_*` columns that represent commonly observed CNVs in Ewing sarcoma (gain of chr1, gain of chr8, gain of ch12, and loss of chr16). 
+* `annotate-tumor-cells`: Annotations are assigned to all cells based on the CNV and AUCell z-scores: 
+  * Tumor cells are identified as those with a CNV z-score (total or Ewing specific CNV) > 2 (tier2), > 1 (tier1), or > 0 (tier0). 
+  * Any cells that are tumor cells are further classified into `high` or `low` based on expression of `EF-activated` (high) or `EF-repressed` (low) gene sets as indicated by `AUCell`. 
+  The z-score for each gene set is determined and the mean z-score for all gene sets categorized as either `EF-activated` or `EF-repressed` is calculated. 
+  Cells are classified if the mean z-score is greater than 0. 
 * `summary-report`: This module generates a HTML report summarizing the results from the workflow for each sample. 
 
 
