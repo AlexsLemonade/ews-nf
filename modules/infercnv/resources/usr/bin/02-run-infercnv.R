@@ -239,31 +239,6 @@ sum_cnv_df <- cnv_df |>
 all_cnv_df <- cnv_df |> 
   dplyr::left_join(sum_cnv_df, by = "cell_id")
 
-cnv_columns <- c(
-  "cnv_zscore" = "total_cnv_per_cell",
-  "chr1_zscore" = "proportion_scaled_dupli_chr1",
-  "chr8_zscore" = "proportion_scaled_dupli_chr8",
-  "chr12_zscore" = "proportion_scaled_dupli_chr12",
-  "chr16_zscore" = "proportion_scaled_loss_chr16"
-  )
-
-cnv_columns |> 
-  purrr::imap(
-    \(column, new_column_name){
-      
-      ref_cnv_sums <- all_cnv_df |> 
-        dplyr::filter(cell_group == "reference") |> 
-        dplyr::pull({{column}})
-      ref_mean <- mean(ref_cnv_sums)
-      ref_sd <- sd(ref_cnv_sums)
-      
-      z_scores <- (all_cnv_df[[column]] - ref_mean)/ref_sd
-      
-    }
-  ) |> 
-  dplyr::bind_cols() |> 
-  dplyr::mutate(cell_id = all_cnv_df$cell_id)
-
 # calculate a z-score for the total CNV and Ewing specific CNVS using the reference cells as mean and sd
 # list of all columns to calculate z score for 
 # names will eventually be the column names used in the output
