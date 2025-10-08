@@ -154,7 +154,7 @@ results_df <- coldata_df |>
   dplyr::mutate(
     # first classify the tumor cells by the highest threshold that gets passed across total CNV or any Ewing specific chromosomes
     tumor_class = dplyr::case_when(
-      ref_or_query != "reference" & dplyr::if_any(dplyr::ends_with("_zscore"), ~ .x > 2) ~ "tumor_tier2",
+      ref_or_query != "reference" & dplyr::if_any(dplyr::ends_with("_zscore"), \(x) x > 2) ~ "tumor_tier2",
       ref_or_query != "reference" & dplyr::if_any(dplyr::ends_with("_zscore"), ~ .x > 1) ~ "tumor_tier1",
       ref_or_query != "reference" & dplyr::if_any(dplyr::ends_with("_zscore"), ~ .x > 0) ~ "tumor_tier0",
       .default = "normal"

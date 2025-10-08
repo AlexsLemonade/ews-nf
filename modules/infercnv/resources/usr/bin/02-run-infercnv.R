@@ -252,7 +252,7 @@ cnv_columns <- c(
 
 # make df with cnv zscores 
 zscore_df <- cnv_columns |> 
-  # for each column calculate the z-score for each cell 
+  # for each column calculate the z-score for each cell relative to the reference cells
   purrr::imap(
     \(column, new_column_name){
       
