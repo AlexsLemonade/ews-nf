@@ -90,7 +90,7 @@ workflow {
   infercnv(run_ch)
 
   // annotate tumor cells
-  annotate_tumor_cells(run_ch, aucell.out.query, aucell.out.ref, infercnv.out)
+  annotate_tumor_cells(run_ch, aucell.out.query, infercnv.out)
 
   // generate report 
   // TODO: Update report to take in output from tumor cell annotation module

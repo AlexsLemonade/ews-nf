@@ -13,7 +13,6 @@ process export_annotations {
           path(sce_file), 
           path(aucell_file),
           path(infercnv_metadata)
-    path ref_aucell_file
     path gene_set_category_file
   output:
     tuple val(unique_id),
@@ -26,7 +25,6 @@ process export_annotations {
       --unique_id ${unique_id} \
       --sce_file "${sce_file}" \
       --aucell_results_file "${aucell_file}" \
-      --reference_aucell_file "${ref_aucell_file}" \
       --gene_set_category_file "${gene_set_category_file}" \
       --infercnv_results_file "${infercnv_metadata}" \
       --marker_gene_cutoff ${params.marker_gene_cutoff} \
@@ -44,7 +42,6 @@ workflow annotate_tumor_cells {
   take:
     library_ch  // [unique_id, sample_id, path to processed SCE file]
     aucell_query // [unique id, sample_id, path to aucell results]
-    aucell_ref // path to file with all reference cell results from aucell 
     infercnv_ch // [unique id, sample_id, path to cnv heatmap, path to cnv metadata]
   main:
 
@@ -63,8 +60,7 @@ workflow annotate_tumor_cells {
 
     // render report 
     export_annotations(
-      annotation_ch, 
-      aucell_ref,
+      annotation_ch,
       file(params.gene_set_category_file)
     )
 
