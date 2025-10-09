@@ -22,6 +22,9 @@
 # outdir: Path to the output directory where the ews-nf results will be saved
 # overwrite_reference: Used to re-create the normal reference if files already exist. 
 #  The reference will include any samples found in `scpca_nf_dir`. 
+# skip_infercnv: Used to skip running inferCNV for samples where inferCNV results already exist in the output directory
+#  By default, inferCNV will be run on all samples regardless of if results exist
+#  To skip, use --skip_infercnv 1
 # project_dir: Path to the ews-nf repo, default is $HOME/ews-nf
 
 # To submit this script use the following example:
@@ -44,6 +47,7 @@ sample_ids=""
 scpca_nf_dir="$project_dir/scpca-nf-out"
 outdir="$project_dir/ews-nf-out"
 overwrite_reference=${overwrite_reference:-0}
+skip_infercnv=${skip_infercnv:-0}
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
@@ -59,6 +63,13 @@ if [ -n "$sample_ids" ]; then
     sample_flag="--sample_ids $sample_ids"
 else
     sample_flag=""
+fi
+
+# flag for infercnv
+if [[ $skip_infercnv -eq 1 ]]; then 
+    infercnv_flag="--skip_infercnv"
+else 
+    infercnv_flag=""
 fi
 
 # expected reference files 
@@ -84,4 +95,5 @@ nextflow run "$project_dir/main.nf" \
   -profile "pitt_htc" \
   --scpca_nf_dir "$scpca_nf_dir" \
   --outdir "$outdir" \
-  $sample_flag
+  $sample_flag \
+  $infercnv_flag \
