@@ -31,7 +31,7 @@ process run_infercnv {
   tag "${unique_id}"
   label 'mem_96'
   cpus 8
-  time '6h'
+  time '12h'
   publishDir "${params.outdir}/infercnv/${sample_id}", mode: 'copy'
   input:
     tuple val(unique_id),
@@ -74,13 +74,54 @@ workflow infercnv {
     library_ch  // [unique_id, sample_id, path to processed SCE file]
   main:
 
+    infercnv_ch = library_ch
+      .map{ unique_id, sample_id, sce_file -> tuple(
+        unique_id,
+        sample_id, 
+        sce_file,
+        // path to metadata file
+        "${params.outdir}/infercnv/${sample_id}/${unique_id}_infercnv-metadata.tsv",
+        // path to heatmap file
+        "${params.outdir}/infercnv/${sample_id}/${unique_id}_infercnv-heatmap.png"
+      )}
+      .branch{
+        // branch samples based on if infercnv exists and skip_infercnv is used 
+        skip_infercnv: 
+        (
+          params.skip_infercnv 
+          && file(it[3]).exists() 
+          && file(it[4]).exists()
+        )
+        run_infercnv: true
+      }
+
     // run infercnv using a normal reference 
+    run_infercnv_ch = infercnv_ch.run_infercnv
+      .map{ unique_id, sample_id, sce_file, _metadata_file, _heatmap_file -> tuple(
+        unique_id,
+        sample_id,
+        sce_file
+      )}
+
     run_infercnv(
-      library_ch,
+      run_infercnv_ch,
       file(params.ref_sce_file, checkIfExists: true), 
       file(params.gene_order_file, checkIfExists: true)
     )
 
+
+    output_ch = infercnv_ch.skip_infercnv
+      // drop sce file from channel where infercnv wasn't run
+      .map{ unique_id, sample_id, _sce_file, metadata_file, heatmap_file -> tuple(
+        unique_id,
+        sample_id,
+        file(metadata_file),
+        file(heatmap_file)
+      )}
+      // mix with samples that were run
+      .mix(run_infercnv.out)
+
+
   emit:
-    run_infercnv.out // [unique_id, sample_id, infercnv metadata, infercnv heatmap]
+    output_ch // [unique_id, sample_id, infercnv metadata, infercnv heatmap]
 }
