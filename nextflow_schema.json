@@ -75,6 +75,11 @@
           "default": 0.01,
           "description": "Proportion of detected genes to use as the threshold for the max AUC rank when running AUCell"
         },
+        "marker_gene_cutoff": {
+          "type": "number",
+          "default": 2,
+          "description": "z-score cutoff for classifying cells based on EF-activated (tumor-high) and EF-repressed (tumor-low) gene expression"
+        },
         "ref_celltypes_file": {
           "type": "string",
           "default": "${projectDir}/references/reference-celltypes.tsv",
@@ -113,6 +118,11 @@
           "format": "file-path",
           "mimetype": "text/tab-separated-values",
           "description": "Path to gene order file for use with InferCNV"
+        },
+        "skip_infercnv": {
+          "type": "boolean",
+          "default": false,
+          "description": "If the inferCNV results already exist, optionally skip re-running inferCNV"
         },
         "validation_groups_file": {
           "type": "string",
