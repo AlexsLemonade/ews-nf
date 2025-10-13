@@ -121,6 +121,7 @@
         },
         "skip_infercnv": {
           "type": "boolean",
+          "default": false,
           "description": "If the inferCNV results already exist, optionally skip re-running inferCNV"
         },
         "validation_groups_file": {

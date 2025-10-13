@@ -80,17 +80,17 @@ workflow infercnv {
         sample_id, 
         sce_file,
         // path to metadata file
-        "${params.outdir}/infercnv/${sample_id}/${unique_id}_infercnv-metadata.tsv",
+        file("${params.outdir}/infercnv/${sample_id}/${unique_id}_infercnv-metadata.tsv"),
         // path to heatmap file
-        "${params.outdir}/infercnv/${sample_id}/${unique_id}_infercnv-heatmap.png"
+        file("${params.outdir}/infercnv/${sample_id}/${unique_id}_infercnv-heatmap.png")
       )}
       .branch{
         // branch samples based on if infercnv exists and skip_infercnv is used 
         skip_infercnv: 
         (
           params.skip_infercnv 
-          && file(it[3]).exists() 
-          && file(it[4]).exists()
+          && it[3].exists() 
+          && it[4].exists()
         )
         run_infercnv: true
       }
@@ -115,8 +115,8 @@ workflow infercnv {
       .map{ unique_id, sample_id, _sce_file, metadata_file, heatmap_file -> tuple(
         unique_id,
         sample_id,
-        file(metadata_file),
-        file(heatmap_file)
+        metadata_file,
+        heatmap_file
       )}
       // mix with samples that were run
       .mix(run_infercnv.out)
