@@ -131,7 +131,7 @@ coldata_df <- scuttle::makePerCellDF(
 
 # combine all aucell results and get mean for EF-activated, EF-repressed, and EMT-ECM genesets
 all_aucell_df <- aucell_df |> 
-  # add zscores for reference cells
+  # add zscores for reference cells, we want to include all reference cells used to keep AUC and CNV information in one file 
   dplyr::full_join(aucell_ref_df) |> 
   # add gene set categories
   dplyr::left_join(geneset_df, by = c("gene_set" = "geneset_name")) |> 
@@ -148,7 +148,8 @@ all_aucell_df <- aucell_df |>
 # only keep cells that are in the object, we don't need to classify the reference cells from other libraries
 results_df <- coldata_df |> 
   # aucell results
-  dplyr::left_join(all_aucell_df, by = "cell_id") |> 
+  # again using full join here since we want to keep both library unknown and reference cells
+  dplyr::full_join(all_aucell_df, by = "cell_id") |> 
   # infercnv results
   dplyr::left_join(infercnv_df, by = "cell_id") |> 
   dplyr::mutate(
