@@ -25,7 +25,7 @@
 
 # tumor_class: Highest CNV threshold passed to be considered tumor, tumor_tier2 means the highest zscore for CNV > 2,
 #   tumor_tier1 means the highest zscore for any CNV columns was > 1 but < 2
-# expression_class: high (EF-activated) > 2 or low (EF-repressed) > 2
+# expression_class: high (EF-activated) > 0 or low (EF-repressed) > 0
 # annotation_tier0: Combined annotation where tumor cells are those that are in all tiers
 # annotation_tier1: Combined annotation where tumor cells are those that are in tumor_tier1 or tumor_tier2
 # annotation_tier2: Combined annotation where tumor cells are only those that are in tumor_tier2
@@ -50,6 +50,12 @@ option_list <- list(
     type = "character",
     default = "",
     help = "Path to TSV file with AUCell results for the given object"
+  ),
+  make_option(
+    opt_str = c("--reference_aucell_file"),
+    type = "character",
+    default = "",
+    help = "Path to TSV file with AUCell reference z-scores"
   ),
   make_option(
     opt_str = c("--gene_set_category_file"),
@@ -86,6 +92,7 @@ opt <- parse_args(OptionParser(option_list = option_list))
 stopifnot(
   "sce file does not exist" = file.exists(opt$sce_file),
   "aucell results file does not exist" = file.exists(opt$aucell_results_file), 
+  "aucell reference file does not exist" = file.exists(opt$reference_aucell_file),
   "gene set category file does not exist" = file.exists(opt$gene_set_category_file),
   "infercnv results file does not exist" = file.exists(opt$infercnv_results_file)
 )
@@ -103,6 +110,7 @@ geneset_df <- readr::read_tsv(opt$gene_set_category_file)
 
 # read in results
 aucell_df <- readr::read_tsv(opt$aucell_results_file)
+aucell_ref_df <- readr::read_tsv(opt$reference_aucell_file)
 infercnv_df <- readr::read_tsv(opt$infercnv_results_file) |> 
   dplyr::select(cell_id, contains("zscore"))
 
@@ -121,8 +129,10 @@ coldata_df <- scuttle::makePerCellDF(
 
 # Combine AUCell results -------------------------------------------------------
 
-# get the mean for EF-activated, EF-repressed, and EMT-ECM genesets
-aucell_df <- aucell_df |> 
+# combine all aucell results and get mean for EF-activated, EF-repressed, and EMT-ECM genesets
+all_aucell_df <- aucell_df |> 
+  # add zscores for reference cells
+  dplyr::full_join(aucell_ref_df) |> 
   # add gene set categories
   dplyr::left_join(geneset_df, by = c("gene_set" = "geneset_name")) |> 
   # group by geneset category and keep ref_or_query column for output later 
@@ -138,7 +148,7 @@ aucell_df <- aucell_df |>
 # only keep cells that are in the object, we don't need to classify the reference cells from other libraries
 results_df <- coldata_df |> 
   # aucell results
-  dplyr::left_join(aucell_df, by = "cell_id") |> 
+  dplyr::left_join(all_aucell_df, by = "cell_id") |> 
   # infercnv results
   dplyr::left_join(infercnv_df, by = "cell_id") |> 
   dplyr::mutate(
