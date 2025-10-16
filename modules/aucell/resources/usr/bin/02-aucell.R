@@ -36,7 +36,7 @@ option_list <- list(
   ),
   make_option(
     opt_str = c("--is_reference"),
-    type = "store_true",
+    action = "store_true",
     default = FALSE,
     help = "Specify that the input SCE object contains a collection of reference cells.
       If used, all cells will be labeled as 'reference' in the 'ref_or_query' column of the output 
