@@ -66,6 +66,11 @@ option_list <- list(
 # Parse options
 opt <- parse_args(OptionParser(option_list = option_list))
 
+# TODO: remove after testing
+opt$sce_file <- "ews-nf-out/reference/all-ref-sce.rds"
+opt$gene_set_collection_file <- "ews-nf-out/ews-gene-set-collection.rds"
+opt$is_reference <- TRUE 
+
 # Set up -----------------------------------------------------------------------
 
 # set the seed
@@ -111,6 +116,9 @@ if(opt$is_reference){
     dplyr::mutate(cell_id = glue::glue("{unique_id}_{barcodes}"),
                   ref_or_query = "reference")
   
+  # add detected column to rowData for filtering
+  rowData(sce)$detected <- rowSums(counts(sce))
+  
 } else {
   # if the input is a single library, then we run AUCell on that library 
   # this also includes calculating z-scores, which requires AUCell results for a reference group of cells
@@ -132,12 +140,11 @@ if(opt$is_reference){
   coldata_df <- data.frame(
     barcodes = colnames(sce),
     sample_id = metadata(sce)$sample_id,
-    unique_id = unique_id,
-    cell_id = glue::glue("{unique_id}_{barcodes}")
+    unique_id = unique_id
   ) |> 
-    # add ref or query column 
     # label based on if cells are part of the reference or query cells
-    dplyr::mutate(ref_or_query = dplyr::if_else(cell_id %in% ref_cells, "reference", "query"))
+    dplyr::mutate(cell_id = glue::glue("{unique_id}_{barcodes}"),
+                  ref_or_query = dplyr::if_else(cell_id %in% ref_cells, "reference", "query"))
   
   # set names of sce to be cell_id to keep labeling consistent across run modes
   colnames(sce) <- coldata_df$cell_id
