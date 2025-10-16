@@ -116,10 +116,10 @@ if(opt$is_reference){
   # this also includes calculating z-scores, which requires AUCell results for a reference group of cells
   
   # check that reference tsv is provided 
-  stopifnot("Missing reference_cells_file" = file.exists(opt$reference_cells_file))
+  stopifnot("Missing AUCell results from all reference cells, --ref_aucell_results" = file.exists(opt$ref_aucell_results))
   
   # read in ref cells file with aucell results for all ref cells 
-  ref_aucell_df <- readr::read_tsv(opt$reference_cells_file)
+  ref_aucell_df <- readr::read_tsv(opt$ref_aucell_results)
   
   # define the list of reference cells
   ref_cells <- ref_aucell_df$cell_id |> 
