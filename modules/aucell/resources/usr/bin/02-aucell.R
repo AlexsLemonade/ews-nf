@@ -4,8 +4,13 @@
 # gene sets used are custom gene sets and a set of Ewing specific gene sets from MsigDB
 # gene sets should be provided as a GeneSetCollection object (as created by 01-build-genesetcollection.R)
 
+# the z-score for each cell and each gene set is calculated using the results from a set of reference cells
+# If the input SCE file contains only reference cells use `--is_reference`
+# if the input SCE file is all cells from a library, provide the AUcell reference results with `ref_aucell_results`
+
 # the results are exported as a single TSV file with the following columns:
-# `gene_set`, `barcodes`, `auc`, `auc_threshold`, and `unique_id`
+# `gene_set`, `barcodes`, `auc`, `auc_threshold`, `unique_id`, `sample_id`, and `auc_zscore`
+
 
 library(optparse)
 
