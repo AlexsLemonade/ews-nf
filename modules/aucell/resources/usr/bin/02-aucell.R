@@ -66,11 +66,6 @@ option_list <- list(
 # Parse options
 opt <- parse_args(OptionParser(option_list = option_list))
 
-# TODO: remove after testing
-opt$sce_file <- "ews-nf-out/reference/all-ref-sce.rds"
-opt$gene_set_collection_file <- "ews-nf-out/ews-gene-set-collection.rds"
-opt$is_reference <- TRUE 
-
 # Set up -----------------------------------------------------------------------
 
 # set the seed
