@@ -25,7 +25,7 @@
 
 # tumor_class: Highest CNV threshold passed to be considered tumor, tumor_tier2 means the highest zscore for CNV > 2,
 #   tumor_tier1 means the highest zscore for any CNV columns was > 1 but < 2
-# expression_class: high (EF-activated) > 0 or low (EF-repressed) > 0
+# expression_class: high (EF-activated) > marker_gene_cutoff or low (EF-repressed) > marker_gene_cutoff
 # annotation_tier0: Combined annotation where tumor cells are those that are in all tiers
 # annotation_tier1: Combined annotation where tumor cells are those that are in tumor_tier1 or tumor_tier2
 # annotation_tier2: Combined annotation where tumor cells are only those that are in tumor_tier2
