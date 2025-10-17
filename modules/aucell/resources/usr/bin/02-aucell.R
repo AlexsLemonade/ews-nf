@@ -235,18 +235,14 @@ auc_df <- auc_results@assays@data$AUC |>
   dplyr::left_join(coldata_df, by = c("cell_id")) |> 
   dplyr::relocate(gene_set, .after = cell_id)
 
-# get all gene set names 
-gene_set_names <- unique(auc_df$gene_set)
+# split auc_df into gene sets
+gene_set_df_list <- split(auc_df, auc_df$gene_set)
 
 # calculate z-scores 
 # calculate ref mean and sd and get z-score for all cells in each gene set 
-zscore_df <- gene_set_names |> 
-  purrr::map(\(name){
+zscore_df <- gene_set_df_list |> 
+  purrr::imap(\(gene_set_df, name){
     
-    # subset results to only include auc for the gene set
-    gene_set_df <- auc_df |> 
-      dplyr::filter(gene_set == name) 
-
     # if the object is a single library, grab the reference cells from the ref object for the given gene set
     if(!opt$is_reference){
       ref_auc <- ref_aucell_df |> 
