@@ -77,7 +77,8 @@ umap_theme <- function() {
       axis.ticks = element_blank(),
       panel.grid = element_blank(),
       aspect.ratio = 1,
-      strip.background = element_rect(fill = "transparent")
+      strip.background = element_rect(fill = "transparent"),
+      legend.justification = "top"
     )
 }
 
@@ -148,9 +149,12 @@ coldata_df <- scuttle::makePerCellDF(
   dplyr::mutate(
     unique_id = params$unique_id,
     cell_id = glue::glue("{unique_id}_{barcodes}")
-  ) |> 
-  # first add in annotations results, use a full join so that we have all cells from reference and query library together
-  dplyr::full_join(annotations_df, by = c("cell_id", "barcodes", "unique_id")) |> 
+  ) 
+
+annotations_df <- annotations_df |> 
+  # add coldata into annotations dataframe
+  # this keeps all library cells and all reference cells
+  dplyr::full_join(coldata_df, by = c("cell_id", "barcodes", "unique_id")) |> 
   # now validation groups for plotting
   dplyr::left_join(validation_groups_df, by = c("consensus_celltype_annotation" = "consensus_annotation")) |> 
   tidyr::pivot_longer(
@@ -159,11 +163,13 @@ coldata_df <- scuttle::makePerCellDF(
     values_to = "ews_annotation"
   ) |> 
   dplyr::mutate(
+    ews_annotation = forcats::fct_relevel(ews_annotation, "Unknown", after = Inf),
     broad_celltype_group = dplyr::case_when(
       stringr::str_detect(ews_annotation, "tumor") ~ ews_annotation,
       is.na(broad_celltype_group) ~ "unknown",
       .default = broad_celltype_group
-    ),
+    ) |> 
+      forcats::fct_relevel("unknown", after = Inf),
     # use this when making plots that look at tumor high, tumor low vs normal 
     detail_tumor_category = dplyr::if_else(
       stringr::str_detect(broad_celltype_group, "tumor"),
@@ -175,56 +181,70 @@ coldata_df <- scuttle::makePerCellDF(
       stringr::str_detect(broad_celltype_group, "tumor"),
       "tumor",
       "non-malignant"
+    ),
+    # include a column with the annotation of all reference cells in one group 
+    # use for density plots confirming high AUC/CNV in tumor cells vs. reference
+    reference_category = dplyr::if_else(
+      ref_or_query == "reference",
+      "reference",
+      ews_annotation
     )
-  ) |> 
-  dplyr::group_by(annotation_tier) |> 
-  dplyr::mutate(
-    broad_celltype_group_lumped = forcats::fct_lump_n(broad_celltype_group, 8, other_level = "other", ties.method = "first") |>
-      forcats::fct_infreq() |>
-      forcats::fct_relevel("unknown", "other", after = Inf),
-  ) |> 
-  dplyr::ungroup()
+  )
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 # get the total counts for each group and add a column to use for labeling plots 
-celltype_counts_df <- coldata_df |>
-  dplyr::select(cell_id, annotation_tier, broad_celltype_group) |> 
-  dplyr::add_count(annotation_tier, broad_celltype_group) |> 
+celltype_counts_df <- annotations_df |>
+  dplyr::select(cell_id, annotation_tier, reference_category) |> 
+  dplyr::add_count(annotation_tier, reference_category) |> 
   # add in y label 
   dplyr::mutate(
-    y_label = glue::glue("{broad_celltype_group} ({n})"),
+    y_label = glue::glue("{reference_category} ({n})"),
     # classify based on malignant or not malignant
-    cell_category = dplyr::if_else(stringr::str_detect(broad_celltype_group, "tumor"), "tumor", "non-malignant") |> 
+    tumor_category = dplyr::if_else(stringr::str_detect(reference_category, "tumor"), "tumor", "non-malignant") |> 
       factor(levels = c("tumor", "non-malignant"))
   ) |> 
   dplyr::select(-cell_id) |> 
   dplyr::distinct()
 
-# grab order of broad cell types based on cell type categories 
+# grab order of cell types based on cell type categories that will be plotted in the density plots
 celltype_levels <- celltype_counts_df |> 
-  dplyr::arrange(cell_category) |> 
+  dplyr::arrange(tumor_category) |> 
   dplyr::pull(y_label) |>
   unique() |> 
-  as.character()
+  as.character() 
+
+# pull out reference label to set at the end of the factors 
+# this ensures the reference group is always at the bottom of the plot
+ref_label <- celltype_levels[stringr::str_detect(celltype_levels, "reference")]
+non_ref_labels <- celltype_levels[celltype_levels != ref_label]
 
 # combine everything into one df including counts
-all_info_df <- coldata_df |> 
+all_info_df <- annotations_df |> 
   dplyr::left_join(celltype_counts_df) |> 
   dplyr::filter(n >= 3) |> 
   dplyr::mutate(
-    y_label = factor(y_label, levels = rev(celltype_levels))
+    y_label = factor(y_label, levels = rev(c(non_ref_labels, ref_label)))
   )
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 # names of split lists to use for mapping
 cnv_names <- c("CNV z-score > 0", "CNV z-score > 1", "CNV z-score > 2")
 
 # first split all cells for plots that include reference cells
 all_df_list <- split(all_info_df, all_info_df$annotation_tier) |> 
   purrr::set_names(cnv_names) |> 
-  rev()
+  rev() |> 
+  purrr::map(\(df){
+    # for each annotation tier, get a lumped category with the top 8 celltypes
+    df <- df |> 
+      dplyr::mutate(
+        broad_celltype_group_lumped = forcats::fct_lump_n(broad_celltype_group, 8, other_level = "other", ties.method = "first") |>
+          forcats::fct_infreq() |>
+          forcats::fct_relevel("unknown", "other", after = Inf),
+      )
+  })
 
 # create a copy of the information for just the library cells
 library_df_list <- all_df_list |> 
@@ -256,7 +276,15 @@ library_df_list |>
     
     df |> 
       dplyr::count(ews_annotation, broad_celltype_group, name = "Total") |> 
+      # first arrange by total counts
       dplyr::arrange(desc(Total)) |> 
+      dplyr::mutate(
+        # set order so that all annotations are first ordered by counts and then unknown is last
+        ews_annotation = factor(ews_annotation, levels = ews_annotation ) |> 
+          forcats::fct_relevel("Unknown", after = Inf)
+      ) |>
+      # arrange by levels
+      dplyr::arrange(ews_annotation) |> 
       knitr::kable() |> 
       print()
   })
@@ -342,7 +370,8 @@ gene_exp_df <- scuttle::makePerCellDF(
                 unique_id = params$unique_id) 
 
 # Join all consensus results and marker gene info
-all_info_df <- library_df |>
+all_info_df <- annotations_df |>
+  dplyr::filter(unique_id == params$unique_id) |> 
   # only want to look at cells annotated with a normal cell type
   dplyr::filter(!stringr::str_detect(broad_celltype_group, "tumor") | broad_celltype_group == "unknown") |> 
   dplyr::select(barcodes, unique_id, broad_celltype_group) |> 
@@ -397,7 +426,7 @@ all_df_list |>
     umap <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = zscore)) +
       geom_point(alpha = 0.5, size = 0.2) +
       facet_grid(rows = vars(method_category),
-                 cols = vars(detail_cell_category)) +
+                 cols = vars(detail_tumor_category)) +
       scale_color_viridis_c(option = "turbo") +
       labs(color = "Mean z-score") +
       umap_theme() 
@@ -421,7 +450,9 @@ The dotted lines in the plots indicate a z-score of `r marker_gene_cutoff`, i.e.
 Any cells with a z-score > `r marker_gene_cutoff` are labeled as `tumor-high` (`EF-activated`) or `tumor-low` (`EF-repressed`). 
 
 ```{r}
-scatterplot_df <- library_df |> 
+scatterplot_df <- annotations_df |>
+  # only plot values for cells in this library
+  dplyr::filter(unique_id == params$unique_id) |> 
   dplyr::select(barcodes, `EF-activated`, `EF-repressed`, cnv_zscore) |> 
   dplyr::distinct()
 
@@ -463,8 +494,8 @@ Any cell type with less than 3 cells will not be included in the plot.
 
 ```{r}
 # only have tumor and non-malignant
-cell_category_colors <- RColorBrewer::brewer.pal(n = 2, name = "Dark2")
-names(cell_category_colors) <- c("tumor", "non-malignant")
+tumor_category_colors <- RColorBrewer::brewer.pal(n = 2, name = "Dark2")
+names(tumor_category_colors) <- c("tumor", "non-malignant")
 ```
 
 
@@ -479,16 +510,16 @@ all_df_list |>
                           values_to = "mean_category_zscore")
     
     # faceted ridge plot for each gene set category
-    ridge_plot <- ggplot(ridges_plot_df, aes(x = mean_category_zscore, y = y_label, fill = cell_category)) +
+    ridge_plot <- ggplot(ridges_plot_df, aes(x = mean_category_zscore, y = y_label, fill = tumor_category)) +
       ggridges::geom_density_ridges(alpha = 0.5) +
       facet_wrap(vars(geneset_category),
                  ncol = 1,
                  scales = "free_x") +
-      scale_fill_manual(values = cell_category_colors) +
+      scale_fill_manual(values = tumor_category_colors) +
       labs(
         x = "Mean z-score",
         y = "Broad cell type group",
-        fill = "Cell type \ncategory"
+        fill = "Tumor \ncategory"
       ) +
       geom_vline(xintercept = marker_gene_cutoff, linetype = "dashed")
     
@@ -529,9 +560,9 @@ all_df_list |>
     cutoff <- stringr::word(title, -1, sep = " ") |> as.numeric()
     
     # total CNV across cell types
-    total_cnv_plot <- ggplot(df, aes(x = cnv_zscore, y = y_label, fill = forcats::fct_rev(cell_category))) +
+    total_cnv_plot <- ggplot(df, aes(x = cnv_zscore, y = y_label, fill = forcats::fct_rev(tumor_category))) +
       ggridges::geom_density_ridges(alpha = 0.5) +
-      scale_fill_manual(values = cell_category_colors) +
+      scale_fill_manual(values = tumor_category_colors) +
       labs(
         x = "Total CNV z-score",
         y = "",
@@ -582,13 +613,13 @@ all_df_list |>
       
     
     # faceted by chromosome
-    cnv_plot <- ggplot(cnv_df, aes(x = zscore, y = cell_category, fill = cell_category)) +
+    cnv_plot <- ggplot(cnv_df, aes(x = zscore, y = y_label, fill = tumor_category)) +
       ggridges::geom_density_ridges(alpha = 0.5) +
       facet_wrap(
         vars(chromosome),
         scales = "free_x"
       ) +
-      scale_fill_manual(values = cell_category_colors) +
+      scale_fill_manual(values = tumor_category_colors) +
       labs(
         x = "Proportion CNV",
         y = ""
@@ -623,7 +654,7 @@ qc_columns <- c(
 qc_columns |>
   purrr::imap(\(column, y_label){
     
-    ggplot(library_df_list$`CNV z-score > 2`, aes(x = detail_cell_category, y = !!sym(column))) +
+    ggplot(library_df_list$`CNV z-score > 2`, aes(x = detail_tumor_category, y = !!sym(column))) +
       ggforce::geom_sina(size = 0.3) +
       # add median diamond
       stat_summary(
