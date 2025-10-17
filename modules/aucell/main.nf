@@ -74,22 +74,20 @@ process run_aucell {
           val(sample_id),
           path("*_aucell-results.tsv")
   script:
-    aucell_output_file = "${unique_id}_aucell-results.tsv"
     """
     02-aucell.R \
       --sce_file ${sce_file} \
       --gene_set_collection_file ${geneset_collection_file} \
       --max_rank_threshold ${params.aucell_max_rank_threshold} \
-      --output_file ${aucell_output_file} \
+      --output_file "${unique_id}_aucell-results.tsv" \
       --ref_aucell_results ${ref_aucell_results} \
       --threads ${task.cpus} \
       --seed ${params.seed}
     """
 
   stub:
-    aucell_output_file = "${unique_id}_aucell-results.tsv"
     """
-    touch ${aucell_output_file}
+    touch "${unique_id}_aucell-results.tsv"
     """
 }
 

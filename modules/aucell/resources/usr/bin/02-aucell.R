@@ -253,7 +253,7 @@ zscore_df <- gene_set_names |>
         dplyr::filter(gene_set == name) |> 
         dplyr::pull(auc)
     } else {
-      # if the object is the reference, then use the auc_df to get all reference cells
+      # if the object is the reference, then use all cells
       ref_auc <- gene_set_df$auc
     }
     
