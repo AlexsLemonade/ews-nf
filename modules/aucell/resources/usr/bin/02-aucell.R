@@ -4,8 +4,13 @@
 # gene sets used are custom gene sets and a set of Ewing specific gene sets from MsigDB
 # gene sets should be provided as a GeneSetCollection object (as created by 01-build-genesetcollection.R)
 
+# the z-score for each cell and each gene set is calculated using the results from a set of reference cells
+# If the input SCE file contains only reference cells use `--is_reference`
+# if the input SCE file is all cells from a library, provide the AUcell reference results with `ref_aucell_results`
+
 # the results are exported as a single TSV file with the following columns:
-# `gene_set`, `barcodes`, `auc`, `auc_threshold`, and `unique_id`
+# `gene_set`, `barcodes`, `auc`, `auc_threshold`, `unique_id`, `sample_id`, and `auc_zscore`
+
 
 library(optparse)
 
@@ -13,11 +18,13 @@ option_list <- list(
   make_option(
     opt_str = c("--sce_file"),
     type = "character",
+    default = "",
     help = "Path to RDS file containing a processed SingleCellExperiment object to use with AUCell."
   ),
   make_option(
     opt_str = c("--gene_set_collection_file"),
     type = "character",
+    default = "",
     help = "Path to RDS file containing GeneSetCollection object to use with AUCell."
   ),
   make_option(
@@ -31,6 +38,21 @@ option_list <- list(
     opt_str = c("--output_file"),
     type = "character",
     help = "Path to TSV file where results will be saved"
+  ),
+  make_option(
+    opt_str = c("--is_reference"),
+    action = "store_true",
+    default = FALSE,
+    help = "Specify that the input SCE object contains a collection of reference cells.
+      If used, all cells will be labeled as 'reference' in the 'ref_or_query' column of the output 
+      and all cells will be used to get the mean and standard deviation for calculating the z-score"
+  ), 
+  make_option(
+    opt_str = c("--ref_aucell_results"),
+    type = "character",
+    default = "",
+    help = "Path to TSV file containing AUCell results for all reference cells. 
+      This is required if --is_reference is FALSE and all cells in this file will be used to calculate z-scores."
   ),
   make_option(
     opt_str = c("-t", "--threads"),
@@ -55,11 +77,6 @@ opt <- parse_args(OptionParser(option_list = option_list))
 set.seed(opt$seed)
 
 # make sure input files exist
-stopifnot(
-  "sce file must be specified using `--sce_file`" = !is.null(opt$sce_file),
-  "GeneSetCollection file must be specified using `--gene_set_collection_file`" = !is.null(opt$gene_set_collection_file)
-)
-
 stopifnot(
   "sce file does not exist" = file.exists(opt$sce_file),
   "GeneSetCollection file does not exist" = file.exists(opt$gene_set_collection_file),
@@ -87,8 +104,51 @@ fs::dir_create(output_dir)
 # read in SCE
 sce <- readr::read_rds(opt$sce_file)
 
-# extract unique id to save to results file from sce file name 
-unique_id <- stringr::word(basename(opt$sce_file), sep = "_", 1)
+# set up the metadata to add to the output TSV 
+# based on if the input is a single library or if it's a collection of reference cells
+# if its reference cells, then cells from multiple libraries will be present and they should all be labeled "reference"
+if(opt$is_reference){
+  # save coldata for joining with results later 
+  coldata_df <- colData(sce) |> 
+    as.data.frame() |> 
+    dplyr::select(barcodes, sample_id, unique_id) |> 
+    # add cell id for joining and label everything as reference in this case 
+    dplyr::mutate(cell_id = glue::glue("{unique_id}_{barcodes}"),
+                  ref_or_query = "reference")
+  
+  # add detected column to rowData for filtering
+  rowData(sce)$detected <- rowMeans(counts(sce) > 0) * 100
+  
+} else {
+  # if the input is a single library, then we run AUCell on that library 
+  # this also includes calculating z-scores, which requires AUCell results for a reference group of cells
+  
+  # check that reference tsv is provided 
+  stopifnot("Missing AUCell results from all reference cells, --ref_aucell_results" = file.exists(opt$ref_aucell_results))
+  
+  # read in ref cells file with aucell results for all ref cells 
+  ref_aucell_df <- readr::read_tsv(opt$ref_aucell_results)
+  
+  # define the list of reference cells
+  ref_cells <- ref_aucell_df$cell_id |> 
+    unique()
+  
+  # extract unique id to save to results file from sce file name 
+  unique_id <- stringr::word(basename(opt$sce_file), sep = "_", 1)
+  
+  # get the coldata to join with results later
+  coldata_df <- data.frame(
+    barcodes = colnames(sce),
+    sample_id = metadata(sce)$sample_id,
+    unique_id = unique_id
+  ) |> 
+    # label based on if cells are part of the reference or query cells
+    dplyr::mutate(cell_id = glue::glue("{unique_id}_{barcodes}"),
+                  ref_or_query = dplyr::if_else(cell_id %in% ref_cells, "reference", "query"))
+  
+  # set names of sce to be cell_id to keep labeling consistent across run modes
+  colnames(sce) <- coldata_df$cell_id
+}
 
 # remove genes that are not detected from SCE object
 genes_to_keep <- rowData(sce)$detected > 0
@@ -166,17 +226,47 @@ auc_df <- auc_results@assays@data$AUC |>
   as.data.frame() |>
   tibble::rownames_to_column("gene_set") |>
   tidyr::pivot_longer(!"gene_set",
-    names_to = "barcodes",
-    values_to = "auc"
+                      names_to = "cell_id",
+                      values_to = "auc"
   ) |>
   # add in threshold column
   dplyr::left_join(threshold_df, by = "gene_set") |>
-  dplyr::relocate(gene_set, .after = barcodes) |>
-  # add ids to use when joining everything for zscore calculation
-  dplyr::mutate(
-    sample_id = metadata(sce)$sample_id,
-    unique_id = unique_id
-  )
+  # add ids from coldata 
+  dplyr::left_join(coldata_df, by = c("cell_id")) |> 
+  dplyr::relocate(gene_set, .after = cell_id)
+
+# split auc_df into gene sets
+gene_set_df_list <- split(auc_df, auc_df$gene_set)
+
+# calculate z-scores 
+# calculate ref mean and sd and get z-score for all cells in each gene set 
+zscore_df <- gene_set_df_list |> 
+  purrr::imap(\(gene_set_df, name){
+    
+    # if the object is a single library, grab the reference cells from the ref object for the given gene set
+    if(!opt$is_reference){
+      ref_auc <- ref_aucell_df |> 
+        dplyr::filter(gene_set == name) |> 
+        dplyr::pull(auc)
+    } else {
+      # if the object is the reference, then use all cells
+      ref_auc <- gene_set_df$auc
+    }
+    
+    # calculate mean and sd based on reference cells
+    ref_mean <- mean(ref_auc)
+    ref_sd <- sd(ref_auc)
+    
+    # calculate z-score for each cell 
+    gene_set_df <- gene_set_df |> 
+      dplyr::mutate(
+        auc_zscore = (auc - ref_mean)/ref_sd
+      )
+    
+    return(gene_set_df)
+  }) |> 
+  dplyr::bind_rows()
+
 
 # export results as table
-readr::write_tsv(auc_df, opt$output_file)
+readr::write_tsv(zscore_df, opt$output_file)
