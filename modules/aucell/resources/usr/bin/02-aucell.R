@@ -117,7 +117,7 @@ if(opt$is_reference){
                   ref_or_query = "reference")
   
   # add detected column to rowData for filtering
-  rowData(sce)$detected <- rowSums(counts(sce))
+  rowData(sce)$detected <- rowMeans(counts(sce) > 0) * 100
   
 } else {
   # if the input is a single library, then we run AUCell on that library 
