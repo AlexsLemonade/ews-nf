@@ -165,13 +165,13 @@ coldata_df <- scuttle::makePerCellDF(
       .default = broad_celltype_group
     ),
     # use this when making plots that look at tumor high, tumor low vs normal 
-    detail_cell_category = dplyr::if_else(
+    detail_tumor_category = dplyr::if_else(
       stringr::str_detect(broad_celltype_group, "tumor"),
       broad_celltype_group,
       "non-malignant"
     ),
     # use for just tumor vs normal 
-    cell_category = dplyr::if_else(
+    tumor_category = dplyr::if_else(
       stringr::str_detect(broad_celltype_group, "tumor"),
       "tumor",
       "non-malignant"
@@ -227,13 +227,8 @@ all_df_list <- split(all_info_df, all_info_df$annotation_tier) |>
   rev()
 
 # create a copy of the information for just the library cells
-library_df <- all_info_df |> 
-  dplyr::filter(unique_id == params$unique_id) 
-
-# now just the library cells for the library plots
-library_df_list <- split(library_df, library_df$annotation_tier) |> 
-  purrr::set_names(cnv_names) |> 
-  rev()
+library_df_list <- all_df_list |> 
+  purrr::map(\(df) dplyr::filter(df, unique_id == params$unique_id))
 ```
 
 
