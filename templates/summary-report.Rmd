@@ -178,11 +178,11 @@ annotations_df <- annotations_df |>
       broad_celltype_group,
       "non-malignant"
     ),
-    # use for just tumor vs normal 
-    tumor_category = dplyr::if_else(
-      stringr::str_detect(broad_celltype_group, "tumor"),
-      "tumor",
-      "non-malignant"
+    # use for tumor, normal, and unknown
+    tumor_category = dplyr::case_when(
+      stringr::str_detect(broad_celltype_group, "tumor") ~ "tumor",
+      broad_celltype_group == "unknown" ~ "unknown",
+      .default = "non-malignant"
     ),
     # include a column with the annotation of all reference cells in one group 
     # use for density plots confirming high AUC/CNV in tumor cells vs. reference
@@ -201,8 +201,13 @@ celltype_counts_df <- annotations_df |>
   # add in y label 
   dplyr::mutate(
     y_label = glue::glue("{reference_category} ({n})"),
-    # classify based on malignant or not malignant
-    tumor_category = factor(!stringr::str_detect(reference_category, "tumor"), labels = c("tumor", "non-malignant"))
+    # classify based on malignant, not malignant, or unknown
+    tumor_category = dplyr::case_when(
+      stringr::str_detect(y_label, "tumor") ~ "tumor",
+      stringr::str_detect(y_label, "unknown") ~ "unknown",
+      .default = "non-malignant"
+    ) |> 
+      forcats::fct_relevel(c("non-malignant", "unknown"), after = Inf)
   )
 
 # grab order of cell types based on cell type categories that will be plotted in the density plots
@@ -412,6 +417,7 @@ We expect that tumor cells have both high CNV scores and high expression of `EWS
 
 Here we show UMAPs colored by the mean z-score for either the gene set category or sum CNV.
 The UMAP is faceted by cell type category so that only cells from that category are included in the panel. 
+Any cell that is labeled "unknown" is not included.
 
 
 ```{r, results='asis', fig.height=6, fig.width=6}
@@ -495,13 +501,15 @@ Gene sets can be divided into three groups to help distinguish tumor cells from 
 
 For the plots below all reference cells across all samples are shown alongside all query cells from `r params$unique_id`. 
 
-Cell types are colored based on whether or not the cell type is classified as tumor or non-malignant. 
+Cell types are colored based on whether or not the cell type is classified as tumor, non-malignant, or unknown using the specified threshold. 
+Some cell types may not be present for each threshold as decreasing the stringency may result in cells that were previously annotated with a non-malignant cell type (e.g., fibroblasts) to instead be labeled as tumor cells. 
+
 Any cell type with less than 3 cells will not be included in the plot. 
 
 ```{r}
 # only have tumor and non-malignant
-tumor_category_colors <- RColorBrewer::brewer.pal(n = 2, name = "Dark2")
-names(tumor_category_colors) <- c("tumor", "non-malignant")
+tumor_category_colors <- RColorBrewer::brewer.pal(n = 3, name = "Dark2")
+names(tumor_category_colors) <- c("tumor", "non-malignant", "unknown")
 ```
 
 
@@ -557,7 +565,8 @@ Below is the heatmap showing chromosome gains and losses as output by `inferCNV`
 Below we look at the distribution of total CNVs detected per cell. 
 The number of chromosomes with a detectable CNV is totaled and then the mean and standard deviation of the total CNV sum for all reference cells are used to calculate a z-score for all cells in the dataset. 
 
-As with the `AUCell` results, cell types are colored based on whether or not the cell is classified as tumor or non-malignant. 
+As with the `AUCell` results, cell types are colored based on whether or not the cell is classified as tumor, non-malignant, or unknown. 
+Some cell types may not be present for each threshold as decreasing the stringency may result in cells that were previously annotated with a non-malignant cell type (e.g., fibroblasts) to instead be labeled as tumor cells. 
 All reference cells belonging to the pooled reference are shown in the plots below. 
 
 
