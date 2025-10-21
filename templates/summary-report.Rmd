@@ -163,7 +163,9 @@ annotations_df <- annotations_df |>
     values_to = "ews_annotation"
   ) |> 
   dplyr::mutate(
-    ews_annotation = forcats::fct_relevel(ews_annotation, "Unknown", after = Inf),
+    # make sure Unknown is lower case to match everything else thats lower case
+    ews_annotation = stringr::str_to_lower(ews_annotation) |> 
+      forcats::fct_relevel(ews_annotation, "unknown", after = Inf),
     broad_celltype_group = dplyr::case_when(
       stringr::str_detect(ews_annotation, "tumor") ~ ews_annotation,
       is.na(broad_celltype_group) ~ "unknown",
@@ -201,8 +203,7 @@ celltype_counts_df <- annotations_df |>
     y_label = glue::glue("{reference_category} ({n})"),
     # classify based on malignant or not malignant
     tumor_category = factor(!stringr::str_detect(reference_category, "tumor"), labels = c("tumor", "non-malignant"))
-  ) |> 
-  dplyr::distinct()
+  )
 
 # grab order of cell types based on cell type categories that will be plotted in the density plots
 celltype_levels <- celltype_counts_df |> 
@@ -278,7 +279,7 @@ library_df_list |>
       dplyr::mutate(
         # set order so that all annotations are first ordered by counts and then unknown is last
         ews_annotation = factor(ews_annotation, levels = ews_annotation ) |> 
-          forcats::fct_relevel("Unknown", after = Inf)
+          forcats::fct_relevel("unknown", after = Inf)
       ) |>
       # arrange by levels
       dplyr::arrange(ews_annotation) |> 
@@ -390,6 +391,14 @@ if(dim(all_info_df)[2] > 0){
     celltype_colors = celltype_colors,
     min_cells = 0 #TODO: Update this if needed to remove some cell types
   ) 
+} else {
+  glue::glue("
+    <div class=\"alert alert-info\">
+
+    No consensus cell types were annotated in this sample.
+
+    </div>
+  ")
 }
 ```
 
@@ -506,6 +515,9 @@ all_df_list |>
                           names_to = "geneset_category",
                           values_to = "mean_category_zscore")
     
+    # extract the cutoff to add a line to the plot
+    cutoff <- stringr::word(title, -1, sep = " ") |> as.numeric()
+    
     # faceted ridge plot for each gene set category
     ridge_plot <- ggplot(ridges_plot_df, aes(x = mean_category_zscore, y = y_label, fill = tumor_category)) +
       ggridges::geom_density_ridges(alpha = 0.5) +
@@ -518,7 +530,7 @@ all_df_list |>
         y = "Broad cell type group",
         fill = "Tumor \ncategory"
       ) +
-      geom_vline(xintercept = marker_gene_cutoff, linetype = "dashed")
+      geom_vline(xintercept = cutoff, linetype = "dashed")
     
     print(glue::glue('### {title}'))
     print(ridge_plot)
