@@ -195,16 +195,13 @@ annotations_df <- annotations_df |>
 ```{r, warning=FALSE, message=FALSE}
 # get the total counts for each group and add a column to use for labeling plots 
 celltype_counts_df <- annotations_df |>
-  dplyr::select(cell_id, annotation_tier, reference_category) |> 
-  dplyr::add_count(annotation_tier, reference_category) |> 
+  dplyr::count(annotation_tier, reference_category) |> 
   # add in y label 
   dplyr::mutate(
     y_label = glue::glue("{reference_category} ({n})"),
     # classify based on malignant or not malignant
-    tumor_category = dplyr::if_else(stringr::str_detect(reference_category, "tumor"), "tumor", "non-malignant") |> 
-      factor(levels = c("tumor", "non-malignant"))
+    tumor_category = factor(!stringr::str_detect(reference_category, "tumor"), labels = c("tumor", "non-malignant"))
   ) |> 
-  dplyr::select(-cell_id) |> 
   dplyr::distinct()
 
 # grab order of cell types based on cell type categories that will be plotted in the density plots
@@ -216,7 +213,7 @@ celltype_levels <- celltype_counts_df |>
 
 # pull out reference label to set at the end of the factors 
 # this ensures the reference group is always at the bottom of the plot
-ref_label <- celltype_levels[stringr::str_detect(celltype_levels, "reference")]
+ref_label <- stringr::str_subset(celltype_levels, "reference")
 non_ref_labels <- celltype_levels[celltype_levels != ref_label]
 
 # combine everything into one df including counts
