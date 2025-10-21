@@ -183,7 +183,8 @@ annotations_df <- annotations_df |>
       stringr::str_detect(broad_celltype_group, "tumor") ~ "tumor",
       broad_celltype_group == "unknown" ~ "unknown",
       .default = "non-malignant"
-    ),
+    ) |> 
+      factor(levels = c("tumor", "non-malignant", "unknown")),
     # include a column with the annotation of all reference cells in one group 
     # use for density plots confirming high AUC/CNV in tumor cells vs. reference
     reference_category = dplyr::if_else(
@@ -207,7 +208,7 @@ celltype_counts_df <- annotations_df |>
       stringr::str_detect(y_label, "unknown") ~ "unknown",
       .default = "non-malignant"
     ) |> 
-      forcats::fct_relevel(c("non-malignant", "unknown"), after = Inf)
+      factor(levels = c("tumor", "non-malignant", "unknown"))
   )
 
 # grab order of cell types based on cell type categories that will be plotted in the density plots
@@ -578,7 +579,7 @@ all_df_list |>
     cutoff <- stringr::word(title, -1, sep = " ") |> as.numeric()
     
     # total CNV across cell types
-    total_cnv_plot <- ggplot(df, aes(x = cnv_zscore, y = y_label, fill = forcats::fct_rev(tumor_category))) +
+    total_cnv_plot <- ggplot(df, aes(x = cnv_zscore, y = y_label, fill = tumor_category)) +
       ggridges::geom_density_ridges(alpha = 0.5) +
       scale_fill_manual(values = tumor_category_colors) +
       labs(
