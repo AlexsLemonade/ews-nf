@@ -28,7 +28,6 @@ process create_geneset_collection {
 
 process build_aucell_reference {
   container params.ews_nf_container
-  tag "${unique_id}"
   label 'mem_24'
   cpus 2
   time '2h'
