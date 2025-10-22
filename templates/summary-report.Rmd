@@ -27,15 +27,18 @@ output:
 
 This report shows a summary of the cell type annotations assigned by `ews-nf`. 
 
-* First, normal cell types were assigned based on their consensus consensus cell type annotations output by `scpca-nf`.
+* First, cell types were assigned based on their consensus consensus cell type annotations output by `scpca-nf`.
 More information on how consensus cell types are assigned can be found in the [ScPCA Portal documentation](https://scpca.readthedocs.io/en/stable/processing_information.html#cell-type-annotation). 
-* All immune and endothelial cells are pooled across samples to create a "normal" reference used with `InferCNV` and `AUCell`.
-* Tumor cells are those with a total CNV z-score or presence of a Ewing-specific CNV (chr1 gain, chr8 gain, chr16 gain, or chr16 loss) above a specified threshold. 
+* All immune and endothelial cells are pooled across samples to create a "normal" or "non-malignant" reference used with `InferCNV` and `AUCell`.
+* Tumor cells are classified as those with a total CNV z-score or presence of a Ewing-specific CNV (chr1 gain, chr8 gain, chr16 gain, or chr16 loss) above a specified threshold. 
   * Here, tumor cells were labeled using three different thresholds, > 2, > 1, or > 0
   * All three classifications are shown in the plots below, with the CNV z-score > 2 being the most stringent. 
-* Tumor cells are then classified using results from `AUCell`. 
+  * Tumor cells are further classified using results from `AUCell`. 
 Cells labeled `tumor-high` or `tumor-low` if they have a `EF-activated` z-score > `r params$marker_gene_cutoff` or `EF-repressed` z-score > `r params$marker_gene_cutoff`, respectively. 
-Cells labeled `tumor` do not meet either criteria. 
+Cells labeled `tumor` do not meet either criteria.
+* Any cells that are not part of the pooled reference and are not classified as a tumor cell based on the shown CNV threshold are labeled with their assigned consensus cell type. 
+In most cases this includes cells that are labeled as fibroblasts, muscle cells, and similar cell types. 
+If no consensus was assigned and the cell does not meet the specified threshold to be a tumor cell, then it is labeled as "unknown". 
 
 
 ```{r setup, message = FALSE, echo = FALSE}
@@ -187,6 +190,7 @@ annotations_df <- annotations_df |>
     ),
     # use for tumor, normal, and unknown
     tumor_category = dplyr::case_when(
+      ref_or_query == "reference" ~ "non-malignant", # make sure all reference cells are non-malignant
       stringr::str_detect(broad_celltype_group, "tumor") ~ "tumor",
       broad_celltype_group == "unknown" ~ "unknown",
       .default = "non-malignant"
@@ -232,7 +236,7 @@ non_ref_labels <- celltype_levels[!(celltype_levels %in% ref_labels)]
 
 # combine everything into one df including counts
 all_info_df <- annotations_df |> 
-  dplyr::left_join(celltype_counts_df) |> 
+  dplyr::left_join(celltype_counts_df, by = c("annotation_tier", "reference_category", "tumor_category")) |> 
   dplyr::filter(n >= 3) |> 
   dplyr::mutate(
     y_label = factor(y_label, levels = rev(c(non_ref_labels, ref_labels)))
@@ -263,7 +267,7 @@ library_df_list <- all_df_list |>
     # make sure we only keep one row per cell and remove duplicate reference cells
     df |> 
       dplyr::filter(unique_id == params$unique_id) |> 
-      dplyr::select(-c(ref_or_query, reference_category, y_label)) |> 
+      dplyr::select(-c(n, ref_or_query, reference_category, y_label)) |> 
       unique()
     
   })
@@ -514,10 +518,12 @@ Gene sets can be divided into three groups to help distinguish tumor cells from 
 * `EF-repressed`: These gene sets contain genes that are repressed by the fusion gene, `EWS::FLI1`. 
 * `EMT-ECM`: These gene sets contain genes that are found to be highly expressed in tumor cells with low expression of `EWS::FLI1`.
 
-For the plots below all reference cells across all samples are shown alongside all query cells from `r params$unique_id`. 
+For the plots below all reference cells across all samples are shown alongside all query cells from `r params$unique_id` and labeled as "reference". 
+Cells that are from this sample and are part of the larger reference are shown both in the "reference" distribution and separately in the "internal_reference" distribution. 
 
 Cell types are colored based on whether or not the cell type is classified as tumor, non-malignant, or unknown using the specified threshold. 
 Some cell types may not be present for each threshold as decreasing the stringency may result in cells that were previously annotated with a non-malignant cell type (e.g., fibroblasts) to instead be labeled as tumor cells. 
+Here all cells that are part of the reference are considered "non-malignant". 
 
 Any cell type with less than 3 cells will not be included in the plot. 
 
@@ -582,7 +588,8 @@ The number of chromosomes with a detectable CNV is totaled and then the mean and
 
 As with the `AUCell` results, cell types are colored based on whether or not the cell is classified as tumor, non-malignant, or unknown. 
 Some cell types may not be present for each threshold as decreasing the stringency may result in cells that were previously annotated with a non-malignant cell type (e.g., fibroblasts) to instead be labeled as tumor cells. 
-All reference cells belonging to the pooled reference are shown in the plots below. 
+All reference cells belonging to the pooled reference are shown in the plots with the "reference" label. 
+Cells that are from this sample and are part of the larger reference are shown both in the "reference" distribution and separately in the "internal_reference" distribution.
 
 
 ```{r, results='asis', message = FALSE}
