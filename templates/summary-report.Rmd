@@ -120,7 +120,7 @@ annotations_df <- readr::read_tsv(params$annotations_results_file)
 # pull out pooled reference cells 
 internal_ref_df <- annotations_df |> 
   dplyr::filter(ref_or_query == "reference" & unique_id == params$unique_id) |> 
-  dplyr::mutate(ref_or_query = "internal_reference")
+  dplyr::mutate(ref_or_query = "sample reference")
 
 # validation groups and marker gene table urls 
 validation_groups_df <- readr::read_tsv(params$validation_groups_file) |> 
@@ -470,7 +470,7 @@ library_df_list |>
 ```
 
 
-## Scatter plot
+## Gene set score scatter plot
 
 The scatter plot below shows the z-score for the repressed (`EF-repressed`) vs. activated (`EF-activated`) gene sets in each cell.
 The points are then colored by the total CNV score. 
@@ -519,13 +519,13 @@ Gene sets can be divided into three groups to help distinguish tumor cells from 
 * `EMT-ECM`: These gene sets contain genes that are found to be highly expressed in tumor cells with low expression of `EWS::FLI1`.
 
 For the plots below all reference cells across all samples are shown alongside all query cells from `r params$unique_id` and labeled as "reference". 
-Cells that are from this sample and are part of the larger reference are shown both in the "reference" distribution and separately in the "internal_reference" distribution. 
+Cells from this sample that are classified as one of the reference cell types are shown as "sample reference" as well as being included in the "reference" distribution.
 
 Cell types are colored based on whether or not the cell type is classified as tumor, non-malignant, or unknown using the specified threshold. 
 Some cell types may not be present for each threshold as decreasing the stringency may result in cells that were previously annotated with a non-malignant cell type (e.g., fibroblasts) to instead be labeled as tumor cells. 
 Here all cells that are part of the reference are considered "non-malignant". 
 
-Any cell type with less than 3 cells will not be included in the plot. 
+Any cell type with fewer than 3 cells will not be included in the plot. 
 
 ```{r}
 # only have tumor and non-malignant
