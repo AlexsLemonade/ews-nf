@@ -29,7 +29,7 @@ process render_report {
       output_file = '${summary_report_html}',\
       params = list(unique_id = '${unique_id}', \
                     sce_file = '${sce_file}', \
-                    annotations_results_file \ '${annotations_file}' \
+                    annotations_results_file = '${annotations_file}' \
                     infercnv_heatmap_file = '${infercnv_heatmap}', \
                     validation_groups_file = '${validation_groups_file}', \
                     marker_genes_file = '${marker_genes_file}', \
