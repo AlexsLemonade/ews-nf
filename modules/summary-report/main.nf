@@ -35,7 +35,7 @@ process render_report {
                     marker_genes_file = '${marker_genes_file}', \
                     color_palette_file = '${color_palette_file}', \
                     plotting_functions_file = '${plotting_functions_file}',\
-                    marker_gene_cutoff = ${params.marker_gene_cutoff})"
+                    marker_gene_cutoff = ${params.marker_gene_cutoff}))"
     """
   stub:
     summary_report_html = "${unique_id}_summary-report.html"
