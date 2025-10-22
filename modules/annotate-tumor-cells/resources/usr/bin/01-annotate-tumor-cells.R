@@ -146,13 +146,15 @@ all_aucell_df <- aucell_df |>
 
 # combine celltypes, aucell, and infercnv information together
 # only keep cells that are in the object, we don't need to classify the reference cells from other libraries
-results_df <- coldata_df |> 
+results_df <- all_aucell_df |> 
   # aucell results
   # again using full join here since we want to keep both library unknown and reference cells
-  dplyr::full_join(all_aucell_df, by = "cell_id") |> 
+  dplyr::left_join(coldata_df, by = "cell_id") |> 
   # infercnv results
   dplyr::left_join(infercnv_df, by = "cell_id") |> 
   dplyr::mutate(
+    # make sure unique ID exists for all cells 
+    unique_id = stringr::word(cell_id, 1, sep = "_"),
     # first classify the tumor cells by the highest threshold that gets passed across total CNV or any Ewing specific chromosomes
     tumor_class = dplyr::case_when(
       ref_or_query != "reference" & dplyr::if_any(dplyr::ends_with("_zscore"), \(x) x > 2) ~ "tumor_tier2",
