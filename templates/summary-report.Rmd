@@ -1,19 +1,14 @@
 ---
 params:
-  unique_id: "SCPCL001229-SCPCS000849"
-  sce_file: "../scpca-nf-out/SCPCP000026/SCPCS000849/SCPCL001229-SCPCS000849_processed.rds"
+  unique_id: "SCPCL001228-SCPCS000844"
+  sce_file: "../scpca-nf-out/SCPCP000026/SCPCS000844/SCPCL001228-SCPCS000844_processed.rds"
+  annotations_results_file: "../ews-nf-out/annotations/SCPCS000844/SCPCL001228-SCPCS000844_annotations.tsv"
+  infercnv_heatmap_file: "../ews-nf-out/infercnv/SCPCS000844/SCPCL001228-SCPCS000844_infercnv-heatmap.png"
   validation_groups_file: "../references/consensus-validation-groups.tsv"
   marker_genes_file: "../references/validation-markers.tsv"
   color_palette_file: "../palettes/validation-group-palette.tsv"
-  aucell_results_file: "../ews-nf-out/aucell/SCPCS000849/SCPCL001229-SCPCS000849_aucell-zscores.tsv"
-  ref_aucell_file: "../ews-nf-out/aucell/aucell-reference-zscores.tsv"
-  ref_annotations_file: "../ews-nf-out/build-reference/all-ref-annotations.tsv"
-  gene_set_category_file: "../genesets/gene-set-categories.tsv"
-  infercnv_heatmap_file: "../ews-nf-out/infercnv/SCPCS000849/SCPCL001229-SCPCS000849_infercnv-heatmap.png"
-  infercnv_results_file: "../ews-nf-out/infercnv/SCPCS000849/SCPCL001229-SCPCS000849_infercnv-metadata.tsv"
   plotting_functions_file: "utils/plotting-functions.Rmd"
-  output_annotations_file: "SCPCL000849_annotations.tsv"
-  zscore_cutoff: 2
+  marker_gene_cutoff: 2
   seed: 2025
 
 title: "`r glue::glue('ews-nf summary report for {params$unique_id}')`"
@@ -21,14 +16,30 @@ author: "Childhood Cancer Data Lab"
 output:
   html_document:
     toc: true
-    toc_depth: 2
+    toc_depth: 3
     toc_float:
       collapsed: false
     number_sections: false
     code_download: true
 ---
 
-# Set Up
+# Annotation overview 
+
+This report shows a summary of the cell type annotations assigned by `ews-nf`. 
+
+* First, cell types were assigned based on their consensus consensus cell type annotations output by `scpca-nf`.
+More information on how consensus cell types are assigned can be found in the [ScPCA Portal documentation](https://scpca.readthedocs.io/en/stable/processing_information.html#cell-type-annotation). 
+* All immune and endothelial cells are pooled across samples to create a "normal" or "non-malignant" reference used with `InferCNV` and `AUCell`.
+* Tumor cells are classified as those with a total CNV z-score or presence of a Ewing-specific CNV (chr1 gain, chr8 gain, chr16 gain, or chr16 loss) above a specified threshold. 
+  * Here, tumor cells were labeled using three different thresholds, > 2, > 1, or > 0
+  * All three classifications are shown in the plots below, with the CNV z-score > 2 being the most stringent. 
+  * Tumor cells are further classified using results from `AUCell`. 
+Cells labeled `tumor-high` or `tumor-low` if they have a `EF-activated` z-score > `r params$marker_gene_cutoff` or `EF-repressed` z-score > `r params$marker_gene_cutoff`, respectively. 
+Cells labeled `tumor` do not meet either criteria.
+* Any cells that are not part of the pooled reference and are not classified as a tumor cell based on the shown CNV threshold are labeled with their assigned consensus cell type. 
+In most cases this includes cells that are labeled as fibroblasts, muscle cells, and similar cell types. 
+If no consensus was assigned and the cell does not meet the specified threshold to be a tumor cell, then it is labeled as "unknown". 
+
 
 ```{r setup, message = FALSE, echo = FALSE}
 # knitr options
@@ -59,7 +70,7 @@ options(
 # Set seed
 set.seed(params$seed)
 
-zscore_cutoff <- params$zscore_cutoff
+marker_gene_cutoff <- params$marker_gene_cutoff
 
 # define a umap theme
 umap_theme <- function() {
@@ -69,7 +80,8 @@ umap_theme <- function() {
       axis.ticks = element_blank(),
       panel.grid = element_blank(),
       aspect.ratio = 1,
-      strip.background = element_rect(fill = "transparent")
+      strip.background = element_rect(fill = "transparent"),
+      legend.justification = "top"
     )
 }
 
@@ -89,15 +101,11 @@ plot_density()
 # file checks 
 stopifnot(
   "sce file does not exist" = file.exists(params$sce_file),
+  "annotations results file does not exist" = file.exists(params$annotations_results_file),
+  "infercnv heatmap file does not exist" = file.exists(params$infercnv_heatmap_file),
   "validation groups file does not exist" = file.exists(params$validation_groups_file),
   "marker genes file does not exist" = file.exists(params$marker_genes_file),
-  "color palette file does not exist" = file.exists(params$color_palette_file),
-  "aucell results file does not exist" = file.exists(params$aucell_results_file), 
-  "aucell reference file does not exist" = file.exists(params$ref_aucell_file),
-  "reference annotation file does not exist" = file.exists(params$ref_annotations_file),
-  "gene set category file does not exist" = file.exists(params$gene_set_category_file),
-  "infercnv heatmap file does not exist" = file.exists(params$infercnv_heatmap_file), 
-  "infercnv results file does not exist" = file.exists(params$infercnv_results_file)
+  "color palette file does not exist" = file.exists(params$color_palette_file)
 )
 ```
 
@@ -105,6 +113,14 @@ stopifnot(
 ```{r, message=FALSE}
 # read in sce 
 sce <- readr::read_rds(params$sce_file)
+
+# read in annotations results 
+annotations_df <- readr::read_tsv(params$annotations_results_file)
+
+# pull out pooled reference cells 
+internal_ref_df <- annotations_df |> 
+  dplyr::filter(ref_or_query == "reference" & unique_id == params$unique_id) |> 
+  dplyr::mutate(ref_or_query = "sample reference")
 
 # validation groups and marker gene table urls 
 validation_groups_df <- readr::read_tsv(params$validation_groups_file) |> 
@@ -124,26 +140,13 @@ celltype_colors <- readr::read_tsv(params$color_palette_file) |>
 # add greys for unknown and other 
 celltype_colors[["unknown"]] <- "gray60"
 celltype_colors[["other"]] <- "black"
-
-# read in aucell results 
-aucell_df <- readr::read_tsv(params$aucell_results_file)
-ref_aucell_df <- readr::read_tsv(params$ref_aucell_file)
-
-# read in reference annotations and gene set info 
-ref_celltypes_df <- readr::read_tsv(params$ref_annotations_file) |>
-  # only using the annotations from this file
-  dplyr::select(barcodes, unique_id, consensus_celltype_annotation)
-geneset_df <- readr::read_tsv(params$gene_set_category_file)
-
-# read in infercnv results 
-infercnv_df <- readr::read_tsv(params$infercnv_results_file)
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 # get coldata for umap 
 coldata_df <- scuttle::makePerCellDF(
     sce,
-    use.coldata = c("barcodes", "consensus_celltype_annotation", "sum", "detected", "subsets_mito_percent"),
+    use.coldata = c("barcodes", "sum", "detected", "subsets_mito_percent"),
     use.dimred = "UMAP"
   ) |> 
   dplyr::rename(
@@ -151,76 +154,207 @@ coldata_df <- scuttle::makePerCellDF(
       "UMAP2" = "UMAP.2",
       "genes_detected" = "detected"
     ) |> 
-  dplyr::left_join(validation_groups_df, by = c("consensus_celltype_annotation" = "consensus_annotation")) |> 
   dplyr::mutate(
     unique_id = params$unique_id,
-    broad_celltype_group = dplyr::if_else(
-      is.na(broad_celltype_group),
-      "unknown",
-      broad_celltype_group
+    cell_id = glue::glue("{unique_id}_{barcodes}")
+  ) 
+
+annotations_df <- annotations_df |> 
+  # duplicate rows for internal reference 
+  dplyr::bind_rows(internal_ref_df) |> 
+  # add coldata into annotations dataframe
+  # this keeps all library cells and all reference cells
+  dplyr::full_join(coldata_df, by = c("cell_id", "barcodes", "unique_id")) |> 
+  # now validation groups for plotting
+  dplyr::left_join(validation_groups_df, by = c("consensus_celltype_annotation" = "consensus_annotation")) |> 
+  tidyr::pivot_longer(
+    cols = contains("tier"),
+    names_to = "annotation_tier",
+    values_to = "ews_annotation"
+  ) |> 
+  dplyr::mutate(
+    # make sure Unknown is lower case to match everything else thats lower case
+    ews_annotation = stringr::str_to_lower(ews_annotation) |> 
+      forcats::fct_relevel(ews_annotation, "unknown", after = Inf),
+    broad_celltype_group = dplyr::case_when(
+      stringr::str_detect(ews_annotation, "tumor") ~ ews_annotation,
+      is.na(broad_celltype_group) ~ "unknown",
+      .default = broad_celltype_group
+    ) |> 
+      forcats::fct_relevel("unknown", after = Inf),
+    # use this when making plots that look at tumor high, tumor low vs normal 
+    detail_tumor_category = dplyr::if_else(
+      stringr::str_detect(broad_celltype_group, "tumor"),
+      broad_celltype_group,
+      "non-malignant"
+    ),
+    # use for tumor, normal, and unknown
+    tumor_category = dplyr::case_when(
+      ref_or_query == "reference" ~ "non-malignant", # make sure all reference cells are non-malignant
+      stringr::str_detect(broad_celltype_group, "tumor") ~ "tumor",
+      broad_celltype_group == "unknown" ~ "unknown",
+      .default = "non-malignant"
+    ) |> 
+      factor(levels = c("tumor", "non-malignant", "unknown")),
+    # include a column with the annotation of all reference cells in one group 
+    # use for density plots confirming high AUC/CNV in tumor cells vs. reference
+    reference_category = dplyr::if_else(
+      stringr::str_detect(ref_or_query, "reference"),
+      ref_or_query,
+      ews_annotation
     )
   )
 ```
 
-# Normal cell types
+```{r, warning=FALSE, message=FALSE}
+# get the total counts for each group and add a column to use for labeling plots 
+celltype_counts_df <- annotations_df |>
+  dplyr::count(annotation_tier, reference_category) |> 
+  # add in y label 
+  dplyr::mutate(
+    y_label = glue::glue("{reference_category} ({n})"),
+    # classify based on malignant, not malignant, or unknown
+    tumor_category = dplyr::case_when(
+      stringr::str_detect(y_label, "tumor") ~ "tumor",
+      stringr::str_detect(y_label, "unknown") ~ "unknown",
+      .default = "non-malignant"
+    ) |> 
+      factor(levels = c("tumor", "non-malignant", "unknown"))
+  )
 
-This section shows the normal cell types in this sample based on their consensus cell type annotations output by `scpca-nf`.
-Consensus cell types are defined by first annotating cells using two different methods, [`SingleR`](https://bioconductor.org/packages/release/bioc/html/SingleR.html) ([Looney _et al._ 2019](https://doi.org/10.1038/s41590-018-0276-y)) with the `BlueprintEncodeData` reference from [`celldex`](http://bioconductor.org/packages/release/data/experiment/html/celldex.html) and [`CellAssign`](https://github.com/Irrationone/cellassign) ([Zhang _et al._ 2019](https://doi.org/10.1038/s41592-019-0529-1)) using marker genes for bone and soft tissue from [`PanglaoDB`](https://panglaodb.se/). 
-Cells that map to related cell type ontology terms using both methods are assigned a consensus cell type. 
-Any cells with disagreement between the two annotation methods are labeled as `unknown` and may be more likely to be tumor cells. 
-More information on how cell types are assigned can be found in the [ScPCA Portal documentation](https://scpca.readthedocs.io/en/stable/processing_information.html#cell-type-annotation). 
+# grab order of cell types based on cell type categories that will be plotted in the density plots
+celltype_levels <- celltype_counts_df |> 
+  dplyr::arrange(tumor_category) |> 
+  dplyr::pull(y_label) |>
+  unique() |> 
+  as.character() 
 
-Cell types are then grouped into broader cell type groups, e.g., all T cell types will be grouped together as T cells for the plots shown in this report. 
+# pull out reference label to set at the end of the factors 
+# this ensures the reference group is always at the bottom of the plot
+ref_labels <- stringr::str_subset(celltype_levels, "reference") |> 
+  rev() # reverse the order so sample reference appears first
+non_ref_labels <- celltype_levels[!(celltype_levels %in% ref_labels)]
 
-## Table of cell types 
+# combine everything into one df including counts
+all_info_df <- annotations_df |> 
+  dplyr::left_join(celltype_counts_df, by = c("annotation_tier", "reference_category", "tumor_category")) |> 
+  dplyr::filter(n >= 3) |> 
+  dplyr::mutate(
+    y_label = factor(y_label, levels = rev(c(non_ref_labels, ref_labels)))
+  )
+```
 
-```{r}
-coldata_df |> 
-  dplyr::count(consensus_celltype_annotation, broad_celltype_group, name = "Total") |> 
-  dplyr::arrange(desc(Total)) |> 
-  dplyr::rename(
-    "Consensus cell type" = consensus_celltype_annotation,
-    "Broad cell type group" = broad_celltype_group
-  ) |> 
-  knitr::kable()
+```{r, warning=FALSE, message=FALSE}
+# names of split lists to use for mapping
+cnv_names <- c("CNV z-score > 0", "CNV z-score > 1", "CNV z-score > 2")
+
+# first split all cells for plots that include reference cells
+all_df_list <- split(all_info_df, all_info_df$annotation_tier) |> 
+  purrr::set_names(cnv_names) |> 
+  rev() |> 
+  purrr::map(\(df){
+    # for each annotation tier, get a lumped category with the top 8 celltypes
+    df <- df |> 
+      dplyr::mutate(
+        broad_celltype_group_lumped = forcats::fct_lump_n(broad_celltype_group, 8, other_level = "other", ties.method = "first") |>
+          forcats::fct_infreq() |>
+          forcats::fct_relevel("unknown", "other", after = Inf),
+      )
+  })
+
+# create a copy of the information for just the library cells
+library_df_list <- all_df_list |> 
+  purrr::map(\(df) {
+    # make sure we only keep one row per cell and remove duplicate reference cells
+    df |> 
+      dplyr::filter(unique_id == params$unique_id) |> 
+      dplyr::select(-c(n, ref_or_query, reference_category, y_label)) |> 
+      unique()
+    
+  })
 ```
 
 
-## UMAPs
+# Cell type annotation summary
+
+This section summarizes the annotations across all three CNV cutoffs used. 
+For simplicity, non-malignant cell types are grouped into broader cell type groups, e.g., all T cell types will be grouped together as T cells for the plots shown in this report. 
+
+## Tables {.tabset}
+
+```{r}
+# vector of annotation columns to use for printing out tables and umaps 
+tier_cols <- c(
+  "CNV z-score > 0" = "tier0",
+  "CNV z-score > 1" = "tier1",
+  "CNV z-score > 2" = "tier2"
+)
+```
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+library_df_list |> 
+  purrr::iwalk(\(df, title){
+    
+    print(glue::glue('### {title}'))
+    
+    df |> 
+      dplyr::count(ews_annotation, broad_celltype_group, name = "Total") |> 
+      # first arrange by total counts
+      dplyr::arrange(desc(Total)) |> 
+      dplyr::mutate(
+        # set order so that all annotations are first ordered by counts and then unknown is last
+        ews_annotation = factor(ews_annotation, levels = ews_annotation ) |> 
+          forcats::fct_relevel("unknown", after = Inf)
+      ) |>
+      # arrange by levels
+      dplyr::arrange(ews_annotation) |> 
+      knitr::kable() |> 
+      print()
+  })
+```
+
+
+## UMAPs {.tabset}
 
 The below UMAPs shows the top 8 broad cell type groups. 
 The first UMAP shows all cells together and the second UMAP is faceted by cell type, where the cells belonging to the specified cell type are in color and all other are in light grey. 
 Any cells labeled with "other" include all normal cells that are not part of the top 8 cell type groups. 
 
-```{r}
-coldata_df <- coldata_df |> 
-  dplyr::mutate(
-    broad_group_lumped = forcats::fct_lump_n(broad_celltype_group, 8, other_level = "other", ties.method = "first") |>
-      forcats::fct_infreq() |>
-      forcats::fct_relevel("unknown", "other", after = Inf)
-  )
 
-ggplot(coldata_df, aes(x = UMAP1, y = UMAP2, color = broad_group_lumped)) +
-  geom_point(alpha = 0.5, size = 0.2) +
-  scale_color_manual(values = celltype_colors) +
-  umap_theme() +
-  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
-  labs(color = "Broad cell type group")
+```{r, results='asis', fig.width=8, fig.height=8}
+library_df_list |> 
+  purrr::iwalk(\(df, title){
+     
+    # one umap with all cells colored by annotation
+    single_umap <- ggplot(df, aes(x = UMAP1, y = UMAP2, color = broad_celltype_group_lumped)) +
+      geom_point(alpha = 0.5, size = 0.2) +
+      scale_color_manual(values = celltype_colors) +
+      umap_theme() +
+      guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
+      labs(color = "Broad cell type group") 
+    
+    # facet by annotation
+    faceted_umap <- faceted_umap(
+      df,
+      annotation_column = broad_celltype_group_lumped,
+      celltype_colors = celltype_colors,
+      point_size = 0.2
+    )
+    
+    # print out plots in each tab
+    print(glue::glue('### {title}'))
+    print(single_umap)
+    print(faceted_umap)
+    cat("\n\n")
+    
+  })
 ```
 
-```{r, fig.height=7, fig.width=7}
-faceted_umap(
-  coldata_df,
-  annotation_column = broad_group_lumped,
-  celltype_colors = celltype_colors,
-  point_size = 0.2
-)
-```
+## Expression of marker genes in consensus cell types
 
+This section looks at expression of a set of marker genes for each consensus cell type across all cells. 
+Here we show any cells that were given a consensus cell type label. 
 
-## Expression of marker genes 
-
-This section looks at expression of a set of marker genes for each normal cell type across all cells. 
 The dot plot shows the mean expression and percent of cells expressing the marker gene for cells from each broad cell type group. 
 The y-axis includes marker genes for each cell type. 
 Marker genes are obtained from the list of Human cell markers on [`CellMarker2.0`](http://www.bio-bigdata.center/CellMarker_download.html). 
@@ -259,7 +393,12 @@ gene_exp_df <- scuttle::makePerCellDF(
                 unique_id = params$unique_id) 
 
 # Join all consensus results and marker gene info
-all_info_df <- coldata_df |>
+all_info_df <- annotations_df |>
+  dplyr::filter(unique_id == params$unique_id) |> 
+  # only want to look at cells annotated with a normal cell type
+  dplyr::filter(!stringr::str_detect(broad_celltype_group, "tumor") | broad_celltype_group == "unknown") |> 
+  dplyr::select(barcodes, unique_id, broad_celltype_group) |> 
+  dplyr::distinct() |> 
   dplyr::left_join(gene_exp_df, by = c("barcodes", "unique_id")) |>
   # add marker gene information (associated validation group annotation, gene observed count, percent tissues)
   # account for the same gene being present in multiple cell types
@@ -268,340 +407,219 @@ all_info_df <- coldata_df |>
 
 
 ```{r, fig.height=7, fig.width=15, results='asis'}
-marker_gene_dotplot(
-  consensus_df = all_info_df,
-  validation_groups_df = validation_groups_df,
-  markers_df = markers_df,
-  celltype_colors = celltype_colors,
-  min_cells = 0 #TODO: Update this if needed to remove some cell types
-)
+# only make the plot if there are any normal cells that were annotated 
+if(dim(all_info_df)[2] > 0){
+  marker_gene_dotplot(
+    consensus_df = all_info_df,
+    validation_groups_df = validation_groups_df,
+    markers_df = markers_df,
+    celltype_colors = celltype_colors,
+    min_cells = 0 #TODO: Update this if needed to remove some cell types
+  ) 
+} else {
+  glue::glue("
+    <div class=\"alert alert-info\">
+
+    No consensus cell types were annotated in this sample.
+
+    </div>
+  ")
+}
 ```
 
-# `AUCell` summary 
+
+# Validation of tumor cells
+
+The below section explores the tumor cell annotations. 
+We expect that tumor cells have both high CNV scores and high expression of `EWS::FLI1` target genes, indicated by high z-scores for `EF-activated` and `EF-repressed` gene sets. 
+
+## UMAPs {.tabset}
+
+Here we show UMAPs colored by the mean z-score for either the gene set category or sum CNV.
+The UMAP is faceted by cell type category so that only cells from that category are included in the panel. 
+Any cell that is labeled "unknown" is not included.
+
+
+```{r, results='asis', fig.height=6, fig.width=6}
+library_df_list |> 
+  purrr::iwalk(\(df, title){
+    
+    # pivot to have all gene sets and total CNV in a single column for faceting
+    umap_df <- df |> 
+      tidyr::pivot_longer(cols = c("EF-activated", "EF-repressed", "EMT-ECM", "cnv_zscore"),
+                          names_to = "method_category", 
+                          values_to = "zscore") |>
+      dplyr::mutate(
+        # remove zscore from cnv_zscore
+        method_category = stringr::str_remove(method_category, "_zscore")
+      )
+    
+    # faceted umap looking at non-malignant across tumor categories
+    umap <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = zscore)) +
+      geom_point(alpha = 0.5, size = 0.2) +
+      facet_grid(rows = vars(method_category),
+                 cols = vars(detail_tumor_category)) +
+      scale_color_viridis_c(option = "turbo") +
+      labs(color = "Mean z-score") +
+      umap_theme() 
+    
+    print(glue::glue('### {title}'))
+    print(umap)
+    cat("\n\n")
+      
+  })
+```
+
+
+## Gene set score scatter plot
+
+The scatter plot below shows the z-score for the repressed (`EF-repressed`) vs. activated (`EF-activated`) gene sets in each cell.
+The points are then colored by the total CNV score. 
+
+We expect tumor cells to have high CNV scores and high expression of `EWS::FLI1` targets. 
+The dotted lines in the plots indicate a z-score of `r marker_gene_cutoff`, i.e. `r marker_gene_cutoff` standard deviations above the mean. 
+
+Any cells with a z-score > `r marker_gene_cutoff` are labeled as `tumor-high` (`EF-activated`) or `tumor-low` (`EF-repressed`). 
+
+```{r}
+scatterplot_df <- annotations_df |>
+  # only plot values for cells in this library
+  dplyr::filter(unique_id == params$unique_id) |> 
+  dplyr::select(barcodes, `EF-activated`, `EF-repressed`, cnv_zscore) |> 
+  dplyr::distinct()
+
+ggplot(scatterplot_df, aes(x = `EF-activated`, y = `EF-repressed`, color = cnv_zscore)) +
+  geom_point(alpha = 0.5) +
+  scale_color_viridis_c() +
+  labs(
+    x = "EF-activated z-score",
+    y = "EF-repressed z-score",
+    color = "Total CNV"
+  ) +
+  geom_hline(yintercept = marker_gene_cutoff, lty = 2) +
+  geom_vline(xintercept = marker_gene_cutoff, lty = 2)
+```
+
+# Individual methods results 
+
+## `AUCell` summary {.tabset}
 
 The plots in this section will look at the results from running [`AUCell`](https://bioconductor.org/packages/release/bioc/html/AUCell.html) across a set of gene sets obtained from `MSigDB` and custom gene lists. 
 Information about the gene sets used here can be found in [`ews-nf/genesets`](https://github.com/AlexsLemonade/ews-nf/tree/main/genesets). 
 
 Plots here show the z-score calculated from the AUC reported by `AUCell`. 
+
 For each gene set, the mean and standard deviation of the AUC values for all reference cells was used to contain a z-score for all cells. 
 The reference was created by pooling all cells across all samples of interest that were assigned a consensus cell type listed as a reference cell type (see [`references/reference-celltype.tsv`](https://github.com/AlexsLemonade/ews-nf/blob/main/references/reference-celltypes.tsv)). 
-For the plots below all reference cells across all samples are shown alongside all query cells from `r params$unique_id`. 
-
-Cell types are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types (labeled as "normal non-reference") based on consensus cell type labels. 
-If any unknown or normal non-malignant cell types show gene expression patterns expected to be observed in tumor cells, it's likely that those cells are mis-classified and are in fact tumor cells. 
+We then calculated the mean z-score for all gene sets in a given gene set category (e.g., all gene sets that are part of `EF-activated`). 
 
 Gene sets can be divided into three groups to help distinguish tumor cells from normal cells:  
 
 * `EF-activated`: These gene sets contain genes that are activated by the fusion gene, `EWS::FLI1`. 
-We expect any cells with high z-scores relative to reference cells to be tumor cells. 
 * `EF-repressed`: These gene sets contain genes that are repressed by the fusion gene, `EWS::FLI1`. 
-We expect any cells with low z-scores relative to reference cells to be tumor cells.
 * `EMT-ECM`: These gene sets contain genes that are found to be highly expressed in tumor cells with low expression of `EWS::FLI1`.
 
-We expect tumor cells to have high expression of genes that are activated by `EWS::FLI1` and low expression of genes that are repressed by `EWS::FLI1`, indicating high activity of the `EWS::FLI1` fusion. 
-It's likely there could also be a population of tumor cells that are `EWS::FLI1` "low". 
-We expect those cells to have lower expression of the activated genes and higher expression of the repressed genes along with an EMT-like phenotype. 
+For the plots below all reference cells across all samples are shown alongside all query cells from `r params$unique_id` and labeled as "reference". 
+Cells from this sample that are classified as one of the reference cell types are shown as "sample reference" as well as being included in the "reference" distribution.
 
+Cell types are colored based on whether or not the cell type is classified as tumor, non-malignant, or unknown using the specified threshold. 
+Some cell types may not be present for each threshold as decreasing the stringency may result in cells that were previously annotated with a non-malignant cell type (e.g., fibroblasts) to instead be labeled as tumor cells. 
+Here all cells that are part of the reference are considered "non-malignant". 
 
-```{r, message=FALSE}
-# assign broad cell type categories to all reference cells
-ref_celltypes_df <- ref_celltypes_df |> 
-  dplyr::select(barcodes, unique_id, consensus_celltype_annotation) |> 
-  dplyr::left_join(validation_groups_df, by = c("consensus_celltype_annotation" = "consensus_annotation")) |> 
-  dplyr::mutate(
-    broad_celltype_group = dplyr::if_else(
-      is.na(broad_celltype_group),
-      "unknown",
-      broad_celltype_group
-    )
-  )
+Any cell type with fewer than 3 cells will not be included in the plot. 
 
-# combine infor for all cells for the given library with the reference cells 
-celltype_df <- coldata_df |>
-  dplyr::full_join(ref_celltypes_df)
-
-# combine all aucell results
-all_aucell_df <- aucell_df |> 
-  # add zscores for reference cells
-  dplyr::full_join(ref_aucell_df) |> 
-  # add gene set categories
-  dplyr::left_join(geneset_df, by = c("gene_set" = "geneset_name")) |> 
-  # include consensus and broad cell types 
-  dplyr::left_join(celltype_df, by = c("barcodes", "unique_id")) |> 
-  dplyr::mutate(
-    # add cell category and set levels for cell and gene set categories
-    cell_category = dplyr::case_when(
-      ref_or_query == "reference" ~ "reference",
-      broad_celltype_group == "unknown" ~ "unknown",
-      .default = "normal non-reference"
-    ) |> 
-      forcats::fct_relevel("unknown", after = 0),
-    geneset_category = factor(geneset_category, levels = c("EF-activated", "EF-repressed", "EMT-ECM"))
-  )
-
-# define color palettes for AUCell and inferCNV plots 
-# make sure we only pull out colors for the categories that are present which at minimum should be ref and query 
-categories <- unique(all_aucell_df$cell_category)
-num_categories <- length(categories)
-# set to n=8, the max number of categories in this palette
-cell_category_colors <- RColorBrewer::brewer.pal(n = 8, name = "Dark2")[1:num_categories]
-names(cell_category_colors) <- categories
-geneset_colors <- c("#00274C",  "#FFCB05", "gray80")
-names(geneset_colors) <- unique(all_aucell_df$geneset_category)
-```
-
-## AUC Heatmap 
-
-The heatmap below shows the mean z-score for each gene set across all cell types. 
-As with the previous section, the broad cell type group is shown instead of the full consensus cell type. 
-
-The annotation bar on the bottom indicates the gene set category (e.g., `EF-activated` and `EF-repressed`) and the annotation bar on the right indicates the cell type category (e.g., reference, unknown, or normal non-reference). 
-
-```{r, message=FALSE}
-# create mtx with mean zscore for heatmap 
-auc_mtx <- all_aucell_df |> 
-  dplyr::group_by(broad_celltype_group, gene_set) |> 
-  dplyr::summarize(
-    mean_zscore = mean(auc_zscore)
-  ) |> 
-  tidyr::pivot_wider(names_from = gene_set, 
-                     values_from = mean_zscore) |> 
-  tidyr::drop_na() |> 
-  tibble::column_to_rownames("broad_celltype_group") |>
-  as.matrix()
-
-
-# add ref or query annotation bars
-ref_annotation_df <- all_aucell_df |> 
-  dplyr::distinct(broad_celltype_group, cell_category) |>
-  tidyr::drop_na() |> 
-  dplyr::mutate(broad_celltype_group = factor(broad_celltype_group, levels = rownames(auc_mtx))) |> 
-  dplyr::arrange(broad_celltype_group)
-
-ref_annotation <- ComplexHeatmap::rowAnnotation(
-    cell_category = ref_annotation_df$cell_category,
-    col = list(cell_category = cell_category_colors),
-    annotation_label = c(cell_category = "Cell category"),
-    show_annotation_name = FALSE
-  )
-
-# add gene set category annotation bars 
-geneset_annotation_df <- all_aucell_df |> 
-  dplyr::distinct(gene_set, geneset_category) |>
-  tidyr::drop_na() |> 
-  dplyr::mutate(gene_set = factor(gene_set, levels = colnames(auc_mtx))) |> 
-  dplyr::arrange(gene_set)
-
-geneset_annotation <- ComplexHeatmap::columnAnnotation(
-  geneset_category = geneset_annotation_df$geneset_category,
-  col = list(geneset_category = geneset_colors),
-  annotation_label = c(geneset_category = "Gene set \ncategory"),
-  show_annotation_name = FALSE
-)
+```{r}
+# only have tumor and non-malignant
+tumor_category_colors <- RColorBrewer::brewer.pal(n = 3, name = "Dark2")
+names(tumor_category_colors) <- c("tumor", "non-malignant", "unknown")
 ```
 
 
-```{r, fig.height=8, fig.width=10}
-ComplexHeatmap::Heatmap(
-    auc_mtx,
-    # set the color scale based on min and max values
-    col = circlize::colorRamp2(seq(min(auc_mtx), max(auc_mtx), length = 2), colors = c("white", "#00274C")),
-    border = TRUE,
-    ## Row parameters
-    cluster_rows = TRUE,
-    row_title = "Broad cell type group",
-    row_title_side = "left",
-    row_names_side = "left",
-    row_dend_side = "right",
-    row_names_gp = grid::gpar(fontsize = 10),
-    ## Column parameters
-    column_title = "Gene set",
-    cluster_columns = TRUE,
-    show_column_names = TRUE,
-    column_names_gp = grid::gpar(fontsize = 8),
-    bottom_annotation = geneset_annotation,
-    right_annotation = ref_annotation,
-    heatmap_legend_param = list(
-      title = "Mean z-score"
-    )
-)
-  
-```
-
-## Ridge plots 
-
-The below ridge plot shows the distribution of z-scores for each gene set.
-Cells are grouped based on if they are part of the reference or query, where query is broken up into "unknown" and normal non-malignant cell types based on consensus cell type labels. 
-
-```{r, fig.height=12, fig.width=8, message=FALSE}
-# ridge plot faceted by geneset within each category
-levels(all_aucell_df$geneset_category) |> 
-  purrr::map(\(category){
+```{r, results='asis', fig.width=8, fig.height=15, message=FALSE}
+all_df_list |> 
+  purrr::iwalk(\(df, title){
     
-    all_aucell_df |> 
-      dplyr::filter(geneset_category == category) |> 
-      ggplot(aes(x = auc_zscore, y = forcats::fct_rev(cell_category), fill = cell_category)) +
-      ggridges::geom_density_ridges(alpha = 0.5, scale = 1.5) +
-      facet_wrap(vars(gene_set), ncol = 3) +
-      scale_fill_manual(values = cell_category_colors) +
+    # pivot to include all gene sets in their own category
+    ridges_plot_df <- df |> 
+      tidyr::pivot_longer(cols = c("EF-activated", "EF-repressed", "EMT-ECM"),
+                          names_to = "geneset_category",
+                          values_to = "mean_category_zscore")
+    
+    # extract the cutoff to add a line to the plot
+    cutoff <- stringr::word(title, -1, sep = " ") |> as.numeric()
+    
+    # faceted ridge plot for each gene set category
+    ridge_plot <- ggplot(ridges_plot_df, aes(x = mean_category_zscore, y = y_label, fill = tumor_category)) +
+      ggridges::geom_density_ridges(alpha = 0.5) +
+      facet_wrap(vars(geneset_category),
+                 ncol = 1,
+                 scales = "free_x") +
+      scale_fill_manual(values = tumor_category_colors) +
       labs(
-        title = category,
-        x = "z-score",
-        y = "Cell type category"
+        x = "Mean z-score",
+        y = "Broad cell type group",
+        fill = "Tumor \ncategory"
       ) +
-      theme(legend.position = "none")
+      geom_vline(xintercept = cutoff, linetype = "dashed")
     
-  }) |>
-  patchwork::wrap_plots(ncol = 1, guides = "collect") +
-  patchwork::plot_layout(heights = c(6, 4, 2))
+    print(glue::glue('### {title}'))
+    print(ridge_plot)
+    cat("\n\n")
+    
+    
+  })
 ```
 
 
-Below we calculated the mean z-score for all gene sets in a given gene set category (e.g., all gene sets that are part of `EF-activated`). 
-We then look at the distribution of those mean z-scores across all cell types. 
-Ridge plots for each cell type are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types based on consensus cell type labels. 
-Any cell type with less than 3 cells will not be included in the plot. 
-
-```{r, message=FALSE}
-# get the mean zscore for each gene set category 
-grouped_aucell_df <- all_aucell_df |> 
-  dplyr::group_by(cell_id, broad_celltype_group, geneset_category, cell_category) |> 
-  dplyr::summarize(
-    mean_category_zscore = mean(auc_zscore)
-  ) 
-
-# get total number of cells for each cell type
-# need this to both label the axes and filter out any cell types that have too few cells
-celltype_counts_df <- grouped_aucell_df |>
-  dplyr::ungroup() |> 
-  dplyr::select(cell_id, broad_celltype_group) |> 
-  dplyr::distinct() |> 
-  dplyr::add_count(broad_celltype_group) |> 
-  # add in y label 
-  dplyr::mutate(
-    y_label = glue::glue("{broad_celltype_group} ({n})")
-  ) |> 
-  dplyr::select(broad_celltype_group, y_label, n) |> 
-  dplyr::distinct()
-
-# grab order of broad cell types based on cell type categories 
-celltype_levels <- celltype_counts_df |> 
-  dplyr::left_join(ref_annotation_df) |> 
-  dplyr::arrange(cell_category) |> 
-  dplyr::pull(y_label) |>
-  as.character()
-
-# prep for ridge plot 
-ridges_plot_df <- grouped_aucell_df |> 
-  dplyr::left_join(celltype_counts_df) |> 
-  dplyr::filter(n >= 3) |> 
-  dplyr::mutate(
-    y_label = factor(y_label, levels = rev(celltype_levels))
-  )
-```
-
-
-```{r, fig.width=8, fig.height=15, message=FALSE}
-ggplot(ridges_plot_df, aes(x = mean_category_zscore, y = y_label, fill = cell_category)) +
-  ggridges::geom_density_ridges(alpha = 0.5) +
-  facet_wrap(vars(geneset_category),
-             ncol = 1,
-             scales = "free_x") +
-  scale_fill_manual(values = cell_category_colors) +
-  labs(
-    x = "Mean z-score",
-    y = "Broad cell type group",
-    fill = "Cell type \ncategory"
-  )
-```
-
-
-# `inferCNV` summary
+## `inferCNV` summary
 
 [`inferCNV`](https://github.com/broadinstitute/inferCNV/wiki) was run using all normal cell types that are listed in [`references/reference-celltype.tsv`](https://github.com/AlexsLemonade/ews-nf/blob/main/references/reference-celltypes.tsv) as a reference. 
 
-## Heatmap 
+### Heatmap 
 
 Below is the heatmap showing chromosome gains and losses as output by `inferCNV`. 
 
 ![](`r params$infercnv_heatmap_file`)
 
 
-## All CNVs
+### All CNVs {.tabset}
 
 Below we look at the distribution of total CNVs detected per cell. 
 The number of chromosomes with a detectable CNV is totaled and then the mean and standard deviation of the total CNV sum for all reference cells are used to calculate a z-score for all cells in the dataset. 
 
-As with the `AUCell` results, cells are colored based on whether or not the cell type is part of the reference or query cell types, where query is broken up into "unknown" and normal non-malignant cell types (labeled as "normal non-reference") based on consensus cell type labels. 
-We expect tumor cells to have higher numbers of CNVs than reference cells. 
+As with the `AUCell` results, cell types are colored based on whether or not the cell is classified as tumor, non-malignant, or unknown. 
+Some cell types may not be present for each threshold as decreasing the stringency may result in cells that were previously annotated with a non-malignant cell type (e.g., fibroblasts) to instead be labeled as tumor cells. 
+All reference cells belonging to the pooled reference are shown in the plots with the "reference" label. 
+Cells from this sample that are classified as one of the reference cell types are shown as "sample reference" as well as being included in the "reference" distribution.
 
-The first plot shows all cell type groups (unknown, normal non-reference, and unknown) and then the second plot shows each broad cell type category. 
-Only cell types with at least 3 cells are shown. 
-All reference cells belonging to the pooled reference are shown in the plots below. 
 
-### Ridge plots
-
-```{r}
-# read infercnv results
-all_cnv_df <- infercnv_df |>
-  # indicator for reference vs query cell based on `subcluster` name
-  dplyr::mutate(cell_group = stringr::str_split_i(subcluster, "_", 1)) |>
-  # separate barcode and library
-  tidyr::separate(
-    cell_id,
-    sep = "_",
-    into = c("unique_id", "barcodes"),
-    remove = FALSE
-  ) |> 
-  dplyr::left_join(celltype_df, by = c("barcodes", "unique_id")) |> 
-  dplyr::mutate(
-    # add cell category 
-    cell_category = dplyr::case_when(
-      stringr::str_detect(subcluster, "reference") ~ "reference",
-      broad_celltype_group == "unknown" ~ "unknown",
-      .default = "normal non-reference"
-    ) |> 
-      forcats::fct_relevel("unknown", after = 0) |>
-      forcats::fct_rev()
-  )
+```{r, results='asis', message = FALSE}
+all_df_list |> 
+  purrr::iwalk(\(df, title){
+    
+    # extract the cutoff to add a line to the plot
+    cutoff <- stringr::word(title, -1, sep = " ") |> as.numeric()
+    
+    # total CNV across cell types
+    total_cnv_plot <- ggplot(df, aes(x = cnv_zscore, y = y_label, fill = tumor_category)) +
+      ggridges::geom_density_ridges(alpha = 0.5) +
+      scale_fill_manual(values = tumor_category_colors) +
+      labs(
+        x = "Total CNV z-score",
+        y = "",
+        fill = "Cell type \ncategory"
+      ) +
+      geom_vline(xintercept = cutoff, linetype = "dashed")
+    
+    print(glue::glue('#### {title}'))
+    print(total_cnv_plot)
+    cat("\n\n")
+    
+  })
 ```
 
 
-```{r, message = FALSE}
-# ridge plot showing z-score of cnv sum 
-ggplot(all_cnv_df, aes(x = cnv_zscore, y = cell_category, fill = cell_category)) +
-  ggridges::geom_density_ridges(alpha = 0.5) +
-  scale_fill_manual(values = cell_category_colors) +
-  labs(
-    y = "",
-    x = "CNV z-score"
-  ) +
-  theme(legend.position = "none")
-```
-
-```{r, message = FALSE}
-# remove cell types with < 3 and set cell category levels
-filtered_cnv_df <- all_cnv_df |> 
-  # add in a y label and celltype counts
-  dplyr::left_join(celltype_counts_df) |> 
-  dplyr::filter(n >= 3) |> 
-  dplyr::mutate(
-    y_label = factor(y_label, levels = rev(celltype_levels))
-  )
-
-
-ggplot(filtered_cnv_df, aes(x = cnv_zscore, y = y_label, fill = forcats::fct_rev(cell_category))) +
-  ggridges::geom_density_ridges(alpha = 0.5) +
-  scale_fill_manual(values = cell_category_colors) +
-  labs(
-    x = "z-score",
-    y = "",
-    fill = "Cell type \ncategory"
-  )
-```
-
-
-## Ewing-specific CNVs
+### Ewing-specific CNVs {.tabset}
 
 There are a few known copy number variations in Ewing's sarcoma: 
 
@@ -613,362 +631,56 @@ There are a few known copy number variations in Ewing's sarcoma:
 Although these are the most frequent, there are patients who do not have any of these alterations and patients that only have some of these alterations. 
 See [Tirode _et al._ 2014](https://doi.org/10.1158/2159-8290.CD-14-0622) and [Crompton _et al._ 2014](https://doi.org/10.1158/2159-8290.CD-13-1037)
 
-Below we look at the presence of these specific CNVs by showing the proportion of each chromosome that is part of any of the CNV events.
-For each chromsome we show the proportions for gains, losses and total proportion. 
+Below we look at the presence of these specific CNVs in tumor and non-malignant cells.
 
-```{r, message=FALSE}
-# define the chromosomes typically affected in Ews
-validation_chr <- c("chr1", "chr8", "chr12", "chr16")
-
-# get the proportion for each chromosome of interest split out by type (cnv, dupli, loss)
-prop_cnv_df <- all_cnv_df |>
-  dplyr::select(
-    starts_with("proportion_scaled_"),
-    cell_id,
-    unique_id,
-    barcodes,
-    subcluster
-  ) |>
-  tidyr::pivot_longer(
-    starts_with("proportion_scaled_"),
-    names_to = "cnv_type_raw",
-    values_to = "proportion"
-  ) |>
-  # more tidying
-  dplyr::mutate(cnv_type_raw = stringr::str_remove(cnv_type_raw, "^proportion_scaled_")) |>
-  tidyr::separate(cnv_type_raw, sep = "_", into = c("cnv_type", "chr")) |>
-  # only care about validation chromosomes here 
-  dplyr::filter(chr %in% validation_chr) |> 
-  # set chr factors
-  dplyr::mutate(
-    chr = stringr::str_remove(chr, "^chr"),
-    chr = factor(chr, levels = 1:22),
-    cnv_type = dplyr::case_when(
-      cnv_type == "cnv" ~ "total",
-      cnv_type == "dupli" ~ "gain", 
-      .default = cnv_type
-    ),
-    # create unique label to use for faceting 
-    facet_label = glue::glue("chr{chr}-{cnv_type}")
-  ) |> 
-  dplyr::left_join(all_cnv_df)
-```
-
-```{r, message = FALSE, fig.height=8, fig.width=8}
-ggplot(prop_cnv_df, aes(x = proportion, y = cell_category, fill = cell_category)) +
-  ggridges::geom_density_ridges(alpha = 0.5) +
-  facet_wrap(
-    vars(facet_label),
-    scales = "free_x",
-    ncol = 3
-  ) +
-  scale_fill_manual(values = cell_category_colors) +
-  labs(
-    x = "Proportion CNV",
-    y = ""
-  ) +
-  theme(legend.position = "none")
-```
-
-# Compare `AUCell` and `inferCNV` results 
-
-The below section compares the results from `AUCell` and `inferCNV`. 
-We expect that tumor cells have both high CNV scores and high expression of `EWS::FLI1` marker genes. 
-
-## UMAPs
-
-Here we show UMAPs colored by the mean z-score for either the gene set category or sum CNV.
-The UMAP is faceted by cell type category so that only cells from that category are included in the panel. 
-
-```{r, fig.height=6, fig.width=6}
-# combine with umap_df and create faceted umap by mean auc for each geneset 
-auc_umap_df <- grouped_aucell_df |> 
-  dplyr::rename(
-    method_category = geneset_category,
-    zscore = mean_category_zscore
-  )
-
-cnv_umap_df <- all_cnv_df |> 
-  dplyr::select(cell_id, broad_celltype_group, cell_category, zscore = cnv_zscore) |> 
-  dplyr::mutate(
-    method_category = "Total CNV"
-  )
-
-zscore_df <- dplyr::bind_rows(auc_umap_df, cnv_umap_df)
-
-umap_df <- coldata_df |> 
-  dplyr::mutate(
-    cell_id = glue::glue("{unique_id}_{barcodes}") 
-  ) |> 
-  dplyr::left_join(zscore_df, by = c("cell_id", "broad_celltype_group"))
-
-ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = zscore)) +
-  geom_point(alpha = 0.5, size = 0.2) +
-  facet_grid(rows = vars(method_category),
-             cols = vars(cell_category)) +
-  scale_color_viridis_c(option = "turbo") +
-  labs(color = "Mean z-score") +
-  umap_theme()
-
-```
-
-```{r, message=FALSE}
-combined_df <- all_cnv_df |> 
-  dplyr::left_join(grouped_aucell_df) |> 
-  dplyr::filter(unique_id == params$unique_id) |>
-  dplyr::select(
-    barcodes, 
-    unique_id, 
-    UMAP1, 
-    UMAP2, 
-    sum,
-    genes_detected,
-    subsets_mito_percent,
-    geneset_category, 
-    cell_category, 
-    broad_celltype_group, 
-    broad_group_lumped, 
-    consensus_celltype_annotation, 
-    cnv_zscore, 
-    mean_category_zscore
-  ) |> 
-  dplyr::mutate(
-    geneset_category = glue::glue("auc-zscore_{geneset_category}")
-  ) |> 
-  tidyr::pivot_wider(
-    names_from = geneset_category,
-    values_from = mean_category_zscore
-  )
-```
-
-## Scatter plots
-
-The scatter plots below aim to look at the relationship between CNV scores and gene set expression scores for `EWS::FLI1` activated and repressed gene sets in every cell. 
-
-The top plot shows the z-score for the repressed vs. activated gene sets in each cell. 
-The bottom plot shows the z-score for the EMT vs. repressed gene sets in each cell.
-The points are then colored by the total CNV score. 
-
-We expect tumor cells to have high CNV scores and high expression of `EWS::FLI1` targets. 
-Tumor cells should either show increased expression of activated targets and decreased expression of repressed targets or increased expression of repressed targets and an EMT-like signature. 
-
-The dotted lines in the plots indicate a z-score of `r zscore_cutoff`, i.e. `r zscore_cutoff` standard deviations above the mean. 
-It's likely that any cells with a z-score greater than `r zscore_cutoff`, indicating a high CNV score or gene set score relative to the reference distribution, are tumor cells. 
-
-```{r}
-ggplot(combined_df, aes(x = `auc-zscore_EF-activated`, y = `auc-zscore_EF-repressed`, color = cnv_zscore)) +
-  geom_point(alpha = 0.5) +
-  scale_color_viridis_c() +
-  labs(
-    x = "EF-activated z-score",
-    y = "EF-repressed z-score",
-    color = "Total CNV"
-  ) +
-  geom_hline(yintercept = zscore_cutoff, lty = 2) +
-  geom_vline(xintercept = zscore_cutoff, lty = 2)
-```
-
-```{r}
-ggplot(combined_df, aes(x = `auc-zscore_EF-repressed`, y = `auc-zscore_EMT-ECM`, color = cnv_zscore)) +
-  geom_point(alpha = 0.5) +
-  scale_color_viridis_c() +
-  labs(
-    x = "EF-repressed z-score",
-    y = "EMT-ECM z-score",
-    color = "Total CNV"
-  ) +
-  geom_hline(yintercept = zscore_cutoff, lty = 2) +
-  geom_vline(xintercept = zscore_cutoff, lty = 2)
-```
-
-
-Here we show the CNV score on the y-axis compared to either the score for the `EWS::FLI1` activated (top) or repressed (bottom) gene set. 
-We expect all tumor cells to have high CNV and either increased expression of `EWS::FLI1` activated or repressed targets. 
-
-
-```{r, fig.height=10, fig.width=8}
-EF_aucell_columns <- c("auc-zscore_EF-activated", "auc-zscore_EF-repressed") |> 
-  purrr::set_names(c("EF-activated z-score", "EF-repressed z-score"))
-
-EF_aucell_columns |> 
-  purrr::imap(\(column, x_label){
-    ggplot(combined_df, aes(x = !!sym(column), y = cnv_zscore, color = forcats::fct_rev(cell_category))) +
-      geom_point(alpha = 0.3) +
-      scale_color_manual(values = cell_category_colors) +
-      labs(
-        x = x_label,
-        y = "Total CNV z-score",
-        color = "Cell type \ncategory"
+```{r, results='asis', message = FALSE, fig.height=8, fig.width=8}
+all_df_list |> 
+  purrr::iwalk(\(df, title){
+    
+    # extract the cutoff to add a line to the plot
+    cutoff <- stringr::word(title, -1, sep = " ") |> as.numeric()
+    
+    # put all chromosomes in the same column to plot
+    cnv_df <- df |> 
+      tidyr::pivot_longer(cols = c("chr1_gain_zscore", "chr8_gain_zscore", "chr12_gain_zscore", "chr16_loss_zscore"),
+                          names_to = "chromosome",
+                          values_to = "zscore") |> 
+      dplyr::mutate(
+        # make the facet labels prettier
+        chromosome = stringr::str_remove(chromosome, "_zscore")|> 
+          stringr::str_replace("_", " ") |> 
+          factor(levels = c("chr1 gain", "chr8 gain", "chr12 gain", "chr16 loss"))
+      )
+      
+    
+    # faceted by chromosome
+    cnv_plot <- ggplot(cnv_df, aes(x = zscore, y = y_label, fill = tumor_category)) +
+      ggridges::geom_density_ridges(alpha = 0.5) +
+      facet_wrap(
+        vars(chromosome),
+        scales = "free_x"
       ) +
-      guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
-      geom_hline(yintercept = zscore_cutoff, lty = 2) +
-      geom_vline(xintercept = zscore_cutoff, lty = 2)
+      scale_fill_manual(values = tumor_category_colors) +
+      labs(
+        x = "Proportion CNV",
+        y = ""
+      ) +
+      theme(legend.position = "none") +
+      geom_vline(xintercept = cutoff, linetype = "dashed")
     
+    print(glue::glue('#### {title}'))
+    print(cnv_plot)
+    cat("\n\n")
     
-  }) |> 
-  patchwork::wrap_plots(guides = "collect", ncol = 1) &
-  theme(legend.position = "top")
-
+  })
 ```
 
-# Tumor cell assignment
-
-<!--TODO: 
-Move the classification to a separate module once we solidify how we actually will classify things and read in the results to show here. 
--->
-
-Below we will classify tumor cells three different ways: 
-
-- `cnv_annotation`: Cells with CNV z-score > `r zscore_cutoff` will be labeled with `tumor`
-- `aucell_annotation`: Cells with `EF-activated` or `EF-repressed` z-score > `r zscore_cutoff` will be labeled with `tumor`
-- `combined_tumor_annotation`: Cells with CNV z-score > `r zscore_cutoff` and `EF-activated` z-score will be classified as `tumor-high`, while cells with CNV z-score > `r zscore_cutoff` and `EF-repressed` z-score > `r zscore_cutoff` will be classified as `tumor-low`
-Cells that have CNV z-score > `r zscore_cutoff` but do not have increased expression of marker gene sets (either `EF-activated` or `EF-repressed`) will be labeled with `tumor-cnv-only`.
-
-Any cells that do not meet this criteria and were labeled as `unknown` with consensus cell types will continue to be labeled as `unknown`. 
-All other cells will be classified as `normal` and the consensus cell type annotation will be used as their final annotation. 
-
-Below is a table that summarizes the total cells assigned in each category for this sample: 
-
-```{r, warning=FALSE}
-# add classifications
-combined_df <- combined_df |> 
-  dplyr::mutate(
-    cnv_annotation = dplyr::case_when(
-      cnv_zscore > zscore_cutoff ~ "tumor", 
-      broad_celltype_group == "unknown" ~ "unknown",
-      .default = "normal"
-      ),
-    aucell_annotation = dplyr::case_when(
-      `auc-zscore_EF-activated` > zscore_cutoff | `auc-zscore_EF-repressed` > zscore_cutoff ~ "tumor", 
-      broad_celltype_group == "unknown" ~ "unknown",
-      .default = "normal"
-      ),
-    combined_tumor_annotation = dplyr::case_when(
-      cnv_zscore > zscore_cutoff & `auc-zscore_EF-activated` > zscore_cutoff ~ "tumor-high",
-      cnv_zscore > zscore_cutoff & `auc-zscore_EF-repressed` > zscore_cutoff ~ "tumor-low",
-      cnv_zscore > 2 ~ "tumor-cnv-only",
-      broad_celltype_group == "unknown" ~ "unknown",
-      .default = "normal"
-    ),
-    combined_consensus_annotation = dplyr::if_else(
-      stringr::str_detect(combined_tumor_annotation, "tumor"),
-      combined_tumor_annotation,
-      consensus_celltype_annotation
-    ),
-    broad_combined_annotation = dplyr::if_else(
-      stringr::str_detect(combined_tumor_annotation, "tumor"), 
-      combined_tumor_annotation, 
-      broad_celltype_group
-    )
-  )
-
-# print out a table 
-combined_df |> 
-  dplyr::count(cnv_annotation, aucell_annotation, combined_tumor_annotation, combined_consensus_annotation) |>
-  dplyr::arrange(desc(n)) |> 
-  knitr::kable()
-```
-
-## UMAPs 
-
-Now we will look at each of the annotations on a UMAP. 
-In this UMAP, the first two panels showing the annotation using `AUCell` or `inferCNV` alone only labels cells as either `tumor`, `unknown`, or `normal`. 
-The third panel showing the combined annotation will break up tumor cells into `tumor-high`, `tumor-low`, and `tumor-cnv-only`, dependent on the expression of activated (`tumor-high`) and repressed (`tumor-low`) gene sets. 
-
-```{r, warning=FALSE, fig.height=6, fig.width=10}
-# define order for tumor cell types to show up in plots
-tumor_order <- c("tumor-high", "tumor-low", "tumor-cnv-only")
-
-colors <- c(brewer.pal(n=5, "Set1"), "gray60")
-names(colors) <- c("normal", "tumor", tumor_order, "unknown")
-
-combined_df |> 
-  tidyr::pivot_longer(cols = c("cnv_annotation", "aucell_annotation", "combined_tumor_annotation"),
-                      names_to = "annotation_category",
-                      values_to = "annotation"
-  ) |> 
-  dplyr::mutate(annotation_category = stringr::str_remove(annotation_category, "_annotation") |> 
-                  stringr::str_replace_all("_", " "),
-                annotation = factor(annotation, levels = names(colors))) |> 
-  ggplot(aes(x = UMAP1, y = UMAP2, color = annotation)) +
-  geom_point(alpha = 0.3, size = 0.5) +
-  facet_wrap(vars(annotation_category)) +
-  scale_color_manual(values = colors) +
-  umap_theme() +
-  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1)))
-```
-
-We will use the `combined_tumor_annotation` category moving forward. 
-
-The below UMAPs show the annotations for the `combined_tumor_annotation` with normal cells colored by their broad cell type group. 
-The full UMAP is first shown, followed by a faceted UMAP to highlight each cell type with other cells in gray.
-Only cell types with at least 10 cells are shown in the UMAPs. 
-
-```{r, warning=FALSE, message=FALSE}
-# get total counts for each cell
-total_counts_df <- combined_df |> 
-  dplyr::count(broad_combined_annotation) |> 
-  # add column to indicate if tumor or not tumor (used in plots later)
-  # use both columns is_tumor and tumor_rank to order labels first by tumor order and then by total number of cells 
-  dplyr::mutate(
-    is_tumor = stringr::str_detect(broad_combined_annotation, "tumor"),
-    tumor_rank = match(broad_combined_annotation, tumor_order)
-  ) |> 
-  dplyr::arrange(desc(is_tumor), 
-                 dplyr::if_else(is_tumor, tumor_rank, Inf),
-                 desc(n)) |> 
-  # add a label to use in the ridge plots 
-  dplyr::mutate(
-    y_label = glue::glue("{broad_combined_annotation} ({n})"),
-    y_label = factor(y_label, levels = rev(unique(y_label)))
-  )
-
-# add total counts and tumor indication
-annotations_df <- combined_df |> 
-  dplyr::left_join(total_counts_df) |> 
-  # set factor order for plotting
-  dplyr::mutate(is_tumor = factor(is_tumor, levels = c(FALSE, TRUE), labels = c("normal", "tumor")),
-                combined_tumor_annotation = factor(combined_tumor_annotation, levels = c(tumor_order, "normal", "unknown")),
-                broad_combined_annotation = factor(broad_combined_annotation) |> 
-                  forcats::fct_relevel(tumor_order) |> 
-                  forcats::fct_relevel("unknown", after = Inf))
-
-# filter to 10 for umaps and 3 for ridge plots 
-umap_filtered_annotations_df <- annotations_df |> 
-  dplyr::filter(n >= 10)
-
-ridge_filtered_annotations_df <- annotations_df |> 
-  dplyr::filter(n >= 3)
-```
-
-```{r, warning=FALSE}
-tumor_annotation_colors <- unique(umap_filtered_annotations_df$broad_combined_annotation)
-colors <- palette.colors(n = length(tumor_annotation_colors), palette = "alphabet") |> 
-  purrr::set_names(tumor_annotation_colors)
-colors[["unknown"]] <- "gray60"
-
-ggplot(umap_filtered_annotations_df, aes(x = UMAP1, y = UMAP2, color = broad_combined_annotation)) +
-  geom_point(alpha = 0.5, size = 0.5) +
-  guides(color = guide_legend(override.aes = list(size = 2, alpha = 1))) +
-  scale_color_manual(values = colors) +
-  labs(color = "Broad cell type group \nwith tumor annotation") +
-  umap_theme()
-```
-
-```{r, fig.height=15, fig.width=10, warning=FALSE}
-faceted_umap(
-  umap_filtered_annotations_df,
-  annotation_column = broad_combined_annotation,
-  celltype_colors = colors,
-  point_size = 0.2
-)
-```
 
 ## QC plots
 
 The below plots will look at some quality control metrics across groups of cells. 
-In particular, we want to see if the `tumor-low`, `tumor-cnv-only`, or `unknown` cells have an underlying technical difference that could be contributing to those cells having either lower CNV scores or lower marker gene expression. 
-We will look at the total number of genes detected, total counts, and percentage of mitochondrial reads across the cell types using the `combined_tumor_annotation`. 
+In particular, we want to see if the various tumor cell categories have an underlying technical difference that could be contributing to those cells having either lower CNV scores or lower marker gene expression. 
+We will look at the total number of genes detected, total counts, and percentage of mitochondrial reads across the cell types using the results from the CNV z-score > 2 annotations only. 
 The red bar indicates the median. 
 
 ```{r, fig.width=8}
@@ -983,7 +695,7 @@ qc_columns <- c(
 qc_columns |>
   purrr::imap(\(column, y_label){
     
-    ggplot(annotations_df, aes(x = combined_tumor_annotation, y = !!sym(column))) +
+    ggplot(library_df_list$`CNV z-score > 2`, aes(x = detail_tumor_category, y = !!sym(column))) +
       ggforce::geom_sina(size = 0.3) +
       # add median diamond
       stat_summary(
@@ -1002,49 +714,6 @@ qc_columns |>
   patchwork::wrap_plots()
   
 ```
-
-
-## Ridge plots
-
-Finally we will look at the distribution of z-scores for `AUCell` and `inferCNV` using the combined tumor annotation. 
-As with the UMAPs, the braod cell type group is shown for any cells that are classified as normal. 
-The ridge plots are colored by whether or not the cells are labeled tumor or normal and only cell types with at least 3 cells are shown. 
-
-
-```{r, fig.height=15, fig.width=10, message=FALSE}
-geneset_columns <- grep("auc-zscore", colnames(ridge_filtered_annotations_df), value = TRUE)
-
-
-c(geneset_columns, "cnv_zscore") |> 
-  purrr::map(\(column){
-    
-    # make the labels prettier 
-    x_label = dplyr::if_else(
-      stringr::str_detect(column, "cnv"), 
-      "CNV",
-      stringr::str_remove(column, "auc-zscore_")
-    ) |> 
-      paste("z-score", sep = " ")
-    
-    ggplot(ridge_filtered_annotations_df, aes(x = !!sym(column), y = y_label, fill = forcats::fct_rev(is_tumor))) +
-      ggridges::geom_density_ridges(alpha = 0.5) +
-      scale_fill_brewer(palette = "Set1") +
-      labs(
-        y = "Combined CNV and \nAUCell annotation",
-        x = x_label,
-        fill = ""
-      )
-    
-  }) |> 
-  patchwork::wrap_plots(guides = "collect", ncol = 1)
-```
-
-
-```{r}
-# export the annotations df
-readr::write_tsv(combined_df, params$output_annotations_file)
-```
-
 
 # Session Info
 <details>

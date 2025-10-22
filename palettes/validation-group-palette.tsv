@@ -24,3 +24,6 @@ astrocyte	#2ED9FF
 glial cell	#565656
 mesangial cell	#E2E2E2
 unknown	#E5E5E5
+tumor	#FF6F00
+tumor-high	#00BFA0
+tumor-low	#009DC4
