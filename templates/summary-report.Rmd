@@ -286,7 +286,7 @@ tier_cols <- c(
 )
 ```
 
-```{r, results='asis'}
+```{r, results='asis', message=FALSE, warning=FALSE}
 library_df_list |> 
   purrr::iwalk(\(df, title){
     
