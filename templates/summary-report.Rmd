@@ -231,7 +231,8 @@ celltype_levels <- celltype_counts_df |>
 
 # pull out reference label to set at the end of the factors 
 # this ensures the reference group is always at the bottom of the plot
-ref_labels <- stringr::str_subset(celltype_levels, "reference")
+ref_labels <- stringr::str_subset(celltype_levels, "reference") |> 
+  rev() # reverse the order so sample reference appears first
 non_ref_labels <- celltype_levels[!(celltype_levels %in% ref_labels)]
 
 # combine everything into one df including counts
