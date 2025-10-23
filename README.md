@@ -6,12 +6,15 @@
 
 - [Description](#description)
 - [Running the workflow](#running-the-workflow)
+  - [Building the normal reference](#building-the-normal-reference)
+  - [Running the main annotation workflow](#running-the-main-annotation-workflow)
   - [Parameters](#parameters)
   - [Profiles](#profiles)
   - [Running the workflow on the Pittsburgh High Throughput Cluster](#running-the-workflow-on-the-pittsburgh-high-throughput-cluster)
   - [Monitoring the workflow with Seqera](#monitoring-the-workflow-with-seqera)
 - [Output files](#output-files)
 - [Managing software dependencies](#managing-software-dependencies)
+  - [Additional software not managed with `renv`](#additional-software-not-managed-with-renv)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -187,7 +190,8 @@ TBD
 
 ## Managing software dependencies 
 
-All software dependencies are managed with `renv` and a Dockerfile is used to build an image with R, Bioconductor, and all packages included in `renv`. 
+All R packages are managed with `renv` and a Dockerfile is used to build an image with R, Bioconductor, and all packages included in `renv`. 
+This is the default image used for most processes within the workflow that utilize R.
 
 The following command can be used to build the image: 
 
@@ -203,3 +207,11 @@ docker pull ghcr.io/alexslemonade/ews-nf:edge
 
 To add any packages to the image outside of `renv`, the `Dockerfile` should be updated to include installation of the desired package.
 This image is built and pushed to `ghcr.io/alexslemonade/ews-nf:edge` automatically on every update to `ews-nf` (`main`) in which the `Dockerfile` or `renv.lock` files are changed.
+
+### Additional software not managed with `renv`
+
+The `docker` folder contains any additional images that are built for processes that utilize packages that are not managed within `renv`. 
+
+* The `cnmf` folder contains a `pixi.lock` and `Dockerfile` used to build the `ews-nf/cnmf` Docker image. 
+This image is used for running the [`cNMF` package](https://github.com/dylkot/cNMF) within the `ews-nf` workflow. 
+This image is built and pushed to `ghcr.io/alexslemonade/ews-nf/cnmf:edge` automatically on every update to `ews-nf` (`main`) in which the `docker/cnmf/Dockerfile` or `docker/cnmf/pixi.lock` files are changed.

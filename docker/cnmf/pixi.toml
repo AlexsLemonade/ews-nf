@@ -1,0 +1,21 @@
+[workspace]
+authors = ["Childhood Cancer Data Lab, Alex's Lemonade Stand Foundation"]
+channels = ["conda-forge"]
+name = "cnmf"
+platforms = ["osx-64", "linux-64", "linux-aarch64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = "==3.10"
+
+[pypi-dependencies]
+cnmf = ">=1.7.0, <2"
+
+# dependencies for Nextflow images, only available on Linux
+[target.linux-64.dependencies]
+procps-ng = ">=4.0.4,<5"
+
+[target.linux-aarch64.dependencies]
+procps-ng = ">=4.0.4,<5"
