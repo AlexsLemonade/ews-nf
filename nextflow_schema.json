@@ -155,8 +155,22 @@
           "format": "file-path",
           "mimetype": "text/tab-separated-values",
           "description": "Path to TSV file containing categories for each gene set used with AUCell"
+        },
+        "k_components_lower": {
+          "type": "number",
+          "default": 5,
+          "description": "Lower bound for number of components to run with cNMF"
+        },
+        "k_components_upper": {
+          "type": "number",
+          "default": 15,
+          "description": "Upper bound for number of components to run with cNMF"
+        },
+        "skip_cnmf": {
+          "type": "boolean",
+          "default": false,
+          "description": "If the cNMF results directory already exists, optionally skip re-running cNMF"
         }
-
       }
     }
   },
