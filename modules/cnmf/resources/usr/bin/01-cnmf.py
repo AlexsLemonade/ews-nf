@@ -34,13 +34,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--k_components_lower",
         type=int,
-        default=3,
+        default=5,
         help="Lower boundary for number of components (k) for cNMF. (default: %(default)d)",
     )
     parser.add_argument(
         "--k_components_upper",
         type=int,
-        default=20,
+        default=15,
         help="Upper boundary for number of components (k) for cNMF. (default: %(default)d)",
     )
     parser.add_argument(
