@@ -24,12 +24,16 @@ process run_cnmf {
     """
     01-cnmf.py \
       --h5ad_file ${h5_file} \
+      --annotations_file ${annotations_file} \
       --output_dir \$PWD \
       --unique_id ${unique_id} \
       --k_components_lower ${params.k_components_lower} \
       --k_components_upper ${params.k_components_upper} \
       --jobs ${task.cpus} \
       --seed ${params.seed}
+
+    # remove intermediate files before publishing
+    rm -r "${unique_id}_temp"
     """
 
   stub:

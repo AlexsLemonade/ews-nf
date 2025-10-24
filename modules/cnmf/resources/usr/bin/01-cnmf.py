@@ -4,8 +4,9 @@ import argparse
 import multiprocessing
 from pathlib import Path
 
-import anndata
 import numpy
+import anndata
+import pandas 
 import cnmf
 
 
@@ -17,6 +18,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         required=True,
         help="Path to the H5AD file containing a processed AnnData object",
+    )
+    parser.add_argument(
+        "--annotations_file",
+        type=Path,
+        required=True,
+        help="Path to the TSV file containing the tumor cell annotations",
     )
     parser.add_argument(
         "--output_dir",
@@ -83,10 +90,15 @@ def parse_args() -> argparse.Namespace:
 def main():
     args = parse_args()
 
-    # Validate input file
+    # Validate input files
     if not args.h5ad_file.is_file() and args.h5ad_file.suffix == ".h5ad":
         raise ValueError(
             f"H5AD file not found at {args.h5ad_file}. Please ensure the file exists."
+        )
+    
+    if not args.annotations_file.is_file() and args.annotations_file.suffix == ".tsv":
+        raise ValueError(
+            f"Annotations file not found at {args.annotations_file}. Please ensure the file exists."
         )
     
     # check that k_upper and k_lower are numbers and k_lower is < k_upper
@@ -101,10 +113,23 @@ def main():
     # read in h5ad
     adata = anndata.read_h5ad(args.h5ad_file)
 
-    # create a new anndata object with just the raw counts for hvgs
+    # read in annotations tsv
+    annotations_df = pandas.read_csv(args.annotations_file, sep= "\t")
+    # make sure the tumor cell annotation column is provided
+    if not "annotation_tier0" in annotations_df.columns:
+        raise KeyError(
+            "Provided annotations file does not contain the required column, `annotation_tier0`"
+        )
+    
+    # get vector of tumor cells to keep 
+    tumor_barcodes = annotations_df.loc[
+        annotations_df["annotation_tier0"] == "tumor", "barcodes"
+    ].tolist()
+
+    # create a new anndata object with just tumor cells and the raw counts for hvgs
     hv_genes = adata.var['highly_variable']
     adata.X = adata.raw.X # make sure X has the raw counts for subsetting
-    subset_adata = adata[:, hv_genes].copy()
+    subset_adata = adata[tumor_barcodes, hv_genes].copy()
     new_adata = anndata.AnnData(X=subset_adata.X)
 
     # save counts to h5 file to use as input to cnmf
