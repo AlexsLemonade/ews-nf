@@ -7,6 +7,7 @@ include { make_gene_order_file } from './modules/infercnv'
 include { infercnv } from './modules/infercnv'
 include { annotate_tumor_cells } from './modules/annotate-tumor-cells'
 include { summary_report } from './modules/summary-report'
+include { cnmf } from './modules/cnmf'
 
 // **** Parameter checks ****
 include { validateParameters; paramsSummaryLog } from 'plugin/nf-schema'
@@ -95,4 +96,47 @@ workflow {
   // generate report 
   summary_report(run_ch, annotate_tumor_cells.out, infercnv.out)
   
+}
+
+// workflow for generating metaprograms using NMF across all samples 
+workflow nmf_metaprograms {
+  sample_ids = params.sample_ids?.tokenize(';, ') ?: []
+  run_all = sample_ids[0] == "All"
+
+  // create a channel of [unique_id, sample id, path to processed H5 file]
+  sample_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed_rna.h5ad", type: 'file')
+    .map{ file -> tuple(
+      file.name.replace("_processed_rna.h5ad", ""), // extract unique id which will be either library_id or <library_id>-<sample_id>
+      file.parent.name, // extract sample id from file path
+      file // full path to file
+    )}
+    // filter to only specified samples
+    // use either unique id or sample id for filtering
+    .filter{ unique_id, sample_id, _h5_file -> 
+      run_all || (unique_id in sample_ids) || (sample_id in sample_ids) 
+    }
+    .branch{ _unique_id, _sample_id, h5_file -> 
+      run_workflow: h5_file.size() > 0 || h5_file.name.startsWith("STUB")
+      skip_workflow: true
+    }
+
+  // send unique ids for all libraries that don't have enough cells to log 
+  sample_ch.skip_workflow
+    .subscribe{
+      log.error("There are no cells found in the processed object for ${it[0]}.")
+    }
+
+  nmf_run_ch = sample_ch.run_workflow
+    .map { unique_id, sample_id, h5_file ->
+      def annotations_file = file("${params.outdir}/annotations/${sample_id}/${unique_id}_annotations.tsv", checkIfExists: true)
+      [unique_id, sample_id, h5_file, annotations_file]
+    }
+
+  // run cnmf on each sample and output 
+  cnmf(nmf_run_ch)
+
+  // TODO: get robust nmf programs across all samples 
+
+  // TODO: generate metaprograms 
+
 }
