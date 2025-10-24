@@ -45,6 +45,11 @@
           "type": "string",
           "default": "ghcr.io/alexslemonade/ews-nf:edge",
           "description": "Container to use for running individual modules"
+        },
+        "cnmf_container": {
+          "type": "string",
+          "default": "ghcr.io/alexslemonade/ews-nf/cnmf:edge",
+          "description": "Container to use for running the cnmf module"
         }
       }
     },

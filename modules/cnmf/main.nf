@@ -3,7 +3,7 @@
 // Module for running cnmf on each sample
 
 process run_cnmf {
-  container params.ews_nf_container
+  container params.cnmf_container
   tag "${unique_id}"
   label 'mem_96'
   cpus 4
@@ -19,12 +19,12 @@ process run_cnmf {
           val(sample_id),
           path(output_dir)
   script:
-    // use the sample ID as the output directory 
-    output_dir = sample_id
+    // output files will be saved to a folder named with unique ID
+    output_dir = unique_id
     """
-    01-run-cnmf.py \
+    01-cnmf.py \
       --h5ad_file ${h5_file} \
-      --output ${output_dir} \
+      --output_dir \$PWD \
       --unique_id ${unique_id} \
       --k_components_lower ${params.k_components_lower} \
       --k_components_upper ${params.k_components_upper} \
@@ -33,7 +33,7 @@ process run_cnmf {
     """
 
   stub:
-    output_dir = sample_id
+    output_dir = unique_id
     """
     touch ${output_dir}
     """
