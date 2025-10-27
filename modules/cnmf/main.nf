@@ -29,6 +29,7 @@ process run_cnmf {
       --unique_id ${unique_id} \
       --k_components_lower ${params.k_components_lower} \
       --k_components_upper ${params.k_components_upper} \
+      --k_step_size ${params.k_step_size} \
       --jobs ${task.cpus} \
       --seed ${params.seed}
 
@@ -57,6 +58,7 @@ workflow cnmf {
           h5_file,
           annotations_file,
           // path to cnmf output
+          // TODO: Update checking to make sure parameters are the same as the previous run
           file("${params.outdir}/cnmf/${sample_id}/${unique_id}", type: "dir")
         ]
       }

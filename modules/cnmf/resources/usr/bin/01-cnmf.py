@@ -47,8 +47,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--k_components_upper",
         type=int,
-        default=15,
+        default=20,
         help="Upper boundary for number of components (k) for cNMF. (default: %(default)d)",
+    )
+    parser.add_argument(
+        "--k_step_size",
+        type = int,
+        default = 1,
+        help="Step size to use for creating the range of k components to use when running cNMF. (default: %(default)d)",
     )
     parser.add_argument(
         "--n-iter",
@@ -108,7 +114,7 @@ def main():
         )
 
     # assign k range to use for cNMF 
-    k_range = numpy.arange(args.k_components_lower, args.k_components_upper + 1)
+    k_range = numpy.arange(args.k_components_lower, args.k_components_upper + 1, args.k_step_size)
 
     # read in h5ad
     adata = anndata.read_h5ad(args.h5ad_file)
