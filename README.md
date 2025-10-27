@@ -21,7 +21,7 @@
 ## Description 
 
 This repository holds a Nextflow workflow used to analyze single-cell RNA-sequencing samples obtained from patients with Ewing sarcoma. 
-The workflow is organized into the following modules: 
+The main workflow, used to annotate tumor cells, is organized into the following modules: 
 
 * `build-reference`: This module extracts the counts for any cells that should be included in a normal cell reference and saves to a single `SingleCellExperiment` object for use with other modules. 
 An additional TSV file containing the library ID, cell barcode, and consensus cell type annotations is also saved.
@@ -42,13 +42,20 @@ This same approach is used to calculate the z-score for all `proportion_scaled_*
   Cells are classified if the mean z-score is greater than the specified `--marker_gene_cutoff`, which has a default of 2. 
 * `summary-report`: This module generates a HTML report summarizing the results from the workflow for each sample. 
 
+The tumor cells output from the above workflow are then used as input to a workflow used to annotate metaprograms across all samples. 
+That workflow is organized into the following modules: 
+
+* `cnmf`: This module runs [`cNMF`](https://github.com/dylkot/cNMF) on all tumor cells on a range of k values. 
+Here, tumor cells are those that are labeled as tumor by the main workflow with a CNV z-score > 0 (tier0).
+These cells are labeled as `tumor` in the `annotation_tier0` column of the TSV file output by the main annotation workflow (`annotations/<sample_id>/<library_id>_annotations.tsv`)
+The consensus NMF program for each value of k is included in the output.
 
 ## Running the workflow 
 
 In order to run the workflow you will first need to clone the repository. 
 
 Prior to running this workflow, quantified gene expression data must be obtained by running [`scpca-nf`](https://github.com/AlexsLemonade/scpca-nf). 
-The processed `SingleCellExperiment` objects output from that workflow are then used as input to `ews-nf`. 
+The processed `SingleCellExperiment` and `AnnData` objects output from that workflow are then used as input to `ews-nf`.
 
 ### Building the normal reference
 
@@ -70,6 +77,17 @@ After creating the reference files with the `reference` entrypoint, the followin
 nextflow run main.nf
 ```
 
+### Running the metaprogram identification workflow
+
+After annotating tumor cells using the main workflow, the `nmf_metaprograms` entrypoint can be used to identify metapgrograms across a group of samples. 
+This workflow requires the processed `AnnData` objects (`processed_rna.h5ad` files) output from `scpca-nf` and the tumor cell annotations TSV (`annotations/<sample_id>/<library_id>_annotations.tsv`) file output from the main `ews-nf` workflow. 
+
+The following command can be used to run the NMF part of the workflow: 
+
+```sh
+nextflow run main.nf -entry nmf_metaprograms
+```
+
 ### Parameters
 
 Below is a table of parameters that can be modified: 
@@ -80,6 +98,7 @@ Below is a table of parameters that can be modified:
 | `sample_ids` | Comma or semi-colon separated list of sample ids (names of folders in `scpca_nf_out` containing the `_processed.rds` files) to run the workflow on. By default, the workflow will be run on all samples that are present in `scpca_nf_out`. |
 | `outdir` | Full path to the directory to save the output files from `ews-nf`. The default directory is `ews-nf-out` | 
 | `skip_infercnv` | Whether or not to skip running inferCNV for samples with existing inferCNV results in the `outdir`. By default, inferCNV will be run for all samples, unless `--skip_infercnv` is used at the command line | 
+| `skip_cnmf` | Whether or not to skip running cNMF for samples with existing rNMF results in the `outdir`. By default, cNMF will be run for all samples, unless `--skip_cnmf` is used at the command line | 
 
 To run the workflow specifying these parameters use the following command: 
 
@@ -161,6 +180,19 @@ To overwrite an existing reference, use `--overwrite_reference 1`
 
 ```sh
 sbatch slurm-submit.sh --overwrite_reference 1
+```
+
+To run the NMF part of the workflow, use the `slurm-submit-nmf.sh` script after running the main `ews-nf` workflow with `slurm-submit.sh`. 
+This script can be run using the following command: 
+
+```sh
+sbatch slurm-submit-nmf.sh
+```
+
+To skip running cNMF for any samples with existing cNMF results, use: 
+
+```sh
+sbatch slurm-submit-nmf.sh --skip_cnmf 1
 ```
 
 
