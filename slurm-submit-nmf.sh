@@ -87,4 +87,4 @@ nextflow run "$project_dir/main.nf" \
   --k_components_upper $k_components_upper \
   --k_step_size $k_step_size \
   $sample_flag \
-  $infercnv_flag \
+  $cnmf_flag \
