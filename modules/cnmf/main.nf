@@ -34,7 +34,7 @@ process run_cnmf {
       --seed ${params.seed}
 
     # remove intermediate files before publishing
-    rm -r "${unique_id}_temp"
+    rm -r "${unique_id}/cnmf_tmp"
     """
 
   stub:
