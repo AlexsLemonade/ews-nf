@@ -136,7 +136,11 @@ def main():
     hv_genes = adata.var['highly_variable']
     adata.X = adata.raw.X # make sure X has the raw counts for subsetting
     subset_adata = adata[tumor_barcodes, hv_genes].copy()
+
+    # make a simplified version of the object for easy exporting
     new_adata = anndata.AnnData(X=subset_adata.X)
+    new_adata.obs_names = subset_adata.obs_names
+    new_adata.var_names = subset_adata.var_names
 
     # save counts to h5 file to use as input to cnmf
     anndata_file = "anndata.h5ad"
