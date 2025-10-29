@@ -47,7 +47,7 @@ That workflow is organized into the following modules:
 
 * `cnmf`: This module runs [`cNMF`](https://github.com/dylkot/cNMF) on all tumor cells on a range of k values. 
 Here, tumor cells are those that are labeled as tumor by the main workflow with a CNV z-score > 0 (tier0).
-These cells are labeled as `tumor` in the `annotation_tier0` column of the TSV file output by the main annotation workflow (`annotations/<sample_id>/<library_id>_annotations.tsv`)
+These cells are labeled as `tumor` in the `annotation_tier0` column of the TSV file output by the main annotation workflow (`annotations/<sample_id>/<library_id>-<sample_id>_annotations.tsv`)
 The consensus NMF program for each value of k is included in the output.
 
 ## Running the workflow 
@@ -218,7 +218,57 @@ You must be a member of the `SeanKarlCohort` organization and have access to the
 
 ## Output files 
 
-TBD
+Running the workflow with the `reference` entry point will output three reference files found in `<output_dir>/reference`: 
+
+- A gene order file for use with `inferCNV`. 
+The name of the file will be representative of the Ensembl version used to create the file, e.g., `Homo_sapiens.GRCh38.110.gene_order.txt`. 
+- A TSV file with the cell types for all cells included in the pooled reference, `all-ref-annotations.tsv`.
+- An RDS file with a `SingleCellExperiment` object containing the counts for all cells included in the pooled reference, `all-ref-sce.rds`
+
+The main annotation workflow will include a folder with results from each module organized as follows: 
+
+```tree
+ews-nf-out
+├── annotations
+│   └── <sample_id>
+│       └── <library_id>-<sample_id>_annotations.tsv
+├── aucell
+│   └── <sample_id>
+│       └── <library_id>-<sample_id>_aucell-results.tsv
+├── infercnv
+│   └── <sample_id>
+│       ├── <library_id>-<sample_id>_infercnv-heatmap.png
+│       └── <library_id>-<sample_id>_infercnv-metadata.tsv
+└──  reports
+    └── <sample_id>
+        └── <library_id>-<sample_id>_summary-report.html
+
+```
+
+The `<library_id>-<sample_id>_summary-report.html` file contains plots and tables to visualize the results from the workflow. 
+The summarized results, including the final annotations, are available in the `<library_id>-<sample_id>_annotations.tsv` file, which contains the following columns: 
+
+| column | contents | 
+| ------ | -------- | 
+| `barcodes` | Cell barcode | 
+| `unique_id` | Unique sample identifier in the format, `<library_id>-<sample_id>` | 
+| `cell_id` | Unique cell identifier in the format, `<library_id>-<sample_id>-<barcode>` | 
+| `consensus_celltype_annotation` | Original consensus cell type annotation assigned by `scpca-nf` |
+| `ref_or_query` | Whether the cell is part of the pooled reference (`reference`) or query cell (`query`) | 
+| `EF-activated` | Mean z-score of all `EWS::FLI1` activated gene sets output by `AUCell` | 
+| `EF-repressed` | Mean z-score of all `EWS::FLI1` repressed gene sets output by `AUCell` | 
+| `EMT-ECM` | Mean z-score of all EMT and ECM related gene sets output by `AUCell` | 
+| `cnv_zscore` | Total CNV z-score | 
+| `chr1_gain_zscore` | Proportion of chr1 with CNV gain z-score | 
+| `chr8_gain_zscore` | Proportion of chr8 with CNV gain z-score | 
+| `chr12_gain_zscore` | Proportion of chr12 with CNV gain z-score | 
+| `chr16_loss_zscore` | Proportion of chr16 with CNV loss z-score | 
+| `tumor_class` | Indicates if cells are classified as tumor using CNV > 2 (`tumor_tier2`), CNV > 1 (`tumor_tier1`), or CNV > 0 (`tumor_tier0`) or classified as normal | 
+| `expression_class` | Indicates if cells have a `EF-activated` (`high`) or `EF-repressed` (`low`) z-score greater than the marker gene threshold (default: 2). `NA` is used to indicate if the cell does not pass either threshold |
+| `annotation_tier0` | Combined annotation based on `tumor_class`, `expression_class`, and `consensus_celltype_annotation. Here tumor cells are those that have CNV > 0 | 
+| `annotation_tier1` | Combined annotation based on `tumor_class`, `expression_class`, and `consensus_celltype_annotation. Here tumor cells are those that have CNV > 1 | 
+| `annotation_tier2` | Combined annotation based on `tumor_class`, `expression_class`, and `consensus_celltype_annotation. Here tumor cells are those that have CNV > 2 | 
+
 
 ## Managing software dependencies 
 
