@@ -74,10 +74,11 @@ filter_spectra <- function(
   cross_sample_max <- cor_df |>
     # only keep correlations between samples
     dplyr::filter(pair_type == "between_sample") |>
-    dplyr::group_by(spectra1) |>
     # find the max correlation for each spectra
-    dplyr::summarise(max_sample_cor = max(correlation, na.rm = TRUE)) |>
-    dplyr::ungroup()
+    dplyr::summarise(
+      max_sample_cor = max(correlation, na.rm = TRUE),
+      .by = spectra1
+    )
   
   # get the top spectra for each group 
   top_spectra <- group_df |>
@@ -135,8 +136,9 @@ spectra_mtx <- purrr::imap(
   spectra_files, \(file, id) {
     
     # extract k value to use for labeling columns
-    k_value <- stringr::str_extract(file, pattern = "k_[0-9]+") |> 
-      stringr::str_replace("_", "-")
+    k_value <- stringr::str_extract(file, pattern = "k_\\d+") |> 
+      stringr::str_extract("\\d+") |>
+      \(x) sprintf("k%02d", x)
     
     # read in file and create dataframe
     df <- read.table(file) |>
@@ -145,7 +147,8 @@ spectra_mtx <- purrr::imap(
       tibble::rownames_to_column("gene_id")
     
     # rename columns to have id, k, and nmf number
-    colnames(df)[-1] <- glue::glue("{id}_{k_value}_CNMF{colnames(df)[-1]}")
+    nmf_number <- sprintf("%02d", colnames(df)[-1])
+    colnames(df)[-1] <- glue::glue("{id}_{k_value}_CNMF{nmf_number}")
     return(df)
     }
   ) |> 
@@ -244,7 +247,7 @@ ggplot(cor_df, aes(x = correlation, fill = pair_type)) +
   geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
   theme_minimal() +
   labs(x = "Correlation", y = "Count") +
-  facet_grid(rows = vars(pair_type), scales = "free")
+  facet_grid(rows = vars(pair_type), scales = "free_y")
 ```
 
 Interestingly, we actually see a group of spectra with high correlations in the within sample spectra, but don't see that same hump in the between sample spectra? 
