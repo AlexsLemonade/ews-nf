@@ -44,6 +44,7 @@ options(
   readr.show_col_types = FALSE
 )
 
+set.seed(2025)
 ```
 
 ```{r functions}
@@ -138,7 +139,9 @@ spectra_mtx <- purrr::imap(
     # extract k value to use for labeling columns
     k_value <- stringr::str_extract(file, pattern = "k_\\d+") |> 
       stringr::str_extract("\\d+") |>
-      \(x) sprintf("k%02d", x)
+      as.integer() 
+    
+    k_value <- sprintf("k%02d", k_value)
     
     # read in file and create dataframe
     df <- read.table(file) |>
@@ -147,7 +150,7 @@ spectra_mtx <- purrr::imap(
       tibble::rownames_to_column("gene_id")
     
     # rename columns to have id, k, and nmf number
-    nmf_number <- sprintf("%02d", colnames(df)[-1])
+    nmf_number <- sprintf("%02d", as.integer(colnames(df)[-1]))
     colnames(df)[-1] <- glue::glue("{id}_{k_value}_CNMF{nmf_number}")
     return(df)
     }
@@ -293,6 +296,25 @@ length(redundant_spectra)/length(colnames(spectra_mtx))
 
 84% is a lot!
 
+Before doing any filtering, let's look at the max correlation of each spectra both within and between samples. 
+
+```{r}
+# compute cross-sample correlation max for each spectra
+max_correlation <- cor_df |>
+  dplyr::filter(spectra1 != spectra2) |> 
+  # find the max correlation for each spectra
+  dplyr::summarise(max_cor = max(correlation, na.rm = TRUE), .by = c("pair_type", "spectra1"))
+
+# look at max correlation for between and within sample across all ks 
+ggplot(max_correlation, aes(x = max_cor)) +
+  facet_grid(rows = vars(pair_type), scales = "free_y") +
+  geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
+  theme_minimal() +
+  labs(x = "Correlation", y = "Count")
+```
+
+As expected based on the other plots, there is a large group of spectra that have high correlation with other spectra from that sample. 
+
 Let's try and filter out some of these programs that have high redundancy within a single sample. 
 We'll group together spectra that have high correlations to each other and then keep the spectra with the highest correlation to spectra from another sample.
 
@@ -314,19 +336,15 @@ group_df <- tibble::tibble(
 )
 
 # compute cross-sample correlation max for each spectra
-cross_sample_max <- cor_df |>
-  # only keep correlations between samples
-  dplyr::filter(pair_type == "between_sample") |>
-  dplyr::group_by(spectra1) |>
-  # find the max correlation for each spectra
-  dplyr::summarise(max_sample_cor = max(correlation, na.rm = TRUE)) |>
-  dplyr::ungroup()
+cross_sample_max <- max_correlation |> 
+  dplyr::filter(pair_type == "between_sample") |> 
+  dplyr::select(!pair_type)
 
 # get the top spectra for each group 
 top_spectra <- group_df |>
   dplyr::left_join(cross_sample_max, by = "spectra1") |>
   dplyr::group_by(group) |>
-  dplyr::slice_max(order_by = max_sample_cor, n = 1, with_ties = FALSE) |>
+  dplyr::slice_max(order_by = max_cor, n = 1, with_ties = FALSE) |>
   dplyr::ungroup() |> 
   dplyr::pull(spectra1)
 
@@ -386,7 +404,7 @@ First, let's get an idea of what the between sample correlations look like for a
 We specifically want to know what the highest cross sample correlation is, which we already computed when removing redundant samples. 
 
 ```{r}
-summary(cross_sample_max$max_sample_cor)
+summary(cross_sample_max$max_cor)
 ```
 
 It looks like we don't have any negative correlations, but we do have some that are close to 0. 
@@ -394,7 +412,7 @@ What if we remove spectra with low cross-sample correlations, say < 0.1.
 
 ```{r}
 orphan_spectra <- cross_sample_max |>
-  dplyr::filter(max_sample_cor <= 0.1) |>
+  dplyr::filter(max_cor <= 0.1) |>
   dplyr::pull(spectra1)
 
 length(orphan_spectra)
@@ -408,7 +426,7 @@ The heatmap below looks at correlation after dropping within-sample redundant sp
 
 ```{r}
 orphan_spectra <- cross_sample_max |>
-  dplyr::filter(max_sample_cor <= 0.3) |>
+  dplyr::filter(max_cor <= 0.3) |>
   dplyr::pull(spectra1)
 
 non_orphan_spectra <- colnames(filtered_cor_matrix)[which(!colnames(filtered_cor_matrix) %in% orphan_spectra)]
@@ -443,7 +461,7 @@ I am particularly curious if we just use a high value, like k=25, do we get fewe
 To start, let's look at the correlation distributions for each value. 
 
 ```{r}
-k_values <- glue::glue("k-{seq(5,25,5)}")
+k_values <- sprintf("k%02d", seq(5,25,5))
 
 k_values |> 
   purrr::map(\(k){
@@ -466,6 +484,26 @@ It definitely looks like there are fewer within-sample redundant spectra which w
 When we filter out redundant within sample spectra, the spectra with the highest correlation to another sample is kept and it's possible that those spectra that get kept represent multiple values of k.
 By using multiple values of k and then filtering we may be optimizing the spectra to get the "best match" for each sample. 
 
+Now, let's look specifically at the max within and between sample correlation for each spectra and each value of k. 
+
+```{r}
+# compute cross-sample correlation max for each spectra only considering those from a single value of k
+max_correlation <- cor_df |>
+  dplyr::filter(spectra1 != spectra2 & k_value_1 == k_value_2) |> 
+  # find the max correlation for each spectra for each k value 
+  dplyr::summarise(max_cor = max(correlation, na.rm = TRUE), .by = c("pair_type", "spectra1", "k_value_1"))
+
+# between and within sample max correlation for each k 
+ggplot(max_correlation, aes(x = max_cor)) +
+  facet_grid(cols = vars(pair_type),
+             rows = vars(k_value_1),
+             scales = "free_y") +
+  geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
+  theme_minimal() +
+  labs(x = "Correlation", y = "Count")
+```
+
+
 ```{r}
 all_discard_spectra <- k_values |> 
   purrr::map(\(k){
@@ -474,7 +512,7 @@ all_discard_spectra <- k_values |>
       dplyr::filter(k_value_1 == k & k_value_2 == k)
     
     discard_spectra <- filter_spectra(filtered_cor_df)
-    discard_spectra$k <- stringr::str_remove(k, "k-") |> as.numeric()
+    discard_spectra$k <- stringr::str_remove(k, "k") |> as.numeric()
     
     return(discard_spectra)
     
@@ -524,7 +562,9 @@ k_values |>
   })
 ```
 
-It looks like the lower values of k are pretty messy, which is not surprising, but k = 25 looks pretty good and similar to the heatmap produced with the spectra from the range of k values after filtering. 
+From this it looks like lower values of K have the highest between sample correlations and lowest within sample correlations.
+I feel like for this particular group we see a plateau at k=15, where the distributions don't change much and we start to see correlation of spectra outside of the main diagonal. 
+
 
 ## Conclusions 
 
