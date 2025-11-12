@@ -33,7 +33,6 @@ library(ggplot2)
 theme_set(
   theme_bw() +
     theme(
-      plot.margin = margin(rep(20, 4)),
       strip.background = element_rect(fill = "transparent", linewidth = 0.5)
     )
 )
@@ -53,13 +52,23 @@ set.seed(2025)
 # and a vector of orphan spectra (low values of cross sample correlation)
 # this is useful for filtering across each individual value of k
 filter_spectra <- function(
-    cor_df,
+    all_cor_df,
     redundant_cutoff = 0.9,
     orphan_cutoff = 0.3
 ) {
   
+  # compute cross-sample correlation max for each spectra
+  cross_sample_max <- all_cor_df |>
+    # only keep correlations between samples
+    dplyr::filter(pair_type == "between_sample") |>
+    # find the max correlation for each spectra
+    dplyr::summarise(
+      max_sample_cor = max(correlation, na.rm = TRUE),
+      .by = spectra1
+    )
+  
   # pull out any combinations that result in correlation > 0.9 in a single sample
-  high_cor_edges <- cor_df |>
+  high_cor_edges <- all_cor_df |>
     dplyr::filter(correlation > redundant_cutoff, spectra1 != spectra2, pair_type == "within_sample") |> 
     dplyr::select(spectra1, spectra2, sample1, correlation)
   
@@ -70,16 +79,6 @@ filter_spectra <- function(
     spectra1 = names(components$membership),
     group = components$membership
   )
-  
-  # compute cross-sample correlation max for each spectra
-  cross_sample_max <- cor_df |>
-    # only keep correlations between samples
-    dplyr::filter(pair_type == "between_sample") |>
-    # find the max correlation for each spectra
-    dplyr::summarise(
-      max_sample_cor = max(correlation, na.rm = TRUE),
-      .by = spectra1
-    )
   
   # get the top spectra for each group 
   top_spectra <- group_df |>
@@ -225,11 +224,8 @@ We want to see that correlations of spectra between samples is higher than the c
 ```{r}
 # turn the correlation matrix into a dataframe for plotting
 # one row for each correlation 
-cor_df <- as.data.frame(as.table(cor_matrix)) |>
+all_cor_df <- as.data.frame(as.table(cor_matrix)) |>
   dplyr::rename(spectra1 = Var1, spectra2 = Var2, correlation = Freq) |>
-  # only keep distinct pairs
-  dplyr::mutate(pair_id = purrr::map2(spectra1, spectra2, \(x,y) paste(sort(c(x, y)), collapse = "_"))) |>
-  dplyr::distinct(pair_id, .keep_all = TRUE) |> 
   # remove correlations between the same spectra
   dplyr::filter(spectra1 != spectra2) |> 
   dplyr::mutate(
@@ -242,6 +238,13 @@ cor_df <- as.data.frame(as.table(cor_matrix)) |>
     # if the comparison is within a sample, is it from a different k? e.g., are we getting a lot of redundant programs? 
     k_value_type = dplyr::if_else(sample1 == sample2 & k_value_1 == k_value_2, "matching_k", "different_k")
   )
+
+# create a separate df for just the distinct pairs
+# this is useful when plotting the correlation values themselves but we want to use the full df when grouping and finding max correlation
+cor_df <- all_cor_df |> 
+  # only keep distinct pairs
+  dplyr::mutate(pair_id = purrr::map2(spectra1, spectra2, \(x,y) paste(sort(c(x, y)), collapse = "_"))) |> 
+  dplyr::distinct(pair_id, .keep_all = TRUE)
 
 ```
 
@@ -300,7 +303,7 @@ Before doing any filtering, let's look at the max correlation of each spectra bo
 
 ```{r}
 # compute cross-sample correlation max for each spectra
-max_correlation <- cor_df |>
+max_correlation <- all_cor_df |>
   dplyr::filter(spectra1 != spectra2) |> 
   # find the max correlation for each spectra
   dplyr::summarise(max_cor = max(correlation, na.rm = TRUE), .by = c("pair_type", "spectra1"))
@@ -323,7 +326,7 @@ However, we are going to dive a bit deeper here and use some of the intermediate
 
 ```{r}
 # pull out any combinations that result in correlation > 0.9 in a single sample
-high_cor_edges <- cor_df |>
+high_cor_edges <- all_cor_df |>
   dplyr::filter(correlation > 0.9, spectra1 != spectra2, pair_type == "within_sample") |> 
   dplyr::select(spectra1, spectra2, sample1, correlation)
 
@@ -362,7 +365,10 @@ keep_spectra <- colnames(spectra_mtx)[which(!colnames(spectra_mtx) %in% discard_
 filtered_spectra_mtx <- spectra_mtx[, keep_spectra, drop = FALSE]
 
 # how many are left? 
-length(keep_spectra)/length(colnames(spectra_mtx))
+glue::glue(
+  "Fraction of spectra remaining after filtering:
+  {length(keep_spectra)/length(colnames(spectra_mtx))}"
+)
 ```
 
 Doing that removed over 50% of the spectra... 
@@ -408,27 +414,20 @@ summary(cross_sample_max$max_cor)
 ```
 
 It looks like we don't have any negative correlations, but we do have some that are close to 0. 
-What if we remove spectra with low cross-sample correlations, say < 0.1. 
-
-```{r}
-orphan_spectra <- cross_sample_max |>
-  dplyr::filter(max_cor <= 0.1) |>
-  dplyr::pull(spectra1)
-
-length(orphan_spectra)
-```
-
-That's only 5 spectra, which probably won't make a huge difference. 
-Let's increase the cutoff to 0.3 and see what affect that has on our heatmap. 
+What if we remove spectra with low cross-sample correlations, say < 0.3. 
 Because that's near Q1 this will drop 25% of our spectra, which feels too high, but maybe those really aren't useful?  
-
-The heatmap below looks at correlation after dropping within-sample redundant spectra and spectra with < 0.3 max between sample correlation. 
 
 ```{r}
 orphan_spectra <- cross_sample_max |>
   dplyr::filter(max_cor <= 0.3) |>
   dplyr::pull(spectra1)
 
+length(orphan_spectra)
+```
+
+The heatmap below looks at correlation after dropping within-sample redundant spectra and spectra with < 0.3 max between sample correlation. 
+
+```{r}
 non_orphan_spectra <- colnames(filtered_cor_matrix)[which(!colnames(filtered_cor_matrix) %in% orphan_spectra)]
 non_orphan_cor_mtx <- filtered_cor_matrix[non_orphan_spectra, non_orphan_spectra]
 ```
@@ -448,10 +447,8 @@ ComplexHeatmap::Heatmap(
   )
 ```
 
-Actually, I think this looks better than the original! 
-We no longer have that long stretch of spectra with very low correlation to other spectra and have some more visually obvious blocks? 
-Although maybe the blocks are too big and we filtered out too much.
-Again, we need to actually identify MPs to really evaluate this, but I think this looks promising. 
+It looks like even with removing those spectra we still have some spectra that don't have high correlation to other spectra.
+We need to actually identify MPs to really evaluate this, but I think we're going in the right direction? 
 
 ## Individual k values 
 
@@ -488,7 +485,7 @@ Now, let's look specifically at the max within and between sample correlation fo
 
 ```{r}
 # compute cross-sample correlation max for each spectra only considering those from a single value of k
-max_correlation <- cor_df |>
+max_correlation <- all_cor_df |>
   dplyr::filter(spectra1 != spectra2 & k_value_1 == k_value_2) |> 
   # find the max correlation for each spectra for each k value 
   dplyr::summarise(max_cor = max(correlation, na.rm = TRUE), .by = c("pair_type", "spectra1", "k_value_1"))
@@ -508,7 +505,7 @@ ggplot(max_correlation, aes(x = max_cor)) +
 all_discard_spectra <- k_values |> 
   purrr::map(\(k){
     
-    filtered_cor_df <- cor_df |> 
+    filtered_cor_df <- all_cor_df |> 
       dplyr::filter(k_value_1 == k & k_value_2 == k)
     
     discard_spectra <- filter_spectra(filtered_cor_df)
@@ -565,16 +562,97 @@ k_values |>
 From this it looks like lower values of K have the highest between sample correlations and lowest within sample correlations.
 I feel like for this particular group we see a plateau at k=15, where the distributions don't change much and we start to see correlation of spectra outside of the main diagonal. 
 
+## Narrow range of k-values 
+
+After looking at each individual value of k, it looks like the higher values of k have lower between sample correlations and result in a lot more within sample redundancy. 
+Let's zoom in on a more "productive" range of k, k=5, k=10, and k=15 and look across all identified spectra. 
+I expect to see fewer redundant spectra here and potentially less noise, but again the best way to fully evaluate that will be to look at specific MPs. 
+
+```{r}
+keep_k <- c("k05", "k10", "k15")
+
+small_k_df <- all_cor_df |> 
+  dplyr::filter(k_value_1 %in% keep_k & k_value_2 %in% keep_k)
+```
+
+
+First, what does the distribution of max correlations for each spectra both within and between sample look like? 
+
+```{r}
+# compute cross-sample correlation max for each spectra
+max_correlation <- small_k_df |>
+  dplyr::filter(spectra1 != spectra2) |> 
+  # find the max correlation for each spectra
+  dplyr::summarise(max_cor = max(correlation, na.rm = TRUE), .by = c("pair_type", "spectra1"))
+
+# look at max correlation for between and within sample across all ks 
+ggplot(max_correlation, aes(x = max_cor)) +
+  facet_grid(rows = vars(pair_type), scales = "free_y") +
+  geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
+  theme_minimal() +
+  labs(x = "Correlation", y = "Count")
+```
+
+This is pretty similar to the distribution we see when looking at all k values together. 
+What does the heatmap look like? 
+
+```{r}
+small_k_spectra <- small_k_df |> 
+  dplyr::pull(spectra1) |> 
+  unique()
+
+small_k_mtx <- cor_matrix[small_k_spectra, small_k_spectra]
+
+ComplexHeatmap::Heatmap(
+  small_k_mtx, 
+  show_row_names = FALSE, 
+  show_column_names = FALSE, 
+  name = "correlation"
+  )
+```
+
+Now, count how many spectra are redundant and orphan. 
+
+```{r}
+small_k_discards <- filter_spectra(small_k_df) 
+
+redundant_spectra <- small_k_discards$redundant
+orphan_spectra <- small_k_discards$orphan
+
+glue::glue("Percentage of redundant spectra: {(length(redundant_spectra)/390)*100}\n")
+glue::glue("Percentage of orphan spectra: {(length(orphan_spectra)/390)*100}")
+```
+
+36% redundancy is definitely less than the > 50% of spectra that were redundant when looking at the larger range of K. 
+How does the heatmap look after removing these? 
+
+```{r}
+# filter spectra to just this k and remove bad spectra
+small_k_keep_spectra <- small_k_spectra[which(!small_k_spectra %in% c(redundant_spectra, orphan_spectra))]
+
+small_k_filtered_cor_mtx <- cor_matrix[small_k_keep_spectra, small_k_keep_spectra]
+
+ComplexHeatmap::Heatmap(
+  small_k_filtered_cor_mtx, 
+  show_row_names = FALSE, 
+  show_column_names = FALSE, 
+  name = "correlation"
+)
+```
+
+This looks promising maybe? 
 
 ## Conclusions 
 
 * Using a range of k-values results in a lot of spectra that are redundant within a sample. 
+This is reduced slightly when narrowing the range. 
 * A single value of k results in less redundant spectra, even higher values of k have < 1% of spectra that are redundant. 
 This is somewhat surprising to me, since I don't expect to find 25 unique spectra in each sample.
 Are we generating more noise with one value of k? 
 * The number of "orphan" spectra appears to be similar within a range or across single values, but the cutoffs here are pretty arbitrary. 
-* Moving forward I think I would either use a really high value of k or the full range of k.
-I do wonder if using the full range of k and then filtering helps identify the most "robust" programs across values of k rather than relying on a single value, but I think we can't fully evaluate that without actually looking at what the metaprograms look like, which is outside the scope of this particular notebook. 
+* Moving forward I would like to look at the full range of k vs a smaller range and how that affects the metaprograms that get assigned? 
+Mainly, I want to know if we use a larger range of k do we generate more "noise" or just get more "robust" MPs? 
+Answering that question is outside the scope of this notebook and will be addressed next. 
 
 ## Session info
 
