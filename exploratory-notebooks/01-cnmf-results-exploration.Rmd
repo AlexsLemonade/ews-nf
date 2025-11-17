@@ -243,8 +243,7 @@ all_cor_df <- as.data.frame(as.table(cor_matrix)) |>
 # this is useful when plotting the correlation values themselves but we want to use the full df when grouping and finding max correlation
 cor_df <- all_cor_df |> 
   # only keep distinct pairs
-  dplyr::mutate(pair_id = purrr::map2(spectra1, spectra2, \(x,y) paste(sort(c(x, y)), collapse = "_"))) |> 
-  dplyr::distinct(pair_id, .keep_all = TRUE)
+  dplyr::filter(spectra1 < spectra2)
 
 ```
 
@@ -304,7 +303,6 @@ Before doing any filtering, let's look at the max correlation of each spectra bo
 ```{r}
 # compute cross-sample correlation max for each spectra
 max_correlation <- all_cor_df |>
-  dplyr::filter(spectra1 != spectra2) |> 
   # find the max correlation for each spectra
   dplyr::summarise(max_cor = max(correlation, na.rm = TRUE), .by = c("pair_type", "spectra1"))
 
@@ -338,7 +336,7 @@ group_df <- tibble::tibble(
   group = components$membership
 )
 
-# compute cross-sample correlation max for each spectra
+# get cross-sample correlation max for each spectra
 cross_sample_max <- max_correlation |> 
   dplyr::filter(pair_type == "between_sample") |> 
   dplyr::select(!pair_type)
@@ -346,9 +344,7 @@ cross_sample_max <- max_correlation |>
 # get the top spectra for each group 
 top_spectra <- group_df |>
   dplyr::left_join(cross_sample_max, by = "spectra1") |>
-  dplyr::group_by(group) |>
-  dplyr::slice_max(order_by = max_cor, n = 1, with_ties = FALSE) |>
-  dplyr::ungroup() |> 
+  dplyr::slice_max(order_by = max_cor, n = 1, with_ties = FALSE, by = group) |>
   dplyr::pull(spectra1)
 
 # throw out extra spectra
@@ -403,7 +399,7 @@ ggplot(filtered_cor_df, aes(x = correlation, fill = pair_type)) +
   facet_grid(rows = vars(pair_type), scales = "free")
 ```
 
-We still don't see that bump where there is high correlation between samples, but we do see less spectra with high correlation within samples, which is good! 
+We still don't see that bump where there is high correlation between samples, but we do see fewer spectra with high correlation within samples, which is good! 
 
 Now what about removing any "orphan" spectra or those that have low correlation with all spectra from other samples? 
 First, let's get an idea of what the between sample correlations look like for all spectra. 
@@ -461,7 +457,7 @@ To start, let's look at the correlation distributions for each value.
 k_values <- sprintf("k%02d", seq(5,25,5))
 
 k_values |> 
-  purrr::map(\(k){
+  purrr::walk(\(k){
     
     filtered_cor_df <- cor_df |> 
       dplyr::filter(k_value_1 == k & k_value_2 == k)
@@ -537,7 +533,7 @@ Finally, we'll filter out these few spectra for each k and make a heatmap.
 
 ```{r}
 k_values |> 
-  purrr::map(\(k) {
+  purrr::walk(\(k) {
     
     # get the spectra for this value of k
     k_spectra <- colnames(spectra_mtx)[stringr::str_detect(colnames(spectra_mtx), k)]
