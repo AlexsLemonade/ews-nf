@@ -8,7 +8,7 @@ output:
     toc_float:
       collapsed: false
     number_sections: false
-    code_download: true
+    code_folding: hide
 ---
 
 In this notebook, we'll look at the output of running [`cNMF`](https://github.com/dylkot/cNMF) on a subset of the samples from the SKC. 
@@ -22,11 +22,6 @@ In particular, does the value of k impact the amount of redundant and/or orphan 
 ## Set Up
 
 ```{r setup, message = FALSE, echo = FALSE}
-# knitr options
-knitr::opts_chunk$set(
-  echo = FALSE
-)
-
 library(ggplot2)
 
 # Set default ggplot theme
@@ -236,7 +231,10 @@ all_cor_df <- as.data.frame(as.table(cor_matrix)) |>
     k_value_2 = stringr::word(spectra2, 2, sep = "_"),
     pair_type = dplyr::if_else(sample1 == sample2, "within_sample", "between_sample"),
     # if the comparison is within a sample, is it from a different k? e.g., are we getting a lot of redundant programs? 
-    k_value_type = dplyr::if_else(sample1 == sample2 & k_value_1 == k_value_2, "matching_k", "different_k")
+    k_value_type = dplyr::if_else(k_value_1 == k_value_2, "matching_k", "different_k"),
+    # these should be characters and not factors 
+    spectra1 = as.character(spectra1),
+    spectra2 = as.character(spectra2)
   )
 
 # create a separate df for just the distinct pairs
@@ -265,7 +263,7 @@ within_sample_df <- cor_df |>
 
 # look at different k vs matching k
 ggplot(within_sample_df, aes(x = correlation)) +
-  facet_grid(rows = vars(k_value_type)) +
+  facet_grid(rows = vars(k_value_type), scales = "free_y") +
   geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
   theme_minimal() +
   labs(x = "Correlation", y = "Count")
@@ -328,6 +326,7 @@ high_cor_edges <- all_cor_df |>
   dplyr::filter(correlation > 0.9, spectra1 != spectra2, pair_type == "within_sample") |> 
   dplyr::select(spectra1, spectra2, sample1, correlation)
 
+
 # assign groups to spectra that are all correlated to each other
 high_cor_graph <- igraph::graph_from_data_frame(high_cor_edges, directed = FALSE)
 components <- igraph::components(high_cor_graph)
@@ -344,7 +343,7 @@ cross_sample_max <- max_correlation |>
 # get the top spectra for each group 
 top_spectra <- group_df |>
   dplyr::left_join(cross_sample_max, by = "spectra1") |>
-  dplyr::slice_max(order_by = max_cor, n = 1, with_ties = FALSE, by = group) |>
+  dplyr::slice_max(order_by = max_cor, n = 1, with_ties = TRUE, by = group) |>
   dplyr::pull(spectra1)
 
 # throw out extra spectra
@@ -401,6 +400,33 @@ ggplot(filtered_cor_df, aes(x = correlation, fill = pair_type)) +
 
 We still don't see that bump where there is high correlation between samples, but we do see fewer spectra with high correlation within samples, which is good! 
 
+What values of k are represented after we filter redundant spectra?
+First we'll look at all spectra after filtering. 
+
+```{r}
+filtered_cor_df |> 
+  dplyr::select(spectra1, k_value_1) |> 
+  dplyr::distinct() |> 
+  dplyr::count(k_value_1, name = "num_spectra") |> 
+  dplyr::mutate(k = as.numeric(stringr::str_remove(k_value_1, "k")), 
+                percentage = round(num_spectra/(k*13)*100, 2)) |> 
+  dplyr::select(-k)
+```
+
+Now just look at the spectra that were chosen as the "top" spectra in their group. 
+
+```{r}
+# same table but just look at the spectra that get kept using the max correlation
+filtered_cor_df |> 
+  dplyr::filter(spectra1 %in% top_spectra) |> 
+  dplyr::select(spectra1, k_value_1) |> 
+  dplyr::distinct() |> 
+  dplyr::count(k_value_1, name = "num_spectra") |> 
+  dplyr::mutate(k = as.numeric(stringr::str_remove(k_value_1, "k")), 
+                percentage = round(num_spectra/(k*13)*100, 2)) |> 
+  dplyr::select(-k)
+```
+
 Now what about removing any "orphan" spectra or those that have low correlation with all spectra from other samples? 
 First, let's get an idea of what the between sample correlations look like for all spectra. 
 We specifically want to know what the highest cross sample correlation is, which we already computed when removing redundant samples. 
@@ -420,6 +446,21 @@ orphan_spectra <- cross_sample_max |>
 
 length(orphan_spectra)
 ```
+
+Let's see how many of the orphan spectra come from higher values of k. 
+
+```{r}
+all_cor_df |> 
+  dplyr::filter(spectra1 %in% orphan_spectra) |> 
+  dplyr::select(spectra1, k_value_1) |> 
+  dplyr::distinct() |> 
+  dplyr::count(k_value_1, name = "num_spectra") |> 
+  dplyr::mutate(k = as.numeric(stringr::str_remove(k_value_1, "k")), 
+                percentage = round(num_spectra/(k*13)*100, 2)) |> 
+  dplyr::select(-k)
+```
+
+It looks like a higher percentage of k=15, k=20, and k=25 are classified as "orphan". 
 
 The heatmap below looks at correlation after dropping within-sample redundant spectra and spectra with < 0.3 max between sample correlation. 
 
@@ -457,7 +498,7 @@ To start, let's look at the correlation distributions for each value.
 k_values <- sprintf("k%02d", seq(5,25,5))
 
 k_values |> 
-  purrr::walk(\(k){
+  purrr::map(\(k){
     
     filtered_cor_df <- cor_df |> 
       dplyr::filter(k_value_1 == k & k_value_2 == k)
@@ -528,35 +569,6 @@ all_discard_spectra |>
 
 Unlike the range of k-values, we see very few redundant programs but a similar percentage of orphan programs. 
 That could be in part because we are picking a cutoff that was around the Q1 value when looking at all spectra. 
-
-Finally, we'll filter out these few spectra for each k and make a heatmap. 
-
-```{r}
-k_values |> 
-  purrr::walk(\(k) {
-    
-    # get the spectra for this value of k
-    k_spectra <- colnames(spectra_mtx)[stringr::str_detect(colnames(spectra_mtx), k)]
-    
-    # get all spectra to filter
-    redundant_spectra <- all_discard_spectra[[k]]$redundant
-    orphan_spectra <- all_discard_spectra[[k]]$orphan
-    
-    # filter spectra to just this k and remove bad spectra
-    keep_spectra <- k_spectra[which(!k_spectra %in% c(redundant_spectra, orphan_spectra))]
-    
-    filtered_cor_matrix <- cor_matrix[keep_spectra, keep_spectra]
-    
-    annotation <- ComplexHeatmap::HeatmapAnnotation(
-      sample = stringr::word(colnames(filtered_cor_matrix), 1, sep = "_")
-    )
-    
-    ComplexHeatmap::Heatmap(filtered_cor_matrix, show_row_names = FALSE, show_column_names = FALSE, top_annotation = annotation, name = "correlation", column_title = k)
-  })
-```
-
-From this it looks like lower values of K have the highest between sample correlations and lowest within sample correlations.
-I feel like for this particular group we see a plateau at k=15, where the distributions don't change much and we start to see correlation of spectra outside of the main diagonal. 
 
 ## Narrow range of k-values 
 
