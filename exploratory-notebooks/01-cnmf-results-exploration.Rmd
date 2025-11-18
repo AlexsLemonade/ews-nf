@@ -348,15 +348,13 @@ top_spectra <- group_df |>
 
 # throw out extra spectra
 # these are included in the high correlation groups and not part of the top spectra
-discard_spectra <- high_cor_edges |> 
-  dplyr::select(spectra1, spectra2) |> 
-  tidyr::pivot_longer(everything()) |> 
-  dplyr::filter(!value %in% top_spectra) |> 
-  dplyr::pull(value) |> 
-  unique()
+discard_spectra <- setdiff(
+  c(high_cor_edges$spectra1, high_cor_edges$spectra2),
+  top_spectra
+) 
 
 # filter correlation matrix 
-keep_spectra <- colnames(spectra_mtx)[which(!colnames(spectra_mtx) %in% discard_spectra)]
+keep_spectra <- setdiff(colnames(spectra_mtx), discard_spectra)
 filtered_spectra_mtx <- spectra_mtx[, keep_spectra, drop = FALSE]
 
 # how many are left? 
