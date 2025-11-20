@@ -1,0 +1,161 @@
+---
+title: "Metaprogram evaluation"
+author: "Ally Hawkins"
+date: "`r Sys.Date()`"
+output: html_document
+code_folding: hide
+---
+
+## Set Up
+
+```{r setup, message = FALSE, echo = FALSE}
+library(ggplot2)
+
+# Set default ggplot theme
+theme_set(
+  theme_bw() +
+    theme(
+      strip.background = element_rect(fill = "transparent", linewidth = 0.5)
+    )
+)
+
+# some helpful settings
+options(
+  dplyr.summarise.inform = FALSE, 
+  readr.show_col_types = FALSE
+)
+
+set.seed(2025)
+```
+
+```{r}
+# source in some helper functions we'll use to prep data 
+# build_spectra_mtx() build_spectra_cor_df() filter_spectra()
+source("./utils/spectra-helper-functions.R")
+```
+
+```{r}
+# paths to custom geneset files we're going to use for ORA
+geneset_file <- file.path("..", "genesets", "custom-gene-sets.tsv")
+msigdb_geneset_file <- file.path("..", "genesets", "msigdb-gene-sets.tsv")
+category_file <- file.path("..", "genesets", "gene-set-categories.tsv")
+```
+
+
+```{r}
+results_dir <- fs::path("..", "ews-nf-out", "cnmf")
+
+# get all the spectra files
+spectra_files <- fs::dir_ls(
+  path = results_dir, 
+  glob = "*.gene_spectra_score.k_*.dt_*.txt", 
+  recurse = TRUE
+  )
+
+# extract the unique ID for labeling
+unique_ids <- stringr::str_extract(spectra_files, pattern = "SCPCL[0-9]+-SCPCS[0-9]+")
+names(spectra_files) <- unique_ids
+```
+
+```{r}
+# read in and build spectra mtx
+spectra_mtx <- build_spectra_mtx(spectra_files)
+
+# get correlations
+cor_mtx <- cor(spectra_mtx, method = "pearson", use = "pairwise.complete.obs")
+
+# create correlation dataframe with info about each spectra
+all_cor_df <- build_spectra_cor_df(cor_mtx)
+```
+
+```{r}
+dist_mtx <- as.dist(1-cor_mtx)
+tree <- hclust(dist_mtx, method = "ward.D2")
+clusters <- cutree(tree, k = 12)
+mp_cluster_list <- split(colnames(spectra_mtx), clusters)
+names(mp_cluster_list) <- glue::glue("MP{names(mp_cluster_list)}")
+
+# generate mps 
+mp_list <- mp_cluster_list |> 
+  purrr::map(\(spectra_list){
+    
+    mps <- rowMeans(spectra_mtx[, spectra_list, drop = FALSE], na.rm = TRUE) |>
+      sort(decreasing = TRUE)
+    
+  })
+```
+
+
+## Correlation between MPs
+
+```{r}
+# combine all mps into a matrix for a heatmap
+# get correlation to each other
+mp_mtx <- do.call(cbind, mp_list)
+mp_cor_matrix <- cor(mp_mtx, method = "pearson", use = "pairwise.complete.obs")
+
+ComplexHeatmap::Heatmap(
+  mp_cor_matrix
+)
+```
+
+## Sample diversity 
+
+```{r}
+mp_df <- mp_cluster_list |> 
+  purrr::imap_dfr(\(spectra_list, mp_name) {
+    tibble::tibble(
+      metaprogram = mp_name,
+      spectra = spectra_list
+    )
+  }) |> 
+  dplyr::mutate(
+    sample_id = stringr::word(spectra, 1, sep = "_") |> 
+      stringr::word(-1, sep = "-")
+  )
+
+
+mp_prop_df <- mp_df |> 
+  dplyr::group_by(metaprogram, sample_id) |>
+  # generate one row per mp/sample combination with the total count
+  dplyr::summarise(n = dplyr::n(), 
+                   .groups = "drop_last") |> 
+  # get the frequency of each sample compared to all other samples
+  dplyr::mutate(p = n / sum(n),
+                num_samples = dplyr::n_distinct(sample_id)
+  )
+
+mp_prop_df |> 
+  # now the shannon index for each metaprogram 
+  dplyr::summarise(
+    shannon = -sum(p * log(p)), # entropy
+    num_samples = unique(num_samples), # get unique value for printing
+    shannon_norm = shannon / log(num_samples)
+    ) |> 
+  dplyr::arrange(desc(shannon_norm)) |> 
+  DT::datatable()
+```
+
+```{r}
+mp_prop_df <- mp_prop_df |> 
+  # ungroup before setting levels otherwise the plot doesn't work
+  dplyr::ungroup() |> 
+  dplyr::mutate(metaprogram = forcats::fct_reorder(metaprogram, num_samples))
+
+ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
+  geom_col() +
+  labs(
+    y = "Metaprogram",
+    x = "Proportion of spectra",
+    fill = "Sample"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  scale_fill_manual(values = palette.colors("alphabet", n=13))
+```
+
+
+
+## Biological interpretability 
