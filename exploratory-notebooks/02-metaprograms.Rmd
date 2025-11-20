@@ -370,7 +370,7 @@ genes_df <- purrr::map_dfr(names(mp_results_list), \(strategy) {
 
 ```{r}
 split(genes_df, genes_df$strategy) |> 
-  purrr::walk(knitr::kable)
+  purrr::map(DT::datatable)
 ```
 
 I'm not sure that this is super helpful at this point, but I do see some EWS high and low targets coming up. 
@@ -511,7 +511,7 @@ The lower values of k really highlight the EF high and repressed states, which I
 Let's also look at how unique each of the genesets are. 
 The plot below counts how many times each geneset has a positive NES in MPs. 
 
-```{r, fig.height=15, fig.width=15}
+```{r, fig.height=20, fig.width=15}
 geneset_count_df <- gsea_df |> 
   dplyr::filter(NES > 0) |> 
   dplyr::group_by(strategy) |> 
