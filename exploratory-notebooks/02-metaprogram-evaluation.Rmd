@@ -2,14 +2,39 @@
 title: "Metaprogram evaluation"
 author: "Ally Hawkins"
 date: "`r Sys.Date()`"
-output: html_document
-code_folding: hide
+output: 
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    number_sections: false
 ---
+
+In this notebook, we'll generate metaprograms (MPs) for a subset samples from the SKC. 
+This includes `SCPCS000841` through `SCPCS000855`. 
+Note that there were not enough cells in `SCPCS000848` and `SCPCS000854`, so these samples are not included. 
+
+`cNMF` was run with k components set to 5, 10, 15, 20, and 25 and all spectra are used to generate MPs.
+The goal of this notebook is to identify a set of metrics that we can use to evaluate MPs. 
+
+For this particular notebook, MPs are assigned by calculating the correlation of each cNMF spectra to all other spectra and then clustering using k=12.
+(In the future, we could easily modify this to have a parameter for k and look across reports.)
+
+Metaprograms should be: 
+
+* Non-redundant
+* Composed of a mix of samples
+* Biologically interpretable 
+
+Additionally, we expect expression of these MPs to be variable within the cells of each sample, and therefore useful in identifying cell states in the original samples. 
+
+The metrics shown here will help evaluate if the identified MPs show these characteristics.
 
 ## Set Up
 
 ```{r setup, message = FALSE, echo = FALSE}
 library(ggplot2)
+library(SingleCellExperiment)
 
 # Set default ggplot theme
 theme_set(
@@ -30,7 +55,7 @@ set.seed(2025)
 
 ```{r}
 # source in some helper functions we'll use to prep data 
-# build_spectra_mtx() build_spectra_cor_df() filter_spectra()
+# build_spectra_mtx() build_spectra_cor_df()
 source("./utils/spectra-helper-functions.R")
 ```
 
@@ -43,7 +68,12 @@ category_file <- file.path("..", "genesets", "gene-set-categories.tsv")
 
 
 ```{r}
+# cnmf results directory
 results_dir <- fs::path("..", "ews-nf-out", "cnmf")
+
+# directories with processed rds files and annotations output from ews-nf
+data_dir <- file.path("..", "scpca-nf-out", "SCPCP000026")
+annotations_dir <- file.path("..", "ews-nf-out", "annotations")
 
 # get all the spectra files
 spectra_files <- fs::dir_ls(
@@ -68,10 +98,16 @@ cor_mtx <- cor(spectra_mtx, method = "pearson", use = "pairwise.complete.obs")
 all_cor_df <- build_spectra_cor_df(cor_mtx)
 ```
 
+## Generate metaprograms 
+
+To generate metaprograms, we'll first cluster the spectra based on their correlation to each other. 
+We will then get the mean weight for each gene across all spectra in the cluster, omitting `NA`s.
+The gene list will then be sorted by weight with the most important genes listed at the top of the list. 
+
 ```{r}
 dist_mtx <- as.dist(1-cor_mtx)
 tree <- hclust(dist_mtx, method = "ward.D2")
-clusters <- cutree(tree, k = 12)
+clusters <- cutree(tree, k = 12) # TODO: replace with params value
 mp_cluster_list <- split(colnames(spectra_mtx), clusters)
 names(mp_cluster_list) <- glue::glue("MP{names(mp_cluster_list)}")
 
@@ -86,7 +122,10 @@ mp_list <- mp_cluster_list |>
 ```
 
 
-## Correlation between MPs
+## Redundancy of metaprograms
+
+Here we look at the correlation of all MPs to all other MPs. 
+Ideally, MPs are unique and non-redundant and therefore have low correlation to all other MPs. 
 
 ```{r}
 # combine all mps into a matrix for a heatmap
@@ -99,7 +138,14 @@ ComplexHeatmap::Heatmap(
 )
 ```
 
+We see that generally each MP is distinct from other MPs, although there are some groups of MPs that are probably closer than others - MP9 and MP2, MP6 and MP1, and MP8, MP5 and MP4. 
+
 ## Sample diversity 
+
+MPs should represent a mix of samples.
+This metric can be useful in filtering out any MPs that are sample-specific. 
+
+We will use Shannon's entropy to measure the diversity of each MP where 1 indicates high diversity. 
 
 ```{r}
 mp_df <- mp_cluster_list |> 
@@ -138,6 +184,8 @@ sample_diversity_df |>
   DT::datatable()
 ```
 
+The below chart shows the proportion of each spectra that corresponds to each sample. 
+
 ```{r}
 mp_prop_df <- mp_prop_df |> 
   # ungroup before setting levels otherwise the plot doesn't work
@@ -158,12 +206,41 @@ ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
   scale_fill_manual(values = palette.colors("alphabet", n=13))
 ```
 
+We see the entropy values are all very close to 1 and that the MPs appear to be a good mix of samples. 
+Some MPs are only comprised of a handful of samples, which could indicate rarer populations.
+The key here is that we don't see any single-sample MPs. 
+
 ## Biological interpretability 
+
+Ultimately, we want to be able to easily interpret the MPs. 
+We won't actually annotate them here, but we will look to see how biologically distinct the MPs might be. 
+
+To do that, we'll take the first 200 genes for all MPs and do ORA using the custom genesets we use for classifying EWS::FLI1 high and low cells and the Hallmarks collection from `MSigDb`. 
 
 ```{r}
 # read in custom gene lists and EF msigdb gene sets to look at 
 geneset_df <- readr::read_tsv(geneset_file)
 ef_msigdb_df <- readr::read_tsv(msigdb_geneset_file)
+
+# get the EF activated and EF repressed gene sets for classifying later
+ef_category_df <- readr::read_tsv(category_file) |> 
+  # custom gene sets
+  dplyr::left_join(geneset_df, by = c("geneset_name" = "geneset")) |> 
+  # msig genesets
+  dplyr::left_join(ef_msigdb_df, by = c("geneset_name" = "name")) |> 
+  # make sure we have all name info in the same column
+  dplyr::mutate(geneset = dplyr::if_else(is.na(geneset), geneset_name, geneset)) |> 
+  # grab the category
+  dplyr::select(geneset, geneset_category) |> 
+  dplyr::distinct()
+
+ef_activated_genesets <- ef_category_df |> 
+  dplyr::filter(geneset_category == "EF-activated") |> 
+  dplyr::pull(geneset)
+
+ef_repressed_genesets <- ef_category_df |> 
+  dplyr::filter(geneset_category == "EF-repressed") |> 
+  dplyr::pull(geneset)
 
 # use hallmarks in addition to EF lists 
 hallmarks_msigdb_df <- msigdbr::msigdbr(species = "Homo sapiens", collection = "H") |> 
@@ -172,7 +249,7 @@ hallmarks_msigdb_df <- msigdbr::msigdbr(species = "Homo sapiens", collection = "
 
 ```{r}
 # get list of categories that we need to grab from msigdb
-category_list <- ef_msigdb_df |>
+msigdb_category_list <- ef_msigdb_df |>
   dplyr::select(category, subcategory) |>
   unique() |>
   purrr::transpose()
@@ -183,7 +260,7 @@ geneset_list <- ef_msigdb_df$geneset |>
   purrr::set_names(ef_msigdb_df$name)
 
 # first pull out info for each category and then pull out specific genes for geneset
-ef_geneset_df <- category_list |>
+ef_geneset_df <- msigdb_category_list |>
   purrr::map(\(category_list){
     # replace subcategory with default NULL
     # can't use NULL in tsv since it gets read in as a character
@@ -218,6 +295,7 @@ universe <- rownames(spectra_mtx)
 ```
 
 ```{r}
+# run ORA using the top 200 genes
 ora_results <- mp_list |> 
   purrr::map(\(scores){
     genes <- names(scores)[1:200]
@@ -229,18 +307,45 @@ ora_results <- mp_list |>
     )
   })
 
+# combine ora results into a single dataframe
+# only include genesets with pvalue < 0.05, the default by enricher 
 ora_results_df <- ora_results |> 
   purrr::imap_dfr(\(result, mp_name) {
     result@result |> 
       dplyr::mutate(metaprogram = mp_name) |> 
-      dplyr::filter(p.adjust <= 0.1) 
+      dplyr::filter(pvalue <= 0.05) 
   })
 ```
 
-```{r}
+```{r, results='asis'}
+# print out a message about which MPs have 0 genesets 
+all_mps <- names(mp_list)
+missing_mps <- all_mps[!all_mps %in% unique(ora_results_df$metaprogram)] |> 
+  paste0(collapse = ", ")
+
+if(missing_mps != "") {
+  glue::glue("
+      <div class=\"alert alert-info\">
+
+      No gene sets were identified as significant in the following metaprograms: 
+      {missing_mps}
+      </div>
+    ")
+  }
+```
+
+
+To evaluate if the MPs are easily interpretable, we will make a heatmap that shows the significance of each gene set across all MPs. 
+Ideal MPs will show gene sets that are uniquely enriched in that MP instead of enriched across multiple MPs. 
+The rows represent all significant gene sets, the columns indicate the MP, and the heatmap color indicates the -log10(pvalue) for that gene set in that MP.
+
+Only MPs with identified gene sets will be included. 
+
+```{r, fig.height=10, fig.width=10}
+# convert ora results into a heatmap of pvalues
 heatmap_mtx <- ora_results_df |> 
-  dplyr::mutate(logp = -log10(p.adjust)) |>        # convert to -log10
-  dplyr::select(metaprogram, ID, logp) |>  # keep only needed columns
+  dplyr::mutate(logp = -log10(p.adjust)) |> 
+  dplyr::select(metaprogram, ID, logp) |> 
   tidyr::pivot_wider(
     names_from = metaprogram,
     values_from = logp,
@@ -253,9 +358,16 @@ ComplexHeatmap::Heatmap(
   heatmap_mtx,
   name = "-log10(pvalue)",
   row_names_side = "left",
-  row_dend_side = "right"
-)
+  row_dend_side = "right",
+  col = circlize::colorRamp2(c(0, max(heatmap_mtx)), colors = c("white", "darkslateblue")),
+  row_names_gp = grid::gpar(fontsize = 10)
+) |> 
+  # don't cut off super long gene set names
+  ComplexHeatmap::draw(padding = unit(c(2, 6, 2, 2), "cm"))
 ```
+
+We can also look at each of the genesets and calculate Shannon's entropy to indicate how diverse that gene set is, e.g., how many MPs is the gene set significant in.
+Ideally, gene sets are unique to a MP and have values close to 0.
 
 ```{r}
 ora_results_df |> 
@@ -271,51 +383,227 @@ ora_results_df |>
   DT::datatable()
 ```
 
+Alternatively, we can use the Jaccard similarity to index to measure how similar the list of gene sets for each MP is to all other MPs. 
 
 ```{r}
-mp_specificity_df <- ora_results_df |> 
-  dplyr::group_by(metaprogram) |>
-  # now the shannon index for each metaprogram 
-  dplyr::summarise(
-    shannon = -sum(pvalue * log(pvalue)), # entropy
-    num_genesets = length(unique(ID)), # get unique value for printing
-    shannon_norm = shannon / log(num_genesets)
-    ) 
+# helper function for getting jaccard between two vectors
+calc_jaccard <- function(vec1, vec2) {
+  length(intersect(vec1, vec2)) / length(union(vec1, vec2))
+}
 
-mp_specificity_df |> 
-  DT::datatable()
-```
 
-```{r}
-mp_cor_df <- as.data.frame(as.table(mp_cor_matrix)) |>
-  dplyr::rename(mp1 = Var1, mp2 = Var2, correlation = Freq) |> 
-  dplyr::filter(mp1 != mp2) |> 
-  dplyr::summarise(
-    max_mp_cor = max(correlation, na.rm = TRUE),
-    .by = mp1
-  ) |> 
-  dplyr::rename(metaprogram = mp1)
+# only one list here since we will compare each MP to all other MPs
+id1_list <- split(ora_results_df$ID, ora_results_df$metaprogram)
+# create the grid of comparisons
+cross_df <- tidyr::expand_grid(id1 = names(id1_list), id2 = names(id1_list))
 
-diversity_df <- sample_diversity_df |> 
-  dplyr::select(metaprogram, diversity = shannon_norm)
+# calculate a single Jaccard index for each combination using split lists & ids
+jaccard_scores <- cross_df |>
+  purrr::pmap_dbl(\(id1, id2){
+    calc_jaccard(id1_list[[id1]], id1_list[[id2]])
+  })
 
-specificity_df <- mp_specificity_df |> 
-  dplyr::select(metaprogram, specificity = shannon_norm) |> 
-  dplyr::mutate(specificity = dplyr::if_else(is.infinite(specificity), 0, specificity))
-
-all_stats_mtx <- mp_cor_df |>
-  dplyr::left_join(specificity_df, by = "metaprogram") |>
-  dplyr::left_join(diversity_df, by = "metaprogram") |> 
-  tibble::column_to_rownames("metaprogram") |> 
+# add scores to the comparison grid and convert to matrix
+jaccard_matrix <- cross_df |>
+  dplyr::mutate(jaccard = jaccard_scores) |>
+  # convert to matrix
+  tidyr::pivot_wider(
+    names_from = "id2",
+    values_from = "jaccard"
+  ) |>
+  tibble::column_to_rownames(var = "id1") |>
   as.matrix()
 
-
-all_stats_mtx[is.na(all_stats_mtx)] <- 0
-
-ComplexHeatmap::Heatmap(all_stats_mtx)
+ComplexHeatmap::Heatmap(jaccard_matrix,
+                        name = "Jaccard index",
+                        col = circlize::colorRamp2(c(0, max(jaccard_matrix)), colors = c("white", "darkslateblue")))
 ```
 
-## Now let's get a score 
+Here we can see groups of MPs that have similar gene set lists, such as MP4 and MP9.
+
+We know that these tumor cells should show have a group of cells with a EWS::FLI1 repressed cell signature, or "low", as we have been calling them. 
+To see if any of these MPs show that signature, we'll get a score for whether or not that MP shows a high or low signature.
+This is calculated by getting the sum of all significant gene sets in either the EF-activated or EF-repressed gene sets and then dividing by the total number of gene sets in that group. 
 
 
+```{r}
+ora_results_df |> 
+  dplyr::mutate(ef_high = ID %in% ef_activated_genesets,
+                ef_low = ID %in% ef_repressed_genesets) |> 
+  dplyr::summarize(
+    ef_high_score = round(sum(ef_high)/length(ef_activated_genesets), 2),
+    ef_low_score = round(sum(ef_low)/length(ef_repressed_genesets),2),
+    .by = "metaprogram"
+  )
+```
+
+It looks like MP6 and MP7 both show some enrichment of EF-low targets and MP1 has some high targets. 
+MP2 shows both high and low gene sets, which might be sketchy and something to look into.
+
+## Using metaprograms to identify cell states 
+
+Ultimately we want to be able to use these MPs to identify cell states in our original data. 
+In order to do that, we need to assign a score to each cell for each MP and then use that to pull out cells with high scores for that MP. 
+Good MPs should show variation in scores across samples. 
+
+For right now, we'll assign a score for each cell by getting the dot product between the weights for each gene in the MP and the normalized gene expression values.
+
+```{r}
+# first we need to grab the sce files
+# get the unique ids for only those that are present in the cNMF spectra
+# this makes sure we don't try to read in any empty processed files for samples with too few cells
+unique_ids <- all_cor_df |> 
+  dplyr::pull(sample1) |> 
+  unique()
+
+sample_ids <- stringr::word(unique_ids, 2, sep = "-")
+sce_files <- file.path(
+  data_dir, 
+  sample_ids,
+  glue::glue("{unique_ids}_processed.rds"))
+
+sce_list <- sce_files |> 
+  purrr::map(readr::read_rds) |> 
+  purrr::set_names(sample_ids)
+```
+
+
+```{r}
+# don't forget that we only want to look at tumor cells so we need the annotations
+annotation_files <- file.path(
+  annotations_dir,
+  sample_ids,
+  glue::glue("{unique_ids}_annotations.tsv")
+) |> 
+  purrr::set_names(sample_ids)
+
+annotations_df <- annotation_files |> 
+  purrr::map(readr::read_tsv) |> 
+  dplyr::bind_rows(.id = "sample_id") |> 
+  dplyr::select(barcodes, sample_id, annotation_tier0) |> 
+  dplyr::filter(stringr::str_detect(annotation_tier0, "tumor"))
+```
+
+
+
+```{r}
+# get a dataframe with scores for each cell for each MP
+score_df <- sce_list |> 
+  purrr::imap_dfr(\(sce, id) {
+    
+    # we only care about tumor cells here
+    tumor_cells <- annotations_df |> 
+      dplyr::filter(sample_id == id) |> 
+      dplyr::pull(barcodes)
+    
+    # get the genes that are detected and part of spectra
+    detected_genes <- rownames(sce)[rowData(sce)$detected > 0]
+    shared_genes <- intersect(detected_genes, universe)
+    
+    # extract counts for genes and cells of interest
+    expr <- logcounts(sce)[shared_genes,tumor_cells] 
+    
+    # get a score for each MP 
+    purrr::imap_dfr(
+      mp_list,
+      \(mp_vec, mp_name) {
+        
+        # mp specific genes 
+        mp_genes <- intersect(names(mp_vec), detected_genes)
+        
+        # pull weights in correct cell order
+        w <- mp_vec[mp_genes]
+        
+        # expression subset: genes × cells
+        sub_expr <- expr[mp_genes, , drop = FALSE]
+        
+        # compute dot product for each cell (matrix multiply)
+        scores <- as.numeric(w %*% sub_expr)
+        
+        tibble::tibble(
+          sample_id = id,
+          barcodes = colnames(expr),
+          metaprogram = mp_name,
+          dot_score = scores
+        )
+      }
+    )
+  })
+```
+
+First we look at the score distribution for all samples for each metaprogram. 
+Good MPs will show variability within the dataset, in particular we are looking for a bimodal distribution.
+
+```{r}
+ggplot(score_df, 
+       aes(x = dot_score, y = metaprogram)) +
+  ggridges::geom_density_ridges(alpha = 0.8, color = "white") +
+  #facet_wrap(vars(sample_id), scales = "free_x", ncol = 4) +
+  theme(
+    strip.background = element_rect(fill = "grey90"),
+    axis.text.y = element_text(size = 8),
+    legend.position = "none"
+  ) +
+  labs(
+    x = "Score across all samples",
+    y = "Sample"
+  )
+```
+
+Now, look at the distribution of each sample individually. 
+Good MPs should show variability in multiple samples. 
+
+```{r, fig.height=10, message=FALSE, warning=FALSE}
+ggplot(score_df, 
+       aes(x = dot_score, y = sample_id, fill = sample_id)) +
+  ggridges::geom_density_ridges(alpha = 0.8, color = "white", bw = 0.5) +
+  facet_wrap(vars(metaprogram), scales = "free_x", ncol = 4) +
+  theme(
+    strip.background = element_rect(fill = "grey90"),
+    axis.text.y = element_text(size = 8),
+    legend.position = "none"
+  ) +
+  scale_fill_manual(values = palette.colors("alphabet", n=13)) +
+  labs(
+    x = "Score",
+    y = "Sample",
+    title = "MP scores by sample"
+  )
+```
+
+It looks like we do see some good MPs with a lot of variability across a large number of samples (MP1), some programs that are heterogenous across samples like MP8 and MP6, and programs that don't have a lot of variation, MP12. 
+It's likely that MP12 is not super informative here. 
+
+Finally, we'll measure the variance of each MP in each sample and plot that in a sina plot. 
+Good MPs will have high variance. 
+
+```{r}
+# calculate the variance for each MP in each sample
+mp_var_df <- score_df |>
+  dplyr::group_by(sample_id, metaprogram) |>
+  dplyr::summarise(
+    variance = stats::var(dot_score, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(
+  mp_var_df,
+  aes(
+    x = metaprogram,
+    y = variance
+  )
+) +
+  ggforce::geom_sina(size = 2, alpha = 0.8) +
+  labs(
+    x = "Metaprogram",
+    y = "Variance of MP across all cells in a sample"
+  )
+
+```
+
+## Session info
+
+```{r}
+sessionInfo()
+```
 
