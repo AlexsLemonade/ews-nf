@@ -438,7 +438,9 @@ ora_results_df |>
 ```
 
 It looks like MP6 and MP7 both show some enrichment of EF-low targets and MP1 has some high targets. 
-MP2 shows both high and low gene sets, which might be sketchy and something to look into.
+MP2 shows both high and low gene sets, which is sketchy. 
+Looking at the gene sets and pvalues for the gene sets in MP2, these are likely the cycling cells as they have low pvalues for E2F and G2M gene lists. 
+The lowest ranked gene list is the EWS::FLI1 down gene set for that group.
 
 ## Using metaprograms to identify cell states 
 
