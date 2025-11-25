@@ -109,7 +109,7 @@ dist_mtx <- as.dist(1-cor_mtx)
 tree <- hclust(dist_mtx, method = "ward.D2")
 clusters <- cutree(tree, k = 12) # TODO: replace with params value
 mp_cluster_list <- split(colnames(spectra_mtx), clusters)
-names(mp_cluster_list) <- glue::glue("MP{names(mp_cluster_list)}")
+names(mp_cluster_list) <- sprintf("MP%02d",seq(1, length(mp_cluster_list)))
 
 # generate mps 
 mp_list <- mp_cluster_list |> 
@@ -139,6 +139,42 @@ ComplexHeatmap::Heatmap(
 ```
 
 We see that generally each MP is distinct from other MPs, although there are some groups of MPs that are probably closer than others - MP9 and MP2, MP6 and MP1, and MP8, MP5 and MP4. 
+
+Next we will look at the correlation of each spectra to all other spectra within the same MP and across MPs. 
+Ideally, the spectra within a single MP should have high correlation to each other and low correlation to spectra from other MPs.
+
+```{r}
+# get a table assigning MPs to each spectra
+mp_lookup <- tibble::tibble(
+  spectra = names(clusters),
+  metaprogram = sprintf("MP%02d",clusters)
+)
+
+# for each correlation, add in the MPs being compared and classify MP
+mp_cor_df <- all_cor_df |> 
+  dplyr::filter(spectra1 != spectra2) |> 
+  dplyr::left_join(mp_lookup, by = c("spectra1" = "spectra")) |> 
+  dplyr::rename(mp1 = metaprogram) |> 
+  dplyr::left_join(mp_lookup, by = c("spectra2" = "spectra")) |> 
+  dplyr::rename(mp2 = metaprogram) |>
+  dplyr::mutate(within_mp = mp1 == mp2) |> 
+  dplyr::mutate(MP_type = dplyr::if_else(within_mp, "Within MP", "Between MPs")) |> 
+  dplyr::select(spectra1, spectra2, mp1, correlation, MP_type) |> 
+  dplyr::distinct()
+```
+
+```{r}
+ggplot(mp_cor_df, aes(x = correlation, color = MP_type, fill = MP_type)) +
+  geom_density(alpha = 0.25) +
+  facet_wrap(vars(mp1), scales = "free_y") +
+  scale_color_manual(values = c("Within MP" = "#00274C", 
+                                "Between MPs" = "#FFCB05")) +
+  scale_fill_manual(values = c("Within MP" = "#00274C", 
+                               "Between MPs" = "#FFCB05")) +
+  xlab("Correlation") +
+  ylab("Density")
+```
+
 
 ## Sample diversity 
 
@@ -215,7 +251,7 @@ The key here is that we don't see any single-sample MPs.
 Ultimately, we want to be able to easily interpret the MPs. 
 We won't actually annotate them here, but we will look to see how biologically distinct the MPs might be. 
 
-To do that, we'll take the first 200 genes for all MPs and do ORA using the custom genesets we use for classifying EWS::FLI1 high and low cells and the Hallmarks collection from `MSigDb`. 
+To do that, we'll take the first 50 genes for all MPs and do ORA using the custom genesets we use for classifying EWS::FLI1 high and low cells and the Hallmarks collection from `MSigDb`. 
 
 ```{r}
 # read in custom gene lists and EF msigdb gene sets to look at 
@@ -298,7 +334,7 @@ universe <- rownames(spectra_mtx)
 # run ORA using the top 200 genes
 ora_results <- mp_list |> 
   purrr::map(\(scores){
-    genes <- names(scores)[1:200]
+    genes <- names(scores)[1:50]
     
     ora_results <- clusterProfiler::enricher(
       gene = genes,
@@ -419,7 +455,7 @@ ComplexHeatmap::Heatmap(jaccard_matrix,
                         col = circlize::colorRamp2(c(0, max(jaccard_matrix)), colors = c("white", "darkslateblue")))
 ```
 
-Here we can see groups of MPs that have similar gene set lists, such as MP4 and MP9.
+Here we can see groups of MPs that have similar gene set lists, such as MP11 and MP12 or MP4 and MP9.
 
 We know that these tumor cells should show have a group of cells with a EWS::FLI1 repressed cell signature, or "low", as we have been calling them. 
 To see if any of these MPs show that signature, we'll get a score for whether or not that MP shows a high or low signature.
@@ -437,10 +473,7 @@ ora_results_df |>
   )
 ```
 
-It looks like MP6 and MP7 both show some enrichment of EF-low targets and MP1 has some high targets. 
-MP2 shows both high and low gene sets, which is sketchy. 
-Looking at the gene sets and pvalues for the gene sets in MP2, these are likely the cycling cells as they have low pvalues for E2F and G2M gene lists. 
-The lowest ranked gene list is the EWS::FLI1 down gene set for that group.
+It looks like MP6 shows some enrichment of EF-low targets and MP1 has some high targets. 
 
 ## Using metaprograms to identify cell states 
 
@@ -448,7 +481,7 @@ Ultimately we want to be able to use these MPs to identify cell states in our or
 In order to do that, we need to assign a score to each cell for each MP and then use that to pull out cells with high scores for that MP. 
 Good MPs should show variation in scores across samples. 
 
-For right now, we'll assign a score for each cell by getting the dot product between the weights for each gene in the MP and the normalized gene expression values.
+For right now, we'll assign a score for each cell by getting the dot product between the weights for the top 50 genes in the MP and the normalized gene expression values.
 
 ```{r}
 # first we need to grab the sce files
