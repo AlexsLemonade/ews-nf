@@ -45,3 +45,13 @@ The categories are described below:
 * `EF-repressed`: These gene sets contain genes that are repressed by the fusion gene, `EWS-FLI1`. 
 * `EMT-ECM`: These gene sets contain genes that are found to be highly expressed in tumor cells with low expression of `EWS-FLI`.
  
+## EwS multiome gene sets 
+
+The `Furlan_multiome_3_subgroup_links.csv` file contains all genes associated with each module in the [Ewing sarcoma multi-ome paper](https://doi.org/10.1101/2025.06.18.660457).
+Here, modules are representative of potential cell states present in Ewing sarcoma cell lines. 
+This file includes all genes output for each of the three modules from [`ArchR::plotPeak2GeneHeatmap()`](https://www.archrproject.com/reference/plotPeak2GeneHeatmap.html) with a k value of 3.
+Downstream analyses of the modules utilized the unique genes for each module. 
+Original code for generating this file can be found here: https://github.com/furlan-lab/EwS_multiome/blob/669d6ef60a7946ece289ecb5ba353e7fa2c8a2c3/code/fig2.Rmd#L115. 
+
+The `multiome-module-genes.tsv` contains all unique genes associated with each module and the associated Ensembl gene id. 
+This file was prepared using `setup/prep-multiome-genesets.R`.
