@@ -8,6 +8,9 @@ output:
     toc_float:
       collapsed: false
     number_sections: false
+params:
+  k_value: 12
+  filter_spectra: false
 ---
 
 In this notebook, we'll generate metaprograms (MPs) for a subset samples from the SKC. 
@@ -17,8 +20,7 @@ Note that there were not enough cells in `SCPCS000848` and `SCPCS000854`, so the
 `cNMF` was run with k components set to 5, 10, 15, 20, and 25 and all spectra are used to generate MPs.
 The goal of this notebook is to identify a set of metrics that we can use to evaluate MPs. 
 
-For this particular notebook, MPs are assigned by calculating the correlation of each cNMF spectra to all other spectra and then clustering using k=12.
-(In the future, we could easily modify this to have a parameter for k and look across reports.)
+MPs are assigned by calculating the correlation of each cNMF spectra to all other spectra and then clustering using a specified value of k.
 
 Metaprograms should be: 
 
@@ -29,6 +31,13 @@ Metaprograms should be:
 Additionally, we expect expression of these MPs to be variable within the cells of each sample, and therefore useful in identifying cell states in the original samples. 
 
 The metrics shown here will help evaluate if the identified MPs show these characteristics.
+
+## Parameters
+
+This notebook shows results for the following parameters:
+
+* K value: `r params$k_value`
+* Filtering of orphan spectra (spectra with max cross sample correlation < 0.3): `r params$filter_spectra`
 
 ## Set Up
 
@@ -104,10 +113,36 @@ To generate metaprograms, we'll first cluster the spectra based on their correla
 We will then get the mean weight for each gene across all spectra in the cluster, omitting `NA`s.
 The gene list will then be sorted by weight with the most important genes listed at the top of the list. 
 
+```{r, eval=params$filter_spectra}
+# if filtering, calculate the cross sample max and remove any with < 0.3 cross sample max
+# compute cross-sample correlation max for each spectra
+cross_sample_max <- all_cor_df |>
+  # only keep correlations between samples
+  dplyr::filter(pair_type == "between_sample") |>
+  # find the max correlation for each spectra
+  dplyr::summarise(
+    max_sample_cor = max(correlation, na.rm = TRUE),
+    .by = spectra1
+  )
+
+orphan_spectra <- cross_sample_max |>
+    dplyr::filter(max_sample_cor < 0.3) |>
+    dplyr::pull(spectra1) |>
+    as.character() # make sure they aren't factors 
+
+# filter spectra mtx 
+spectra_mtx <- spectra_mtx[,which(!colnames(spectra_mtx) %in% orphan_spectra)]
+
+# recompute cor mtx and df 
+cor_mtx <- cor(spectra_mtx, method = "pearson", use = "pairwise.complete.obs")
+all_cor_df <- build_spectra_cor_df(cor_mtx)
+```
+
+
 ```{r}
 dist_mtx <- as.dist(1-cor_mtx)
 tree <- hclust(dist_mtx, method = "ward.D2")
-clusters <- cutree(tree, k = 12) # TODO: replace with params value
+clusters <- cutree(tree, k = params$k_value)
 mp_cluster_list <- split(colnames(spectra_mtx), clusters)
 names(mp_cluster_list) <- sprintf("MP%02d",seq(1, length(mp_cluster_list)))
 
