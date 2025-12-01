@@ -251,7 +251,7 @@ The key here is that we don't see any single-sample MPs.
 Ultimately, we want to be able to easily interpret the MPs. 
 We won't actually annotate them here, but we will look to see how biologically distinct the MPs might be. 
 
-To do that, we'll take the first 50 genes for all MPs and do ORA using the custom genesets we use for classifying EWS::FLI1 high and low cells and the Hallmarks collection from `MSigDb`. 
+To do that, we'll take the first 200 genes for all MPs and do ORA using the custom genesets we use for classifying EWS::FLI1 high and low cells and the Hallmarks collection from `MSigDb`. 
 
 ```{r}
 # read in custom gene lists and EF msigdb gene sets to look at 
@@ -334,7 +334,7 @@ universe <- rownames(spectra_mtx)
 # run ORA using the top 200 genes
 ora_results <- mp_list |> 
   purrr::map(\(scores){
-    genes <- names(scores)[1:50]
+    genes <- names(scores)[1:200]
     
     ora_results <- clusterProfiler::enricher(
       gene = genes,
@@ -481,7 +481,7 @@ Ultimately we want to be able to use these MPs to identify cell states in our or
 In order to do that, we need to assign a score to each cell for each MP and then use that to pull out cells with high scores for that MP. 
 Good MPs should show variation in scores across samples. 
 
-For right now, we'll assign a score for each cell by getting the dot product between the weights for the top 50 genes in the MP and the normalized gene expression values.
+For right now, we'll assign a score for each cell by getting the dot product between the weights for the top 200 genes in the MP and the normalized gene expression values.
 
 ```{r}
 # first we need to grab the sce files
@@ -544,7 +544,7 @@ score_df <- sce_list |>
       \(mp_vec, mp_name) {
         
         # mp specific genes 
-        mp_genes <- intersect(names(mp_vec), detected_genes)
+        mp_genes <- intersect(names(mp_vec)[1:200], detected_genes)
         
         # pull weights in correct cell order
         w <- mp_vec[mp_genes]
