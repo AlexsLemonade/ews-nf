@@ -113,7 +113,7 @@ To generate metaprograms, we'll first cluster the spectra based on their correla
 We will then get the mean weight for each gene across all spectra in the cluster, omitting `NA`s.
 The gene list will then be sorted by weight with the most important genes listed at the top of the list. 
 
-```{r, eval=params$filter_spectra}
+```{r, eval=params$filter_spectra, echo=params$filter_spectra}
 # if filtering, calculate the cross sample max and remove any with < 0.3 cross sample max
 # compute cross-sample correlation max for each spectra
 cross_sample_max <- all_cor_df |>
@@ -490,7 +490,7 @@ ComplexHeatmap::Heatmap(jaccard_matrix,
                         col = circlize::colorRamp2(c(0, max(jaccard_matrix)), colors = c("white", "darkslateblue")))
 ```
 
-Here we can see groups of MPs that have similar gene set lists, such as MP11 and MP12 or MP4 and MP9.
+Here we can see groups of MPs that have similar gene set lists. 
 
 We know that these tumor cells should show have a group of cells with a EWS::FLI1 repressed cell signature, or "low", as we have been calling them. 
 To see if any of these MPs show that signature, we'll get a score for whether or not that MP shows a high or low signature.
@@ -507,8 +507,6 @@ ora_results_df |>
     .by = "metaprogram"
   )
 ```
-
-It looks like MP6 shows some enrichment of EF-low targets and MP1 has some high targets. 
 
 ## Using metaprograms to identify cell states 
 
@@ -606,7 +604,7 @@ Good MPs will show variability within the dataset, in particular we are looking 
 
 ```{r}
 ggplot(score_df, 
-       aes(x = dot_score, y = metaprogram)) +
+       aes(x = dot_score, y = forcats::fct_rev(metaprogram))) +
   ggridges::geom_density_ridges(alpha = 0.8, color = "white") +
   #facet_wrap(vars(sample_id), scales = "free_x", ncol = 4) +
   theme(
