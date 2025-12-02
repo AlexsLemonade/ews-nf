@@ -229,8 +229,7 @@ mp_df <- mp_cluster_list |>
     )
   }) |> 
   dplyr::mutate(
-    sample_id = stringr::word(spectra, 1, sep = "_") |> 
-      stringr::word(-1, sep = "-")
+    sample_id = stringr::str_extract("SCPCS[0-9]{6}")
   )
 
 
@@ -279,7 +278,7 @@ ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
   scale_fill_manual(values = palette.colors("alphabet", n=13))
 ```
 
-We see the entropy values are all very close to 1 and that the MPs appear to be a good mix of samples. 
+We see the scaled entropy values are all very close to 1 and that the MPs appear to be a good mix of samples. 
 Some MPs are only comprised of a handful of samples, which could indicate rarer populations.
 The key here is that we don't see any single-sample MPs. 
 
@@ -392,11 +391,12 @@ ora_results <- mp_top_list |>
 # combine ora results into a single dataframe
 # only include genesets with pvalue < 0.05, the default by enricher 
 ora_results_df <- ora_results |> 
-  purrr::imap_dfr(\(result, mp_name) {
+  purrr::imap(\(result, mp_name) {
     result@result |> 
       dplyr::mutate(metaprogram = mp_name) |> 
       dplyr::filter(pvalue <= 0.05) 
-  })
+  }) |>
+  purrr::list_rbind()
 ```
 
 ```{r, results='asis'}
