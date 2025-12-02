@@ -70,15 +70,15 @@ source("./utils/spectra-helper-functions.R")
 
 ```{r}
 # paths to custom geneset files we're going to use for ORA
-geneset_file <- file.path("..", "genesets", "custom-gene-sets.tsv")
-msigdb_geneset_file <- file.path("..", "genesets", "msigdb-gene-sets.tsv")
-category_file <- file.path("..", "genesets", "gene-set-categories.tsv")
+geneset_file <- here::here("genesets", "custom-gene-sets.tsv")
+msigdb_geneset_file <- here::here("genesets", "msigdb-gene-sets.tsv")
+category_file <- here::here("genesets", "gene-set-categories.tsv")
 ```
 
 
 ```{r}
 # cnmf results directory
-results_dir <- fs::path("..", "ews-nf-out", "cnmf")
+results_dir <- file.path("..", "ews-nf-out", "cnmf")
 
 # directories with processed rds files and annotations output from ews-nf
 data_dir <- file.path("..", "scpca-nf-out", "SCPCP000026")
@@ -113,31 +113,34 @@ To generate metaprograms, we'll first cluster the spectra based on their correla
 We will then get the mean weight for each gene across all spectra in the cluster, omitting `NA`s.
 The gene list will then be sorted by weight with the most important genes listed at the top of the list. 
 
-```{r, eval=params$filter_spectra, echo=params$filter_spectra}
+```{r, echo=params$filter_spectra}
 # if filtering, calculate the cross sample max and remove any with < 0.3 cross sample max
 # compute cross-sample correlation max for each spectra
-cross_sample_max <- all_cor_df |>
-  # only keep correlations between samples
-  dplyr::filter(pair_type == "between_sample") |>
-  # find the max correlation for each spectra
-  dplyr::summarise(
-    max_sample_cor = max(correlation, na.rm = TRUE),
-    .by = spectra1
-  )
 
-orphan_spectra <- cross_sample_max |>
+if(params$filter_spectra){
+  cross_sample_max <- all_cor_df |>
+    # only keep correlations between samples
+    dplyr::filter(pair_type == "between_sample") |>
+    # find the max correlation for each spectra
+    dplyr::summarise(
+      max_sample_cor = max(correlation, na.rm = TRUE),
+      .by = spectra1
+    )
+  
+  orphan_spectra <- cross_sample_max |>
     dplyr::filter(max_sample_cor < 0.3) |>
     dplyr::pull(spectra1) |>
     as.character() # make sure they aren't factors 
-
-keep_spectra <- which(!colnames(spectra_mtx) %in% orphan_spectra)
-
-# filter spectra mtx and cor mtx
-spectra_mtx <- spectra_mtx[, keep_spectra]
-cor_mtx <- cor_mtx[keep_spectra, keep_spectra]
-
-# recompute cor df 
-all_cor_df <- build_spectra_cor_df(cor_mtx)
+  
+  keep_spectra <- which(!colnames(spectra_mtx) %in% orphan_spectra)
+  
+  # filter spectra mtx and cor mtx
+  spectra_mtx <- spectra_mtx[, keep_spectra]
+  cor_mtx <- cor_mtx[keep_spectra, keep_spectra]
+  
+  # recompute cor df 
+  all_cor_df <- build_spectra_cor_df(cor_mtx) 
+}
 ```
 
 
