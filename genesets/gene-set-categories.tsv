@@ -1,15 +1,15 @@
-geneset_name	geneset_category
-staege	EF-activated
-miyagawa_up	EF-activated
-miyagawa_down	EF-repressed
-zhang	EF-activated
-riggi_up	EF-activated
-riggi_down	EF-repressed
-kinsey_up	EF-activated
-kinsey_down	EF-repressed
-hallmark_EMT	EMT-ECM
-gobp_ECM	EMT-ECM
-aynaud_ews_targets	EF-activated
-wrenn_nt5e_targets	EMT-ECM
-grohar_ews_repressed	EF-repressed
-grohar_ews_activated	EF-activated
+geneset_name	full_geneset_name	geneset_category
+staege	STAEGE_EWING_FAMILY_TUMOR	EF-activated
+miyagawa_up	MIYAGAWA_TARGETS_OF_EWSR1_ETS_FUSIONS_UP	EF-activated
+miyagawa_down	MIYAGAWA_TARGETS_OF_EWSR1_ETS_FUSIONS_DN	EF-repressed
+zhang	ZHANG_TARGETS_OF_EWSR1_FLI1_FUSION	EF-activated
+riggi_up	RIGGI_EWING_SARCOMA_PROGENITOR_UP	EF-activated
+riggi_down	RIGGI_EWING_SARCOMA_PROGENITOR_DN	EF-repressed
+kinsey_up	KINSEY_TARGETS_OF_EWSR1_FLII_FUSION_UP	EF-activated
+kinsey_down	KINSEY_TARGETS_OF_EWSR1_FLII_FUSION_DN	EF-repressed
+hallmark_EMT	HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION	EMT-ECM
+gobp_ECM	GOBP_REGULATION_OF_EXTRACELLULAR_MATRIX_ORGANIZATION	EMT-ECM
+aynaud_ews_targets	aynaud_ews_targets	EF-activated
+wrenn_nt5e_targets	wrenn_nt5e_targets	EMT-ECM
+grohar_ews_repressed	grohar_ews_repressed	EF-repressed
+grohar_ews_activated	grohar_ews_activated	EF-activated
