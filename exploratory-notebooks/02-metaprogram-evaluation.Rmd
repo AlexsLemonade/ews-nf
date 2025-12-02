@@ -9,7 +9,7 @@ output:
       collapsed: false
     number_sections: false
 params:
-  k_value: 12
+  n_metaprograms: 12
   filter_spectra: false
 ---
 
@@ -36,7 +36,7 @@ The metrics shown here will help evaluate if the identified MPs show these chara
 
 This notebook shows results for the following parameters:
 
-* K value: `r params$n_metaprograms`
+* Number of metaprograms (k): `r params$n_metaprograms`
 * Filtering of orphan spectra (spectra with max cross sample correlation < 0.3): `r params$filter_spectra`
 
 ## Set Up
@@ -155,7 +155,7 @@ names(mp_cluster_list) <- sprintf("MP%02d",seq(1, length(mp_cluster_list)))
 mp_list <- mp_cluster_list |> 
   purrr::map(\(spectra_list){
     
-    mps <- rowMeans(spectra_mtx[, spectra_list, drop = FALSE], na.rm = TRUE)
+    rowMeans(spectra_mtx[, spectra_list, drop = FALSE], na.rm = TRUE)
     
   })
 ```
@@ -225,14 +225,15 @@ We will use Shannon's entropy to measure the diversity of each MP where 1 indica
 
 ```{r}
 mp_df <- mp_cluster_list |> 
-  purrr::imap_dfr(\(spectra_list, mp_name) {
+  purrr::imap(\(spectra_list, mp_name) {
     tibble::tibble(
       metaprogram = mp_name,
       spectra = spectra_list
     )
   }) |> 
+  purrr::list_rbind() |> 
   dplyr::mutate(
-    sample_id = stringr::str_extract("SCPCS[0-9]{6}")
+    sample_id = stringr::str_extract(spectra, "SCPCS[0-9]{6}")
   )
 
 
@@ -296,26 +297,16 @@ To do that, we'll take the first 200 genes for all MPs and do ORA using the cust
 # read in custom gene lists and EF msigdb gene sets to look at 
 geneset_df <- readr::read_tsv(geneset_file)
 ef_msigdb_df <- readr::read_tsv(msigdb_geneset_file)
+ef_category_df <- readr::read_tsv(category_file)
 
 # get the EF activated and EF repressed gene sets for classifying later
-ef_category_df <- readr::read_tsv(category_file) |> 
-  # custom gene sets
-  dplyr::left_join(geneset_df, by = c("geneset_name" = "geneset")) |> 
-  # msig genesets
-  dplyr::left_join(ef_msigdb_df, by = c("geneset_name" = "name")) |> 
-  # make sure we have all name info in the same column
-  dplyr::mutate(geneset = dplyr::if_else(is.na(geneset), geneset_name, geneset)) |> 
-  # grab the category
-  dplyr::select(geneset, geneset_category) |> 
-  dplyr::distinct()
-
 ef_activated_genesets <- ef_category_df |> 
   dplyr::filter(geneset_category == "EF-activated") |> 
-  dplyr::pull(geneset)
+  dplyr::pull(full_geneset_name)
 
 ef_repressed_genesets <- ef_category_df |> 
   dplyr::filter(geneset_category == "EF-repressed") |> 
-  dplyr::pull(geneset)
+  dplyr::pull(full_geneset_name)
 
 # use hallmarks in addition to EF lists 
 hallmarks_msigdb_df <- msigdbr::msigdbr(species = "Homo sapiens", collection = "H") |> 
@@ -330,7 +321,7 @@ msigdb_category_list <- ef_msigdb_df |>
   purrr::transpose()
 
 
-# list of genesets and names
+# list of msig genesets and names
 geneset_list <- ef_msigdb_df$geneset |>
   purrr::set_names(ef_msigdb_df$name)
 
@@ -539,13 +530,11 @@ unique_ids <- all_cor_df |>
   unique()
 
 sample_ids <- stringr::word(unique_ids, 2, sep = "-")
+
 sce_files <- file.path(
   data_dir, 
   sample_ids,
-  glue::glue("{unique_ids}_processed.rds"))
-
-sce_list <- sce_files |> 
-  purrr::map(readr::read_rds) |> 
+  glue::glue("{unique_ids}_processed.rds")) |> 
   purrr::set_names(sample_ids)
 ```
 
@@ -569,41 +558,55 @@ annotations_df <- annotation_files |>
 
 
 ```{r}
+# function for getting a score for all tumor cells within a sce object
+# output is a dataframe with barcodes, sample id, mp, and score
+# the score is a dot product between the weights for top 200 genes and the logcounts 
+score_sce <- function(sce_file, id, annotations_df = annotations_df){
+  
+  sce <- readr::read_rds(sce_file)
+  
+  # pull out just the tumor cells
+  tumor_cells <- annotations_df |> 
+    dplyr::filter(sample_id == id) |> 
+    dplyr::pull(barcodes)
+  
+  # extract counts for genes and cells of interest
+  expr <- logcounts(sce)[universe,tumor_cells] 
+  
+  # get a score for each MP 
+  df <- purrr::imap(
+    mp_top_list,
+    \(w, mp_name) {
+      
+      # mp genes 
+      mp_genes <- names(w)
+      
+      # expression subset: genes × cells
+      sub_expr <- expr[mp_genes, , drop = FALSE]
+      
+      # compute dot product for each cell (matrix multiply)
+      scores <- as.numeric(w %*% sub_expr)
+      
+      tibble::tibble(
+        sample_id = id,
+        barcodes = colnames(expr),
+        metaprogram = mp_name,
+        dot_score = scores
+      )
+    }
+  ) |> 
+    purrr::list_rbind()
+  
+  return(df)
+}
+```
+
+
+```{r}
 # get a dataframe with scores for each cell for each MP
-score_df <- sce_list |> 
-  purrr::imap_dfr(\(sce, id) {
-    
-    # we only care about tumor cells here
-    tumor_cells <- annotations_df |> 
-      dplyr::filter(sample_id == id) |> 
-      dplyr::pull(barcodes)
-    
-    # extract counts for genes and cells of interest
-    expr <- logcounts(sce)[universe,tumor_cells] 
-    
-    # get a score for each MP 
-    purrr::imap_dfr(
-      mp_top_list,
-      \(w, mp_name) {
-        
-        # mp genes 
-        mp_genes <- names(w)
-        
-        # expression subset: genes × cells
-        sub_expr <- expr[mp_genes, , drop = FALSE]
-        
-        # compute dot product for each cell (matrix multiply)
-        scores <- as.numeric(w %*% sub_expr)
-        
-        tibble::tibble(
-          sample_id = id,
-          barcodes = colnames(expr),
-          metaprogram = mp_name,
-          dot_score = scores
-        )
-      }
-    )
-  })
+score_df <- sce_files |> 
+  purrr::imap(\(sce_file, id) {score_sce(sce_file, id, annotations_df)}) |> 
+  purrr::list_rbind()
 ```
 
 First we look at the score distribution for all samples for each metaprogram. 
