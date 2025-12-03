@@ -6,9 +6,6 @@
 # The output includes a gene_sybmol, ensembl_gene_id, kmeans_group, and cell_state_module for each gene 
 # only unique genes for each module are included in the output
 
-library(AnnotationDbi)
-library(org.Hs.eg.db)
-
 
 multiome_original_file <- here::here("genesets", "Furlan_multiome_3_subgroup_links.csv")
 multiome_output_file <- here::here("genesets", "multiome-module-genes.tsv")
@@ -25,19 +22,25 @@ multiome_genesets_df <- readr::read_csv(multiome_original_file) |>
 # original paper only uses unique genes in plots and only top 300 genes for ORA to annotate the modules 
 multiome_genesets_df <- multiome_genesets_df[!duplicated(multiome_genesets_df$gene_symbol),]
 
-# get gene symbols and convert to ensembl IDs
-symbols <- multiome_genesets_df$gene_symbol
-gene_ids <- mapIds(
-  org.Hs.eg.db, 
-  keys = symbols, 
-  column = "ENSEMBL", 
-  keytype = "SYMBOL", 
-  multiVals = "first"
+# get ensembl 110 which matches the version used for cellranger
+ensembl_110 <- biomaRt::useEnsembl(
+  biomart = "genes",
+  dataset = "hsapiens_gene_ensembl",
+  version = 110
 )
 
-# check that everything is equal before adding it back 
-stopifnot("Error converting all gene symbols" = all.equal(multiome_genesets_df$gene_symbol, names(gene_ids)))
+# map gene sybmols to ensembl gene id
+gene_map_df <- biomaRt::getBM(
+  attributes =  c("hgnc_symbol", "ensembl_gene_id"), 
+  filters = "hgnc_symbol", 
+  values = multiome_genesets_df$gene_symbol, 
+  mart = ensembl_110
+)
 
-# add new column and export 
-multiome_genesets_df$ensembl_gene_id <- gene_ids
+# join in ensembl gene ids
+multiome_genesets_df <- multiome_genesets_df |> 
+  dplyr::left_join(gene_map_df, by = c("gene_symbol" = "hgnc_symbol"))
+
+# export new file with gene ids
 readr::write_tsv(multiome_genesets_df, multiome_output_file)
+
