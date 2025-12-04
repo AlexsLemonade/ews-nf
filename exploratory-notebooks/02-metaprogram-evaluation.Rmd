@@ -147,6 +147,7 @@ if(params$filter_spectra){
 ```{r}
 dist_mtx <- as.dist(1-cor_mtx)
 tree <- hclust(dist_mtx, method = "ward.D2")
+dend <- as.dendrogram(tree)
 clusters <- cutree(tree, k = params$n_metaprograms)
 mp_cluster_list <- split(colnames(spectra_mtx), clusters)
 names(mp_cluster_list) <- sprintf("MP%02d",seq(1, length(mp_cluster_list)))
@@ -165,6 +166,24 @@ mp_list <- mp_cluster_list |>
 
 Here we look at the correlation of all MPs to all other MPs. 
 Ideally, MPs are unique and non-redundant and therefore have low correlation to all other MPs. 
+The first plot shows all the spectra that comprise the MPs correlation to all other spectra and the second looks at correlation of each MP to all other MPs.
+
+```{r}
+annotation <- ComplexHeatmap::HeatmapAnnotation(
+  clusters = sprintf("MP%02d", clusters)
+)
+
+ComplexHeatmap::Heatmap(
+  cor_mtx, 
+  show_row_names = FALSE, 
+  show_column_names = FALSE, 
+  cluster_rows = dend,
+  cluster_columns = dend,
+  top_annotation = annotation,
+  name = "correlation"
+)
+```
+
 
 ```{r}
 # combine all mps into a matrix for a heatmap
