@@ -23,6 +23,7 @@ option_list <- list(
   make_option(
     opt_str = c("--cnmf_results_dir"),
     type = "character",
+    # TODO: Remove defaults when adding to nextflow
     default = here::here("ews-nf-out", "cnmf"),
     help = "Path to directory containing spectra files output from cNMF"
   ),
