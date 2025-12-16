@@ -119,7 +119,7 @@ option_list <- list(
     opt_str = c("--cnmf_k_range"),
     type = "character",
     default = "all",
-    help = "Set of k values used with cNMF to keep when clustering spectra into metaprograms, comma separated"
+    help = "Set of k values used with cNMF to keep when clustering spectra into metaprograms, comma separated. Use 'all' to use all available k."
   ),
   make_option(
     opt_str = c("--n_metaprograms"),
