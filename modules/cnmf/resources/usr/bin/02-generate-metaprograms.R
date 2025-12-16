@@ -7,7 +7,7 @@
 # cluster_list: Spectra assigned to each cluster/MP
 # cor_matrix: Correlation matrix of spectra
 # n_metaprograms: Number of metaprograms specified
-# cnmf_k_range: Range of k values used with cNMF to consider when generating MPs
+# cnmf_k_range: Set of k values used with cNMF to consider when generating MPs
 # filter_spectra: Whether or not orphan spectra were removed
 # orphan_cutoff: If orphan spectra were removed, the minimum cross sample correlation
 # to keep the spectra. If no filtering, this is -1 
@@ -118,8 +118,8 @@ option_list <- list(
   make_option(
     opt_str = c("--cnmf_k_range"),
     type = "character",
-    default = "5,10,15,20,25",
-    help = "Range of k values used with cNMF to keep when clustering spectra into metaprograms"
+    default = "all",
+    help = "Set of k values used with cNMF to keep when clustering spectra into metaprograms, comma separated"
   ),
   make_option(
     opt_str = c("--n_metaprograms"),
@@ -169,7 +169,12 @@ stopifnot(
 )
 
 k_range <- stringr::str_split_1(opt$cnmf_k_range, ",") |> 
-  as.integer()
+if(toLower(opt$cnmf_k_range) == "all"){
+  k_range = c()
+} else {
+  k_range <- stringr::str_split_1(opt$cnmf_k_range, ",") |> 
+    as.integer()
+}
 
 # get all the spectra files
 spectra_files <- fs::dir_ls(
@@ -181,7 +186,7 @@ spectra_files <- fs::dir_ls(
   purrr::keep(\(file){
     k <- stringr::str_match(file, "k_(\\d+)")[ ,2] |> 
       as.integer() 
-    k %in% k_range
+    k %in% k_range || length(k_range) == 0
   })
 
 # extract the unique ID for labeling
