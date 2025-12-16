@@ -128,7 +128,7 @@ if(opt$filter_spectra){
       .by = spectra1
     )
   
-  # get a vector of orhpan spectra to keep 
+  # get a vector of orphan spectra to remove 
   orphan_spectra <- cross_sample_max |>
     dplyr::filter(max_sample_cor < opt$orphan_cutoff) |>
     dplyr::pull(spectra1) |>
@@ -158,10 +158,8 @@ names(mp_cluster_list) <- sprintf("MP%02d",seq(1, length(mp_cluster_list)))
 # each MP is a list of gene weights where weights are averaged across all spectra
 # names of each list correspond to ensembl gene id
 mp_list <- mp_cluster_list |> 
-  purrr::map(\(spectra_list){
-    
-    rowMeans(spectra_mtx[, spectra_list, drop = FALSE], na.rm = TRUE)
-    
+  purrr::map(\(cluster_spectra){
+    rowMeans(spectra_mtx[, cluster_spectra, drop = FALSE], na.rm = TRUE)
   })
 
 # Export MPs -------------------------------------------------------------------
