@@ -132,10 +132,13 @@ def main():
         annotations_df["annotation_tier0"] == "tumor", "barcodes"
     ].tolist()
 
-    # create a new anndata object with just tumor cells and the raw counts for hvgs
-    hv_genes = adata.var['highly_variable']
+    # create a new anndata object with just tumor cells 
     adata.X = adata.raw.X # make sure X has the raw counts for subsetting
-    subset_adata = adata[tumor_barcodes, hv_genes].copy()
+    subset_adata = adata[tumor_barcodes, ].copy()
+
+    # get the mean of each gene across all cells and only keep those with expression > 0
+    detected_genes = subset_adata.X.mean(axis=0) > 0
+    subset_adata = adata[tumor_barcodes, detected_genes].copy()
 
     # make a simplified version of the object for easy exporting
     new_adata = anndata.AnnData(X=subset_adata.X)
