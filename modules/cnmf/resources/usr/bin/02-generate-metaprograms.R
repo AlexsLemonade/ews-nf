@@ -168,8 +168,7 @@ stopifnot(
   "Output file must end in .rds" = stringr::str_detect(opt$output_file, "\\.rds$")
 )
 
-k_range <- stringr::str_split_1(opt$cnmf_k_range, ",") |> 
-if(toLower(opt$cnmf_k_range) == "all"){
+if(stringr::str_to_lower(opt$cnmf_k_range) == "all"){
   k_range = c()
 } else {
   k_range <- stringr::str_split_1(opt$cnmf_k_range, ",") |> 
