@@ -13,9 +13,97 @@
 # to keep the spectra. If no filtering, this is -1 
 # unique_ids: Vector of unique IDs associated with the MPs
 
-# source in some helper functions we'll use to prep data 
-# build_spectra_mtx() build_spectra_cor_df()
-source(here::here("exploratory-notebooks/utils/spectra-helper-functions.R"))
+# Functions --------------------------------------------------------------------
+
+# helper to read in a list of files with spectra from cNMF and create a single mtx
+build_spectra_mtx <- function(spectra_files){
+  
+  # read in all spectra and combine into a single matrix
+  # rows are genes and each column is a spectra
+  # any genes that are not present in a spectra will have NA 
+  spectra_mtx <- purrr::imap(
+    spectra_files, \(file, id) {
+      
+      # extract k value to use for labeling columns
+      k_value <- stringr::str_extract(file, pattern = "k_\\d+") |> 
+        stringr::str_extract("\\d+") |>
+        as.integer() 
+      
+      k_value <- sprintf("k%02d", k_value)
+      
+      # read in file and create dataframe
+      df <- read.table(file) |>
+        t() |>
+        as.data.frame() |>
+        tibble::rownames_to_column("gene_id")
+      
+      # rename columns to have id, k, and nmf number
+      nmf_number <- sprintf("%02d", as.integer(colnames(df)[-1]))
+      colnames(df)[-1] <- glue::glue("{id}_{k_value}_CNMF{nmf_number}")
+      return(df)
+    }
+  ) |> 
+    purrr::reduce(dplyr::full_join, by = "gene_id") |> 
+    tibble::column_to_rownames("gene_id") |> 
+    as.matrix()
+  
+  return(spectra_mtx)
+  
+}
+
+
+# helper function to build correlation dataframe with one row per pair of spectra
+# duplicates are included to aid in calculation of statistics
+build_spectra_cor_df <- function(cor_matrix){
+  
+  # turn the correlation matrix into a dataframe for plotting
+  # one row for each correlation 
+  all_cor_df <- as.data.frame(as.table(cor_matrix)) |>
+    dplyr::rename(spectra1 = Var1, spectra2 = Var2, correlation = Freq) |>
+    # these should be characters and not factors
+    dplyr::mutate(spectra1 = as.character(spectra1),
+                  spectra2 = as.character(spectra2)) |> 
+    # remove correlations between the same spectra
+    dplyr::filter(spectra1 != spectra2) |> 
+    dplyr::mutate(
+      # add columns for sample and k value to help distinguish between/within sample comparisons
+      sample1 = stringr::word(spectra1, 1, sep = "_"),
+      sample2 = stringr::word(spectra2, 1, sep = "_"),
+      pair_type = dplyr::if_else(sample1 == sample2, "within_sample", "between_sample")
+    )
+  
+  return(all_cor_df)
+  
+}
+
+# generate a character vector of spectra to keep after removing orphans
+filter_spectra <- function(cor_matrix, orphan_cutoff){
+  
+  # create correlation dataframe with info about each spectra
+  all_cor_df <- build_spectra_cor_df(cor_matrix)
+  
+  # compute cross sample max for each spectra
+  cross_sample_max <- all_cor_df |>
+    # only keep correlations between samples
+    dplyr::filter(pair_type == "between_sample") |>
+    # find the max correlation for each spectra
+    dplyr::summarise(
+      max_sample_cor = max(correlation, na.rm = TRUE),
+      .by = spectra1
+    )
+  
+  # get a vector of orphan spectra to remove 
+  orphan_spectra <- cross_sample_max |>
+    dplyr::filter(max_sample_cor < orphan_cutoff) |>
+    dplyr::pull(spectra1) |>
+    as.character() # make sure they aren't factors 
+  
+  keep_spectra <- which(!colnames(spectra_mtx) %in% orphan_spectra)
+  
+  return(keep_spectra)
+}
+
+# Read in arguments ------------------------------------------------------------
 
 library(optparse)
 
@@ -29,9 +117,9 @@ option_list <- list(
   ),
   make_option(
     opt_str = c("--cnmf_k_range"),
-    type = "integer",
-    default = seq(5, 25, 5),
-    help = "Path to RDS file containing GeneSetCollection object to use with AUCell."
+    type = "character",
+    default = "5,10,15,20,25",
+    help = "Range of k values used with cNMF to keep when clustering spectra into metaprograms"
   ),
   make_option(
     opt_str = c("--n_metaprograms"),
@@ -80,6 +168,9 @@ stopifnot(
   "Output file must end in .rds" = stringr::str_detect(opt$output_file, "\\.rds$")
 )
 
+k_range <- stringr::str_split_1(opt$cnmf_k_range, ",") |> 
+  as.integer()
+
 # get all the spectra files
 spectra_files <- fs::dir_ls(
   path = opt$cnmf_results_dir, 
@@ -90,7 +181,7 @@ spectra_files <- fs::dir_ls(
   purrr::keep(\(file){
     k <- stringr::str_match(file, "k_(\\d+)")[ ,2] |> 
       as.integer() 
-    k %in% opt$cnmf_k_range
+    k %in% k_range
   })
 
 # extract the unique ID for labeling
@@ -115,26 +206,8 @@ cor_mtx <- cor(spectra_mtx, method = "pearson", use = "pairwise.complete.obs")
 # filter spectra, identify orphans and remove them
 if(opt$filter_spectra){
   
-  # create correlation dataframe with info about each spectra
-  all_cor_df <- build_spectra_cor_df(cor_mtx)
-  
-  # compute cross sample max for each spectra
-  cross_sample_max <- all_cor_df |>
-    # only keep correlations between samples
-    dplyr::filter(pair_type == "between_sample") |>
-    # find the max correlation for each spectra
-    dplyr::summarise(
-      max_sample_cor = max(correlation, na.rm = TRUE),
-      .by = spectra1
-    )
-  
-  # get a vector of orphan spectra to remove 
-  orphan_spectra <- cross_sample_max |>
-    dplyr::filter(max_sample_cor < opt$orphan_cutoff) |>
-    dplyr::pull(spectra1) |>
-    as.character() # make sure they aren't factors 
-  
-  keep_spectra <- which(!colnames(spectra_mtx) %in% orphan_spectra)
+  # list of spectra to keep after removing orphans
+  keep_spectra <- filter_spectra(cor_mtx, opt$orphan_cutoff)
   
   # filter spectra mtx and cor mtx
   spectra_mtx <- spectra_mtx[, keep_spectra]
