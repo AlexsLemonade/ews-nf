@@ -4,8 +4,11 @@
 # Outputs an RDS file with a list of:
 
 # metaprogram_list: List of gene weights for each MP
+# clusters: original vector of cluster assignments for each spectra
 # cluster_list: Spectra assigned to each cluster/MP
 # cor_matrix: Correlation matrix of spectra
+# spectra_cor_df: Data frame with all spectra correlation information
+# gene_universe: List of all genes used to calculate metaprograms
 # n_metaprograms: Number of metaprograms specified
 # cnmf_k_range: Set of k values used with cNMF to consider when generating MPs
 # filter_spectra: Whether or not orphan spectra were removed
@@ -219,6 +222,10 @@ if(opt$filter_spectra){
 
 }
 
+# turn the spectra information into a dataframe 
+# save this to the final object for use in the report and calculating metrics
+spectra_cor_df <- build_spectra_cor_df(cor_mtx)
+
 # Generate MPs -----------------------------------------------------------------
 
 # cluster spectra into MPs using correlation
@@ -244,14 +251,17 @@ mp_list <- mp_cluster_list |>
 # build a list with MPs, clustered spectra, cor mtx and parameters used to export
 mp_info_list <- list(
   "metaprogram_list" = mp_list,
-  "cluster_list" = mp_cluster_list,
+  "clusters" = clusters, # original cluster assignments
+  "cluster_list" = mp_cluster_list, # spectra grouped by cluster
   "cor_matrix" = cor_mtx,
+  "spectra_cor_df" = spectra_cor_df,
+  "gene_universe" = rownames(spectra_mtx),
   "n_metaprograms" = opt$n_metaprograms,
   "cnmf_k_range" = opt$cnmf_k_range,
   "filter_spectra" = opt$filter_spectra,
   # if no filtering, this is -1 which means everything was kept
   "orphan_cutoff" = ifelse(opt$filter_spectra, opt$orphan_cutoff, -1),
-  "unique_ids" = unique_ids
+  "unique_ids" = unique(unique_ids)
 )
 
 readr::write_rds(mp_info_list, opt$output_file)
