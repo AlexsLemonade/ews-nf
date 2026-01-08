@@ -30,18 +30,55 @@ process generate_metaprograms {
     """
 }
 
+process score_metaprograms {
+  container params.ews_nf_container
+  tag "${unique_id}"
+  label 'mem_24'
+  cpus 2
+  time '12h'
+  publishDir "${params.outdir}/metaprograms/${sample_id}", mode: 'copy'
+  input:
+    tuple val(unique_id),
+          val(sample_id),
+          path(sce_file),
+          path(annotations_file)
+    path metaprograms_rds
+  output:
+    tuple val(unique_id),
+          val(sample_id),
+          path("${unique_id}_metaprogram_scores.tsv")
+  script:
+    """
+    02-score-metaprograms.R \
+      --sce_file ${sce_file} \
+      --annotations_file ${annotations_file} \
+      --metaprograms_file ${metaprograms_rds} \
+      --output_file "${unique_id}_metaprogram_scores.tsv" \
+      --seed ${params.seed}
+    """
+
+  stub:
+    """
+    touch ${unique_id}_metaprogram_scores.tsv
+    """
+}
+
 
 workflow metaprograms {
   take:
     cnmf_ch  // [unique_id, sample_id, cnmf output]
+    sce_ch   // [unique_id, sample_id, sce_file, annotations_file]
   main:
 
     // get all directories as one channel
     metaprograms_input_ch = cnmf_ch.collect{ unique_id, sample_id, cnmf_output -> cnmf_output }
       .collect()
 
-    // generat metaprograms
+    // generate metaprograms
     generate_metaprograms(metaprograms_input_ch)
+
+    // score metaprograms for each sample
+    score_metaprograms(sce_ch, generate_metaprograms.out)
 
     // TODO: render report
 
