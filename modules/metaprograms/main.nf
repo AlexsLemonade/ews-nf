@@ -9,7 +9,7 @@ process generate_metaprograms {
   time '12h'
   publishDir "${params.outdir}/metaprograms", mode: 'copy'
   input:
-    tuple path(cnmf_results_dir)
+    path(cnmf_results_dir)
   output:
     path("metaprograms.rds")
   script:
