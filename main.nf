@@ -8,6 +8,7 @@ include { infercnv } from './modules/infercnv'
 include { annotate_tumor_cells } from './modules/annotate-tumor-cells'
 include { summary_report } from './modules/summary-report'
 include { cnmf } from './modules/cnmf'
+include { metaprograms } from './modules/metaprograms'
 
 // **** Parameter checks ****
 include { validateParameters; paramsSummaryLog } from 'plugin/nf-schema'
@@ -135,8 +136,7 @@ workflow nmf_metaprograms {
   // run cnmf on each sample and output 
   cnmf(nmf_run_ch)
 
-  // TODO: get robust nmf programs across all samples 
-
-  // TODO: generate metaprograms 
+  // generate metaprograms 
+  metaprograms(cnmf.out)
 
 }
