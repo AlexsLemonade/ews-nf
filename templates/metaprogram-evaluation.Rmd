@@ -554,6 +554,8 @@ ggplot(jaccard_df, aes(x = mp1, y = jaccard)) +
 We can also look at each of the gene sets and calculate Shannon's entropy to indicate how diverse that gene set is, e.g., how many MPs is the gene set significant in.
 Ideally, gene sets are unique to a MP and have values close to 0.
 
+This plot shows all gene sets, including EWS::FLI1 gene sets.
+
 ```{r}
 ora_results_df |> 
   dplyr::group_by(ID) |>
@@ -573,19 +575,15 @@ If multiple gene sets are returned, it's likely that they are biologically simil
 Having multiple gene sets that are biologically distinct is going to impede interpretation.
 
 ```{r, fig.height=15, fig.width=15}
-ora_results_df |> 
-  dplyr::group_by(metaprogram, ID) |> 
-  dplyr::arrange(desc(FoldEnrichment)) |> 
-  dplyr::ungroup() |> 
-  dplyr::mutate(
-    geneset_levels = glue::glue("{metaprogram}-{ID}"),
-    ID = factor(geneset_levels, levels = rev(geneset_levels)),
-    y_labels = stringr::word(ID, 1, sep = "-")
-  ) |> 
-  ggplot(aes(x = FoldEnrichment, y = ID)) +
-  geom_col() +
-  facet_wrap(vars(metaprogram), ncol = 2, scales = "free_y") #+
-  #theme(text = element_text(size = 14))
+# dot plots for all mps with at least 1 significant gene set
+ora_results |> 
+  purrr::imap(\(result, mp){
+    if(nrow(result) > 0) {
+      enrichplot::dotplot(result, title = mp)
+    }
+  }) |> 
+  purrr::compact() |>
+  patchwork::wrap_plots(ncol = 2)
 ```
 
 We can try to measure biological similarity by looking at the overlap of the genes in each gene set identified for each MP. 
@@ -593,8 +591,10 @@ The below plot shows the Jaccard index for each geneset compared to all other si
 Gene sets with high similarity to each other should have Jaccard index values close to 1. 
 Only MPs with multiple significant gene sets will be shown in this plot.
 
+This plot only includes gene sets that are not EWS::FLI1 related, as we expect those gene sets already to be highly similar.
+
 ```{r}
-ora_list <- split(filtered_ora_results_df, ora_results_df$metaprogram)
+ora_list <- split(filtered_ora_results_df, filtered_ora_results_df$metaprogram)
 
 ora_jaccard_df <- ora_list |> 
   purrr::map(\(ora_df){
