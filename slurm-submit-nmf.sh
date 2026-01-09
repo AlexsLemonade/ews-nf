@@ -47,7 +47,7 @@ project_dir=$HOME/ews-nf
 
 # set defaults for all arguments
 sample_ids=""
-scpca_nf_dir="/ix1/acillo/alhawk01/scpca-nf-out/results"
+scpca_nf_dir="/ix1/acillo/alhawk01/scpca-nf-out"
 outdir="/ix1/acillo/alhawk01/ews-nf-out"
 skip_cnmf=${skip_cnmf:-0}
 k_components_lower=${k_components_lower:-5}
