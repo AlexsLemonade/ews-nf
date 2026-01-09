@@ -23,8 +23,8 @@
 #  This should also be where the results from running the main ews-nf workflow live 
 #  as the annotations from that workflow are used as input here 
 # k_components_lower: Lower bound for number of components to use with cNMF, default: 5
-# k_components_upper: Upper bound for number of components to use with cNMF, default: 20
-# k_step_size: Step size for creating the range of components to use with cNMF, default: 1
+# k_components_upper: Upper bound for number of components to use with cNMF, default: 25
+# k_step_size: Step size for creating the range of components to use with cNMF, default: 5
 # skip_cnmf: Used to skip running cNMF for samples where cNMF results already exist in the output directory
 #  By default, cNMF will be run on all samples regardless of if results exist
 #  To skip, use --skip_cnmf 1
@@ -47,12 +47,12 @@ project_dir=$HOME/ews-nf
 
 # set defaults for all arguments
 sample_ids=""
-scpca_nf_dir="$project_dir/scpca-nf-out"
-outdir="$project_dir/ews-nf-out"
+scpca_nf_dir="/ix1/acillo/alhawk01/scpca-nf-out/results"
+outdir="/ix1/acillo/alhawk01/ews-nf-out"
 skip_cnmf=${skip_cnmf:-0}
 k_components_lower=${k_components_lower:-5}
-k_components_upper=${k_components_upper:-20}
-k_step_size=${k_step_size:-1}
+k_components_upper=${k_components_upper:-25}
+k_step_size=${k_step_size:-5}
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
