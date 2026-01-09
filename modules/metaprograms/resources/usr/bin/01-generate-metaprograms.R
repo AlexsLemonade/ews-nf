@@ -168,7 +168,7 @@ cnmf_results_dirs <- stringr::str_split_1(opt$cnmf_results_dirs, ",")
 
 # make sure inputs are correct
 stopifnot(
-  "cNMF results directories do not exist" = all(dir.exists(cnmf_results_dirs)),
+  "Not all cNMF results directories exist" = all(dir.exists(cnmf_results_dirs)),
   "orphan cutoff should be between -1 and 1" = dplyr::between(opt$orphan_cutoff, -1, 1),
   "Output file must end in .rds" = stringr::str_detect(opt$output_file, "\\.rds$")
 )

@@ -9,14 +9,14 @@ process generate_metaprograms {
   time '12h'
   publishDir "${params.outdir}/metaprograms", mode: 'copy'
   input:
-    path(cnmf_results_dir)
+    path(cnmf_results_dirs)
   output:
     path("metaprograms.rds")
   script:
-    def cnmf_results_string = cnmf_results_dir.join(',')
+    def cnmf_results_string = cnmf_results_dirs.join(',')
     """
     01-generate-metaprograms.R \
-      --cnmf_results_dir ${cnmf_results_string} \
+      --cnmf_results_dirs ${cnmf_results_string} \
       --cnmf_k_range ${params.cnmf_k_range} \
       --n_metaprograms ${params.n_metaprograms} \
       --filter_spectra ${params.filter_spectra} \
@@ -37,11 +37,10 @@ workflow metaprograms {
     cnmf_ch  // [unique_id, sample_id, cnmf output]
   main:
 
-    // get all directories as one channel
+    // get all directories as one list
     metaprograms_input_ch = cnmf_ch.collect{ unique_id, sample_id, cnmf_output -> cnmf_output }
-      .collect()
 
-    // generat metaprograms
+    // generate metaprograms
     generate_metaprograms(metaprograms_input_ch)
 
     // TODO: render report
