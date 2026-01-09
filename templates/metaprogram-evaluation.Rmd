@@ -20,7 +20,6 @@ params:
 <!--
 TODO: 
 - separate script for generating the scores for each sample/mp and read that into this notebook 
-- need a better number for measuring biological similarity of gene sets in ORA
 -->
 
 This notebook evaluates a single set of metaprograms for a group of samples.
@@ -70,6 +69,9 @@ score_sce <- function(sce_file, id, annotations_df = annotations_df, universe = 
   
   # extract counts for genes and cells of interest
   expr <- logcounts(sce)[universe,tumor_cells] 
+  # TODO: Use quantile normalization instead? 
+  # move this into a separate script rather than happening in the notebook? 
+  # norm_expr <- preprocessCore::normalize.quantiles(sub_expr)
   
   # get a score for each MP 
   df <- purrr::imap(
@@ -81,9 +83,6 @@ score_sce <- function(sce_file, id, annotations_df = annotations_df, universe = 
       
       # expression subset: genes × cells
       sub_expr <- expr[mp_genes, , drop = FALSE]
-      # TODO: Use quantile normalization instead? 
-      # move this into a separate script rather than happening in the notebook? 
-      # norm_expr <- limma::normalizeQuantiles(sub_expr)
       
       # compute dot product for each cell (matrix multiply)
       scores <- as.numeric(w %*% sub_expr)
@@ -193,25 +192,6 @@ ComplexHeatmap::Heatmap(
 )
 ```
 
-Below we look at the distribution of cross-MP correlations. 
-Each MP is shown on the x-axis and each dot represents the correlation of that MP with a different MP. 
-
-```{r}
-mp_single_cor_df <- as.data.frame(as.table(mp_cor_matrix)) |>
-    dplyr::rename(mp1 = Var1, mp2 = Var2, correlation = Freq) |>
-    # these should be characters and not factors
-    # remove correlations between the same spectra
-    dplyr::filter(mp1 != mp2)
-
-ggplot(mp_single_cor_df, aes(x = mp1, y = correlation)) +
-  ggforce::geom_sina() +
-  labs(
-    x = "Metaprogram",
-    y = "Correlation"
-  ) +
-  stat_summary(fun = "median", geom="crossbar", color = "red")
-```
-
 
 Next we will look at the correlation of each spectra to all other spectra within the same MP and across MPs. 
 Ideally, the spectra within a single MP should have high correlation to each other and low correlation to spectra from other MPs.
@@ -231,8 +211,16 @@ mp_cor_df <- all_cor_df |>
   dplyr::left_join(mp_lookup, by = c("spectra2" = "spectra")) |> 
   dplyr::rename(mp2 = metaprogram) |>
   dplyr::mutate(within_mp = mp1 == mp2) |> 
-  dplyr::mutate(MP_type = dplyr::if_else(within_mp, "Within MP", "Between MPs")) |> 
-  dplyr::select(spectra1, spectra2, mp1, mp2, correlation, MP_type) |> 
+  dplyr::mutate(mp_comparison_group = dplyr::if_else(within_mp, "Within MP", "Between MPs"),
+                spectra_comparison_group = dplyr::case_when(
+                  spectra1 == spectra2 ~ "self",
+                  spectra1 < spectra2 ~ "different",
+                  spectra1 > spectra2 ~ "different_dup"
+                )) |> 
+  # only report comparisons between different spectra
+  # and remove duplicates
+  dplyr::filter(spectra_comparison_group == "different") |> 
+  dplyr::select(spectra1, spectra2, mp1, mp2, correlation, mp_comparison_group) |> 
   dplyr::distinct()
 ```
 
@@ -242,13 +230,13 @@ mp_cor_df <- all_cor_df |>
 # compare within to between mps
 mp_stats <- mp_cor_df |> 
   dplyr::group_by(mp1) |> 
-  rstatix::wilcox_test(correlation ~ MP_type,
+  rstatix::wilcox_test(correlation ~ mp_comparison_group,
                        p.adjust.method = "BH")
 
 # calculate effect size for each comparison
 mp_eff_size <- mp_cor_df |> 
   dplyr::group_by(mp1) |> 
-  rstatix::wilcox_effsize(correlation ~ MP_type) |> 
+  rstatix::wilcox_effsize(correlation ~ mp_comparison_group) |> 
   dplyr::select(mp1, effsize, magnitude)
 
 # make a dataframe with the labels to use for each facet
@@ -261,16 +249,18 @@ mp_labels <- mp_stats |>
   dplyr::mutate(x = -Inf, y = Inf)
 ```
 
-```{r}
-ggplot(mp_cor_df, aes(x = correlation, color = MP_type, fill = MP_type)) +
+```{r, fig.width=8}
+ggplot(mp_cor_df, aes(x = correlation, color = mp_comparison_group, fill = mp_comparison_group)) +
   geom_density(alpha = 0.25) +
   facet_wrap(vars(mp1), scales = "free_y") +
   scale_color_manual(values = c("Within MP" = "#00274C", 
                                 "Between MPs" = "#FFCB05")) +
   scale_fill_manual(values = c("Within MP" = "#00274C", 
                                "Between MPs" = "#FFCB05")) +
-  xlab("Correlation") +
-  ylab("Density") +
+  labs(x = "Correlation",
+       y = "Density",
+       fill = "MP comparison group",
+       color = "MP comparison group") +
   geom_text(
     data = mp_labels,
     aes(x = x, y = y, label = label),
@@ -529,32 +519,10 @@ ComplexHeatmap::Heatmap(jaccard_matrix,
                         col = circlize::colorRamp2(c(0, max(jaccard_matrix)), colors = c("white", "darkslateblue")))
 ```
 
-The below plot shows the distribution of Jaccard index values for each MP.
-Good MPs should have a list of gene sets that are unique meaning a Jaccard index close to 0.
-
-```{r}
-jaccard_df <- as.data.frame(as.table(jaccard_matrix)) |>
-    dplyr::rename(mp1 = Var1, mp2 = Var2, jaccard = Freq) |>
-    # these should be characters and not factors
-    # remove correlations between the same spectra
-    dplyr::filter(mp1 != mp2)
-
-ggplot(jaccard_df, aes(x = mp1, y = jaccard)) +
-  ggforce::geom_sina() +
-  labs(
-    x = "Metaprogram",
-    y = "Jaccard index"
-  ) +
-  stat_summary(fun = "median", geom="crossbar", color = "red")
-
-```
-
 ### Specificity and similarity of gene sets
 
 We can also look at each of the gene sets and calculate Shannon's entropy to indicate how diverse that gene set is, e.g., how many MPs is the gene set significant in.
 Ideally, gene sets are unique to a MP and have values close to 0.
-
-This plot shows all gene sets, including EWS::FLI1 gene sets.
 
 ```{r}
 ora_results_df |> 
@@ -573,6 +541,7 @@ ora_results_df |>
 Here we will look at the identified gene sets for each metaprogram. 
 If multiple gene sets are returned, it's likely that they are biologically similar. 
 Having multiple gene sets that are biologically distinct is going to impede interpretation.
+This plot shows all gene sets, including EWS::FLI1 gene sets.
 
 ```{r, fig.height=15, fig.width=15}
 # dot plots for all mps with at least 1 significant gene set
@@ -586,44 +555,6 @@ ora_results |>
   patchwork::wrap_plots(ncol = 2)
 ```
 
-We can try to measure biological similarity by looking at the overlap of the genes in each gene set identified for each MP. 
-The below plot shows the Jaccard index for each geneset compared to all other significant gene sets for a given MP.
-Gene sets with high similarity to each other should have Jaccard index values close to 1. 
-Only MPs with multiple significant gene sets will be shown in this plot.
-
-This plot only includes gene sets that are not EWS::FLI1 related, as we expect those gene sets already to be highly similar.
-
-```{r}
-ora_list <- split(filtered_ora_results_df, filtered_ora_results_df$metaprogram)
-
-ora_jaccard_df <- ora_list |> 
-  purrr::map(\(ora_df){
-    
-    if(nrow(ora_df) > 1){
-      geneset_list <- ora_df |> 
-        dplyr::pull(ID)
-      
-      # create the grid of comparisons
-      cross_df <- tidyr::expand_grid(geneset1 = geneset_list, geneset2 = geneset_list) |>
-        dplyr::filter(geneset1 != geneset2) |> 
-        dplyr::rowwise() |> 
-        dplyr::mutate(
-          jaccard = geneset_jaccard(geneset1, geneset2)
-        ) 
-      
-      return(cross_df)
-    }
-    
-  }) |> 
-  dplyr::bind_rows(.id = "metaprogram")
-
-```
-
-
-```{r}
-ggplot(ora_jaccard_df, aes(x = metaprogram, y = jaccard)) +
-  ggforce::geom_sina()
-```
 
 ### Ewing specific gene sets
 
