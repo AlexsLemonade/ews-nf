@@ -276,7 +276,7 @@ ggplot(mp_cor_df, aes(x = correlation, color = mp_comparison_group, fill = mp_co
 MPs should represent a mix of samples.
 This metric can be useful in filtering out any MPs that are sample-specific. 
 
-We will use Shannon's entropy to measure the diversity of each MP where 1 indicates high diversity. 
+We will use Shannon's entropy to measure the diversity of each MP where a normalized value of 1 indicates high diversity. 
 
 ```{r}
 # add sample Id column to metaprogram/spectra map
@@ -311,7 +311,7 @@ sample_diversity_df |>
   DT::datatable()
 ```
 
-The below chart shows the proportion of each spectra that corresponds to each sample. 
+The chart below shows the proportion of spectra from each metaprogram that are derived from individual samples. 
 
 ```{r}
 mp_prop_df <- mp_prop_df |> 
