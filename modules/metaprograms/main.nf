@@ -4,14 +4,14 @@
 
 process generate_metaprograms {
   container params.ews_nf_container
-  label 'mem_24'
+  label 'mem_96'
   cpus 2
   time '12h'
   publishDir "${params.outdir}/metaprograms", mode: 'copy'
   input:
-    path(cnmf_results_dirs)
+    path cnmf_results_dirs
   output:
-    path("metaprograms.rds")
+    path "metaprograms.rds"
   script:
     def cnmf_results_string = cnmf_results_dirs.join(',')
     """
