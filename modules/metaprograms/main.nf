@@ -13,9 +13,10 @@ process generate_metaprograms {
   output:
     path("metaprograms.rds")
   script:
+    def cnmf_results_string = cnmf_results_dir.join(',')
     """
     01-generate-metaprograms.R \
-      --cnmf_results_dir ${cnmf_results_dir} \
+      --cnmf_results_dir ${cnmf_results_string} \
       --cnmf_k_range ${params.cnmf_k_range} \
       --n_metaprograms ${params.n_metaprograms} \
       --filter_spectra ${params.filter_spectra} \
