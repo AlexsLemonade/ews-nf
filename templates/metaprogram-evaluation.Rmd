@@ -9,7 +9,7 @@ output:
     number_sections: false
     code_folding: hide
 params:
-  metapgrograms_object_file: "../metaprograms.rds"
+  metaprograms_object_file: "../metaprograms.rds"
   annotations_dir: "../ews-nf-out/annotations"
   sce_data_dir: "../scpca-nf-out/SCPCP000026"
   geneset_file: "../genesets/custom-gene-sets.tsv"
@@ -163,7 +163,7 @@ ef_category_df <- readr::read_tsv(params$category_file)
 
 ```{r}
 # read in object
-mp_obj <- readr::read_rds(params$metapgrograms_object_file)
+mp_obj <- readr::read_rds(params$metaprograms_object_file)
 
 # pull out some items we are going to use multiple places to decrease typing later
 cor_mtx <- mp_obj$cor_matrix
