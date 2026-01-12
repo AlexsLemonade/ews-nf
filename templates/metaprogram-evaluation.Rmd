@@ -9,18 +9,12 @@ output:
     number_sections: false
     code_folding: hide
 params:
-  metaprograms_object_file: "../ews-nf-out/metaprograms/metaprograms.rds"
-  annotations_dir: "../ews-nf-out/annotations"
-  sce_data_dir: "../scpca-nf-out/SCPCP000026"
+  metaprograms_object_file: "../metaprograms.rds"
+  scores_file_list: NULL
   geneset_file: "../genesets/custom-gene-sets.tsv"
   msigdb_geneset_file: "../genesets/msigdb-gene-sets.tsv"
   category_file: "../genesets/gene-set-categories.tsv"
 ---
-
-<!--
-TODO: 
-- separate script for generating the scores for each sample/mp and read that into this notebook 
--->
 
 This notebook evaluates a single set of metaprograms for a group of samples.
 Metaprograms should be: 
@@ -84,51 +78,6 @@ ora_jaccard_heatmap <- function(results_df, title){
                           column_title = title,
                           col = circlize::colorRamp2(c(0, max(jaccard_matrix)), colors = c("white", "darkslateblue")))  
 }
-
-# function for getting a score for all tumor cells within a sce object
-# output is a dataframe with barcodes, sample id, mp, and score
-# the score is a dot product between the weights for top 200 genes and the logcounts 
-score_sce <- function(sce_file, id, annotations_df = annotations_df, universe = mp_obj$gene_universe){
-  
-  sce <- readr::read_rds(sce_file)
-  
-  # pull out just the tumor cells
-  tumor_cells <- annotations_df |> 
-    dplyr::filter(sample_id == id) |> 
-    dplyr::pull(barcodes)
-  
-  # extract counts for genes and cells of interest
-  expr <- logcounts(sce)[universe,tumor_cells] 
-  # TODO: Use quantile normalization instead? 
-  # move this into a separate script rather than happening in the notebook? 
-  # norm_expr <- preprocessCore::normalize.quantiles(sub_expr)
-  
-  # get a score for each MP 
-  df <- purrr::imap(
-    mp_top_list,
-    \(w, mp_name) {
-      
-      # mp genes 
-      mp_genes <- names(w)
-      
-      # expression subset: genes × cells
-      sub_expr <- expr[mp_genes, , drop = FALSE]
-      
-      # compute dot product for each cell (matrix multiply)
-      scores <- as.numeric(w %*% sub_expr)
-      
-      tibble::tibble(
-        sample_id = id,
-        barcodes = colnames(expr),
-        metaprogram = mp_name,
-        dot_score = scores
-      )
-    }
-  ) |> 
-    purrr::list_rbind()
-  
-  return(df)
-}
 ```
 
 
@@ -169,6 +118,18 @@ mp_obj <- readr::read_rds(params$metaprograms_object_file)
 cor_mtx <- mp_obj$cor_matrix
 all_cor_df <- mp_obj$spectra_cor_df
 ```
+
+```{r}
+# get a single dataframe with all scores
+score_files <- stringr::str_split_1(params$scores_file_list)
+score_df <- score_files |> 
+  purrr::map(readr::read_tsv) |> 
+  dplyr::bind_rows() |> 
+  dplyr::mutate(
+    sample_id = stringr::word(unique_id, -1, sep = "-")
+  )
+```
+
 
 
 ## Parameters
@@ -602,55 +563,15 @@ In order to do that, we need to assign a score to each cell for each MP and then
 Good MPs should show variation in scores across samples. 
 
 We'll assign a score for each cell by getting the dot product between the weights for the top 200 genes in the MP and the normalized gene expression values.
-<!-- TODO: Before calculating the score, gene expression will be quantile normalized within each sample. --> 
-
-```{r}
-# first we need to grab the sce files
-# get the unique ids for only those that are present in the cNMF spectra
-# this makes sure we don't try to read in any empty processed files for samples with too few cells
-unique_ids <- unique(mp_obj$unique_ids)
-sample_ids <- stringr::word(unique_ids, 2, sep = "-")
-
-sce_files <- file.path(
-  params$sce_data_dir, 
-  sample_ids,
-  glue::glue("{unique_ids}_processed.rds")) |> 
-  purrr::set_names(sample_ids)
-```
-
-
-```{r}
-# don't forget that we only want to look at tumor cells so we need the annotations
-annotation_files <- file.path(
-  params$annotations_dir,
-  sample_ids,
-  glue::glue("{unique_ids}_annotations.tsv")
-) |> 
-  purrr::set_names(sample_ids)
-
-annotations_df <- annotation_files |> 
-  purrr::map(readr::read_tsv) |> 
-  dplyr::bind_rows(.id = "sample_id") |> 
-  dplyr::select(barcodes, sample_id, annotation_tier0) |> 
-  dplyr::filter(stringr::str_detect(annotation_tier0, "tumor"))
-```
-
-
-```{r}
-# get a dataframe with scores for each cell for each MP
-score_df <- sce_files |> 
-  purrr::imap(\(sce_file, id) {score_sce(sce_file, id, annotations_df)}) |> 
-  purrr::list_rbind()
-```
+Before calculating the score, gene expression will be quantile normalized within each sample.
 
 First we look at the score distribution for all samples for each metaprogram. 
 Good MPs will show variability within the dataset, in particular we are looking for a bimodal distribution.
 
 ```{r}
 ggplot(score_df, 
-       aes(x = dot_score, y = forcats::fct_rev(metaprogram))) +
+       aes(x = mp_score, y = forcats::fct_rev(metaprogram))) +
   ggridges::geom_density_ridges(alpha = 0.8, color = "white") +
-  #facet_wrap(vars(sample_id), scales = "free_x", ncol = 4) +
   theme(
     strip.background = element_rect(fill = "grey90"),
     axis.text.y = element_text(size = 8),
@@ -667,7 +588,7 @@ Good MPs should show variability in multiple samples.
 
 ```{r, fig.height=10, message=FALSE, warning=FALSE}
 ggplot(score_df, 
-       aes(x = dot_score, y = metaprogram, fill = metaprogram)) +
+       aes(x = mp_score, y = metaprogram, fill = metaprogram)) +
   ggridges::geom_density_ridges(alpha = 0.8, color = "white", bw = 0.5) +
   facet_wrap(vars(sample_id), scales = "free_x", ncol = 4) +
   theme(
@@ -691,7 +612,7 @@ Good MPs will have high variance.
 mp_var_df <- score_df |>
   dplyr::group_by(sample_id, metaprogram) |>
   dplyr::summarise(
-    variance = stats::var(dot_score, na.rm = TRUE),
+    variance = stats::var(mp_score, na.rm = TRUE),
     .groups = "drop"
   )
 
