@@ -4,8 +4,11 @@
 # Outputs an RDS file with a list of:
 
 # metaprogram_list: List of gene weights for each MP
+# clusters: original vector of cluster assignments for each spectra
 # cluster_list: Spectra assigned to each cluster/MP
 # cor_matrix: Correlation matrix of spectra
+# spectra_cor_df: Data frame with all spectra correlation information
+# gene_universe: List of all genes used to calculate metaprograms
 # n_metaprograms: Number of metaprograms specified
 # cnmf_k_range: Set of k values used with cNMF to consider when generating MPs
 # filter_spectra: Whether or not orphan spectra were removed
@@ -109,11 +112,10 @@ library(optparse)
 
 option_list <- list(
   make_option(
-    opt_str = c("--cnmf_results_dir"),
+    opt_str = c("--cnmf_results_dirs"),
     type = "character",
-    # TODO: Remove defaults when adding to nextflow
-    default = here::here("ews-nf-out", "cnmf"),
-    help = "Path to directory containing spectra files output from cNMF"
+    help = "Comma separated list of directories containing spectra files output from cNMF.
+      Each directory should have cNMF results from a single sample."
   ),
   make_option(
     opt_str = c("--cnmf_k_range"),
@@ -161,9 +163,12 @@ opt <- parse_args(OptionParser(option_list = option_list))
 # set the seed
 set.seed(opt$seed)
 
+# split up results directories
+cnmf_results_dirs <- stringr::str_split_1(opt$cnmf_results_dirs, ",")
+
 # make sure inputs are correct
 stopifnot(
-  "cNMF results directory must be provided" = dir.exists(opt$cnmf_results_dir),
+  "Not all cNMF results directories exist" = all(dir.exists(cnmf_results_dirs)),
   "orphan cutoff should be between -1 and 1" = dplyr::between(opt$orphan_cutoff, -1, 1),
   "Output file must end in .rds" = stringr::str_detect(opt$output_file, "\\.rds$")
 )
@@ -177,7 +182,7 @@ if(stringr::str_to_lower(opt$cnmf_k_range) == "all"){
 
 # get all the spectra files
 spectra_files <- fs::dir_ls(
-  path = opt$cnmf_results_dir, 
+  path = cnmf_results_dirs, 
   glob = "*.gene_spectra_score.k_*.dt_*.txt", 
   recurse = TRUE
 ) |> 
@@ -219,6 +224,10 @@ if(opt$filter_spectra){
 
 }
 
+# turn the spectra information into a dataframe 
+# save this to the final object for use in the report and calculating metrics
+spectra_cor_df <- build_spectra_cor_df(cor_mtx)
+
 # Generate MPs -----------------------------------------------------------------
 
 # cluster spectra into MPs using correlation
@@ -244,14 +253,17 @@ mp_list <- mp_cluster_list |>
 # build a list with MPs, clustered spectra, cor mtx and parameters used to export
 mp_info_list <- list(
   "metaprogram_list" = mp_list,
-  "cluster_list" = mp_cluster_list,
+  "clusters" = clusters, # original cluster assignments
+  "cluster_list" = mp_cluster_list, # spectra grouped by cluster
   "cor_matrix" = cor_mtx,
+  "spectra_cor_df" = spectra_cor_df,
+  "gene_universe" = rownames(spectra_mtx),
   "n_metaprograms" = opt$n_metaprograms,
   "cnmf_k_range" = opt$cnmf_k_range,
   "filter_spectra" = opt$filter_spectra,
   # if no filtering, this is -1 which means everything was kept
   "orphan_cutoff" = ifelse(opt$filter_spectra, opt$orphan_cutoff, -1),
-  "unique_ids" = unique_ids
+  "unique_ids" = unique(unique_ids)
 )
 
 readr::write_rds(mp_info_list, opt$output_file)
