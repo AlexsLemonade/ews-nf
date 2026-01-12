@@ -55,6 +55,36 @@ geneset_jaccard <- function(geneset1, geneset2, geneset_map = all_term_df) {
   return(jaccard)
 }
 
+# make a heatmap looking at the Jaccard index betwen gene sets for each MP
+ora_jaccard_heatmap <- function(results_df, title){
+  # only one list here since we will compare each MP to all other MPs
+  id1_list <- split(results_df$ID, results_df$metaprogram)
+  # create the grid of comparisons
+  cross_df <- tidyr::expand_grid(id1 = names(id1_list), id2 = names(id1_list))
+  
+  # calculate a single Jaccard index for each combination using split lists & ids
+  jaccard_scores <- cross_df |>
+    purrr::pmap_dbl(\(id1, id2){
+      calc_jaccard(id1_list[[id1]], id1_list[[id2]])
+    })
+  
+  # add scores to the comparison grid and convert to matrix
+  jaccard_matrix <- cross_df |>
+    dplyr::mutate(jaccard = jaccard_scores) |>
+    # convert to matrix
+    tidyr::pivot_wider(
+      names_from = "id2",
+      values_from = "jaccard"
+    ) |>
+    tibble::column_to_rownames(var = "id1") |>
+    as.matrix()
+  
+  ComplexHeatmap::Heatmap(jaccard_matrix,
+                          name = "Jaccard index",
+                          column_title = title,
+                          col = circlize::colorRamp2(c(0, max(jaccard_matrix)), colors = c("white", "darkslateblue")))  
+}
+
 # function for getting a score for all tumor cells within a sce object
 # output is a dataframe with barcodes, sample id, mp, and score
 # the score is a dot product between the weights for top 200 genes and the logcounts 
@@ -157,10 +187,16 @@ Ideally, MPs are unique and non-redundant and therefore have low correlation to 
 The first plot shows all the spectra that comprise the MPs correlation to all other spectra and the second looks at correlation of each MP to all other MPs.
 
 ```{r}
+# define colors for the cluster annotations
+cluster_colors <- palette.colors(n = length(mp_obj$cluster_list), palette = "alphabet") |> 
+  purrr::set_names(names(mp_obj$cluster_list))
+
 # metaprogram/cluster annotation
 annotation <- ComplexHeatmap::HeatmapAnnotation(
-  metaprogram = sprintf("MP%02d", mp_obj$clusters)
-)
+  metaprogram = sprintf("MP%02d", mp_obj$clusters),
+  col = list(
+    metaprogram = cluster_colors
+))
 
 
 # get dendrogram 
@@ -186,16 +222,24 @@ ComplexHeatmap::Heatmap(
 mp_mtx <- do.call(cbind, mp_obj$metaprogram_list)
 mp_cor_matrix <- cor(mp_mtx, method = "pearson", use = "pairwise.complete.obs")
 
+annotation <- ComplexHeatmap::HeatmapAnnotation(
+  metaprogram = colnames(mp_mtx),
+  col = list(
+    metaprogram = cluster_colors
+))
+
 ComplexHeatmap::Heatmap(
   mp_cor_matrix,
-  name = "Correlation"
+  name = "Correlation",
+  top_annotation = annotation
 )
 ```
 
 
 Next we will look at the correlation of each spectra to all other spectra within the same MP and across MPs. 
 Ideally, the spectra within a single MP should have high correlation to each other and low correlation to spectra from other MPs.
-At the top of each panel is the Wilcoxon effect size. 
+In the top left corner of each panel the difference in the median between the two groups (within and between MPs) is displayed. 
+
 
 ```{r}
 # convert the mp cluster list into a dataframe with one row per spectra
@@ -226,27 +270,21 @@ mp_cor_df <- all_cor_df |>
 
 
 ```{r}
-# get wilcoxon rank sum for each mp 
-# compare within to between mps
-mp_stats <- mp_cor_df |> 
-  dplyr::group_by(mp1) |> 
-  rstatix::wilcox_test(correlation ~ mp_comparison_group,
-                       p.adjust.method = "BH")
-
-# calculate effect size for each comparison
-mp_eff_size <- mp_cor_df |> 
-  dplyr::group_by(mp1) |> 
-  rstatix::wilcox_effsize(correlation ~ mp_comparison_group) |> 
-  dplyr::select(mp1, effsize, magnitude)
-
-# make a dataframe with the labels to use for each facet
-mp_labels <- mp_stats |> 
-  dplyr::left_join(mp_eff_size, by = "mp1") |> 
-  dplyr::mutate(
-    label = sprintf("p=%.1e, r=%.2f", p, effsize)
+# calculate the difference in medians between the two groups to display on the plot
+mp_labels <- mp_cor_df |> 
+  dplyr::group_by(mp1, mp_comparison_group) |> 
+  dplyr::summarise(
+    group_median = median(correlation)
   ) |> 
-  dplyr::select(mp1, label) |> 
-  dplyr::mutate(x = -Inf, y = Inf)
+  tidyr::pivot_wider(
+    id_cols = mp1,
+    names_from = mp_comparison_group,
+    values_from = group_median
+  ) |> 
+  dplyr::mutate(
+    median_diff = round(`Within MP` - `Between MPs`, 2),
+    x = -Inf, y = Inf
+  ) 
 ```
 
 ```{r, fig.width=8}
@@ -263,10 +301,10 @@ ggplot(mp_cor_df, aes(x = correlation, color = mp_comparison_group, fill = mp_co
        color = "MP comparison group") +
   geom_text(
     data = mp_labels,
-    aes(x = x, y = y, label = label),
+    aes(x = x, y = y, label = median_diff),
     inherit.aes = FALSE,
     hjust = -0.1, vjust = 1.2,
-    size = 3
+    size = 4
   )
 ```
 
@@ -481,42 +519,25 @@ ComplexHeatmap::Heatmap(
 ```
 
 Alternatively, we can use the Jaccard similarity to index to measure how similar the list of gene sets for each MP is to all other MPs. 
-Because we expect EWS::FLI1 gene sets to appear in multiple MPs, we will remove these gene sets from the remaining plots.
+
+
+```{r}
+ora_jaccard_heatmap(ora_results_df,
+                    title = "All gene sets")
+```
+
+
+The custom EF-activated and EF-repressed gene sets are likely to be found in more than 1 module as all of these cells should exhibit some level of EWS::FLI1 activity. 
+To look at the uniqueness of non-EWS::FLI1 gene sets we will re-calculate the Jaccard index for all other gene sets. 
 
 ```{r}
 # remove ef gene sets for jaccard calculations
 # we expect some overlap of these already so let's see how unique the remaining genesets are
 filtered_ora_results_df <- ora_results_df |> 
   dplyr::filter(!ID %in% c(ef_repressed_genesets, ef_activated_genesets))
-```
 
-
-```{r}
-# only one list here since we will compare each MP to all other MPs
-id1_list <- split(filtered_ora_results_df$ID, filtered_ora_results_df$metaprogram)
-# create the grid of comparisons
-cross_df <- tidyr::expand_grid(id1 = names(id1_list), id2 = names(id1_list))
-
-# calculate a single Jaccard index for each combination using split lists & ids
-jaccard_scores <- cross_df |>
-  purrr::pmap_dbl(\(id1, id2){
-    calc_jaccard(id1_list[[id1]], id1_list[[id2]])
-  })
-
-# add scores to the comparison grid and convert to matrix
-jaccard_matrix <- cross_df |>
-  dplyr::mutate(jaccard = jaccard_scores) |>
-  # convert to matrix
-  tidyr::pivot_wider(
-    names_from = "id2",
-    values_from = "jaccard"
-  ) |>
-  tibble::column_to_rownames(var = "id1") |>
-  as.matrix()
-
-ComplexHeatmap::Heatmap(jaccard_matrix,
-                        name = "Jaccard index",
-                        col = circlize::colorRamp2(c(0, max(jaccard_matrix)), colors = c("white", "darkslateblue")))
+ora_jaccard_heatmap(filtered_ora_results_df,
+                    title = "EF gene sets removed")
 ```
 
 ### Specificity and similarity of gene sets
@@ -637,7 +658,7 @@ ggplot(score_df,
   ) +
   labs(
     x = "Score across all samples",
-    y = "Sample"
+    y = "Metaprogram"
   )
 ```
 
@@ -646,9 +667,9 @@ Good MPs should show variability in multiple samples.
 
 ```{r, fig.height=10, message=FALSE, warning=FALSE}
 ggplot(score_df, 
-       aes(x = dot_score, y = sample_id, fill = sample_id)) +
+       aes(x = dot_score, y = metaprogram, fill = metaprogram)) +
   ggridges::geom_density_ridges(alpha = 0.8, color = "white", bw = 0.5) +
-  facet_wrap(vars(metaprogram), scales = "free_x", ncol = 4) +
+  facet_wrap(vars(sample_id), scales = "free_x", ncol = 4) +
   theme(
     strip.background = element_rect(fill = "grey90"),
     axis.text.y = element_text(size = 8),
@@ -657,7 +678,7 @@ ggplot(score_df,
   scale_fill_manual(values = palette.colors("alphabet", n=13)) +
   labs(
     x = "Score",
-    y = "Sample",
+    y = "Metaprogram",
     title = "MP scores by sample"
   )
 ```
