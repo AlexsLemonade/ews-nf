@@ -168,12 +168,12 @@
         },
         "k_components_upper": {
           "type": "number",
-          "default": 25,
+          "default": 20,
           "description": "Upper bound for number of components to run with cNMF"
         },
         "k_step_size": {
           "type": "number",
-          "default": 5,
+          "default": 1,
           "description": "Step size for determining the range of k components to run with cNMF"
         },
         "skip_cnmf": {
