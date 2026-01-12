@@ -67,7 +67,7 @@ workflow cnmf {
         skip_cnmf: 
         (
           params.skip_cnmf 
-          && it[5].exists() 
+          && it[4].exists() 
         )
         run_cnmf: true
       }

@@ -136,7 +136,13 @@ workflow nmf_metaprograms {
   // run cnmf on each sample and output 
   cnmf(nmf_run_ch)
 
-  // generate metaprograms 
-  metaprograms(cnmf.out)
+  // channel of sce files and annotations to use as input for scoring metaprograms
+  sce_ch = nmf_run_ch.map{ unique_id, sample_id, h5_file, annotations_file ->
+    def sce_file = file("${h5_file}".replace("_processed_rna.h5ad", "_processed.rds"), checkIfExists: true)
+    [unique_id, sample_id, sce_file, annotations_file]
+  }
+
+  // generate and score metaprograms across all samples 
+  metaprograms(cnmf.out, sce_ch)
 
 }
