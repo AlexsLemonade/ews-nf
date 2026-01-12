@@ -112,11 +112,10 @@ library(optparse)
 
 option_list <- list(
   make_option(
-    opt_str = c("--cnmf_results_dir"),
+    opt_str = c("--cnmf_results_dirs"),
     type = "character",
-    # TODO: Remove defaults when adding to nextflow
-    default = here::here("ews-nf-out", "cnmf"),
-    help = "Path to directory containing spectra files output from cNMF"
+    help = "Comma separated list of directories containing spectra files output from cNMF.
+      Each directory should have cNMF results from a single sample."
   ),
   make_option(
     opt_str = c("--cnmf_k_range"),
@@ -164,9 +163,12 @@ opt <- parse_args(OptionParser(option_list = option_list))
 # set the seed
 set.seed(opt$seed)
 
+# split up results directories
+cnmf_results_dirs <- stringr::str_split_1(opt$cnmf_results_dirs, ",")
+
 # make sure inputs are correct
 stopifnot(
-  "cNMF results directory must be provided" = dir.exists(opt$cnmf_results_dir),
+  "Not all cNMF results directories exist" = all(dir.exists(cnmf_results_dirs)),
   "orphan cutoff should be between -1 and 1" = dplyr::between(opt$orphan_cutoff, -1, 1),
   "Output file must end in .rds" = stringr::str_detect(opt$output_file, "\\.rds$")
 )
@@ -180,7 +182,7 @@ if(stringr::str_to_lower(opt$cnmf_k_range) == "all"){
 
 # get all the spectra files
 spectra_files <- fs::dir_ls(
-  path = opt$cnmf_results_dir, 
+  path = cnmf_results_dirs, 
   glob = "*.gene_spectra_score.k_*.dt_*.txt", 
   recurse = TRUE
 ) |> 

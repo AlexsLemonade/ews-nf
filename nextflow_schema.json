@@ -180,6 +180,26 @@
           "type": "boolean",
           "default": false,
           "description": "If the cNMF results directory already exists, optionally skip re-running cNMF"
+        },
+        "cnmf_k_range": {
+          "type": "string",
+          "default": "all",
+          "description": "Set of k values used with cNMF to keep when clustering spectra into metaprograms, comma separated. Use 'all' to use all available k."
+        },
+        "n_metaprograms": {
+          "type": "number",
+          "default": 10,
+          "description": "Number of metaprograms to create"
+        },
+        "filter_spectra": {
+          "type": "boolean",
+          "default": false,
+          "description": "Boolean indicating whether to filter orphan spectra prior to generating metaprograms"
+        },
+        "orphan_cutoff": {
+          "type": "number",
+          "default": 0.3,
+          "description": "Minimum cross sample maximum required to keep spectra if filter_spectra is true"
         }
       }
     }
