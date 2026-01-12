@@ -29,6 +29,7 @@ score_mp <- function(mp_weights, norm_expr_mtx = norm_expr){
 # Read in arguments ------------------------------------------------------------
 
 library(optparse)
+library(SingleCellExperiment)
 
 option_list <- list(
   make_option(
