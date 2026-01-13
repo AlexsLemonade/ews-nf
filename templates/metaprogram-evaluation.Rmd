@@ -563,53 +563,14 @@ In order to do that, we need to assign a score to each cell for each MP and then
 Good MPs should show variation in scores across samples. 
 
 We'll assign a score for each cell by getting the dot product between the weights for the top 200 genes in the MP and the normalized gene expression values.
-<!-- TODO: Before calculating the score, gene expression will be quantile normalized within each sample. --> 
-
-```{r}
-# first we need to grab the sce files
-# get the unique ids for only those that are present in the cNMF spectra
-# this makes sure we don't try to read in any empty processed files for samples with too few cells
-unique_ids <- unique(mp_obj$unique_ids)
-sample_ids <- stringr::word(unique_ids, 2, sep = "-")
-
-sce_files <- file.path(
-  params$sce_data_dir, 
-  sample_ids,
-  glue::glue("{unique_ids}_processed.rds")) |> 
-  purrr::set_names(sample_ids)
-```
-
-
-```{r}
-# don't forget that we only want to look at tumor cells so we need the annotations
-annotation_files <- file.path(
-  params$annotations_dir,
-  sample_ids,
-  glue::glue("{unique_ids}_annotations.tsv")
-) |> 
-  purrr::set_names(sample_ids)
-
-annotations_df <- annotation_files |> 
-  purrr::map(readr::read_tsv) |> 
-  dplyr::bind_rows(.id = "sample_id") |> 
-  dplyr::select(barcodes, sample_id, annotation_tier0) |> 
-  dplyr::filter(stringr::str_detect(annotation_tier0, "tumor"))
-```
-
-
-```{r}
-# get a dataframe with scores for each cell for each MP
-score_df <- sce_files |> 
-  purrr::imap(\(sce_file, id) {score_sce(sce_file, id, annotations_df)}) |> 
-  purrr::list_rbind()
-```
+Before calculating the score, gene expression will be quantile normalized within each sample.
 
 First we look at the score distribution for all samples for each metaprogram. 
 Good MPs will show variability within the dataset, in particular we are looking for a bimodal distribution.
 
 ```{r}
 ggplot(score_df, 
-       aes(x = dot_score, y = forcats::fct_rev(metaprogram))) +
+       aes(x = mp_score, y = forcats::fct_rev(metaprogram))) +
   ggridges::geom_density_ridges(alpha = 0.8, color = "white") +
   #facet_wrap(vars(sample_id), scales = "free_x", ncol = 4) +
   theme(
@@ -628,7 +589,7 @@ Good MPs should show variability in multiple samples.
 
 ```{r, fig.height=10, message=FALSE, warning=FALSE}
 ggplot(score_df, 
-       aes(x = dot_score, y = metaprogram, fill = metaprogram)) +
+       aes(x = mp_score, y = metaprogram, fill = metaprogram)) +
   ggridges::geom_density_ridges(alpha = 0.8, color = "white", bw = 0.5) +
   facet_wrap(vars(sample_id), scales = "free_x", ncol = 4) +
   theme(
@@ -651,7 +612,7 @@ Good MPs will have high variance.
 mp_var_df <- score_df |>
   dplyr::group_by(sample_id, metaprogram) |>
   dplyr::summarise(
-    variance = stats::var(dot_score, na.rm = TRUE),
+    variance = stats::var(mp_score, na.rm = TRUE),
     .groups = "drop"
   )
 
