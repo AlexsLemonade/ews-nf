@@ -675,7 +675,6 @@ ggplot(score_df,
     axis.text.y = element_text(size = 8),
     legend.position = "none"
   ) +
-  scale_fill_manual(values = mp_colors) +
   labs(
     x = "Score",
     y = "Metaprogram",
