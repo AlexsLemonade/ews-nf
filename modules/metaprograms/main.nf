@@ -125,5 +125,6 @@ workflow metaprograms {
     )
 
   emit:
-    metaprogram_report.out // ["metaprograms-summary-report.html"]
+    metaprograms = generate_metaprograms.out // ["metaprograms.rds"]
+    metaprogram_scores = score_metaprograms.out // [unique_id, sample_id, metaprogram scores tsv]
 }
