@@ -35,7 +35,8 @@ build_spectra_mtx <- function(spectra_files){
       k_value <- sprintf("k%02d", k_value)
       
       # read in file and create dataframe
-      df <- read.table(file) |>
+      df <- data.table::fread(file, header = TRUE) |>
+        tibble::column_to_rownames("V1") |> 
         t() |>
         as.data.frame() |>
         tibble::rownames_to_column("gene_id")
@@ -54,14 +55,13 @@ build_spectra_mtx <- function(spectra_files){
   
 }
 
-
 # helper function to build correlation dataframe with one row per pair of spectra
 # duplicates are included to aid in calculation of statistics
 build_spectra_cor_df <- function(cor_matrix){
   
   # turn the correlation matrix into a dataframe for plotting
   # one row for each correlation 
-  all_cor_df <- as.data.frame(as.table(cor_matrix)) |>
+  all_cor_df <- as.data.frame(table(cor_matrix)) |>
     dplyr::rename(spectra1 = Var1, spectra2 = Var2, correlation = Freq) |>
     # these should be characters and not factors
     dplyr::mutate(spectra1 = as.character(spectra1),
