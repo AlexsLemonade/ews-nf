@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-# This script is used to get a score for each MP in each cell in a sample
+# This script is used to get a score for each metaprogram in each cell in a sample
 # the output is a tsv containing the following columns: 
 # metaprogram, barcodes, mp_score, unique_id
 
@@ -8,6 +8,12 @@
 
 # function for getting a score for a single MP for all cells in an object
 score_mp <- function(mp_weights, norm_expr_mtx = norm_expr){
+  
+  # make sure gene names are present and in the object
+  stopifnot(
+    "Provided weights are missing gene names" = !is.null(names(mp_weights)),
+    "genes are not found in the SCE object" = all(names(mp_weights) %in% rownames(norm_expr_mtx))
+  )
   
   # mp genes 
   mp_genes <- names(mp_weights)
@@ -35,13 +41,12 @@ option_list <- list(
   make_option(
     opt_str = c("--sce_file"),
     type = "character",
-    default = here::here("scpca-nf-out", "SCPCP000026", "SCPCS000843", "SCPCL001228-SCPCS000843_processed.rds"),
-    help = "Path to processed SCE file output from scpca-nf"
+    default = "",
   ),
   make_option(
     opt_str = c("--annotations_file"),
     type = "character",
-    default = here::here("ews-nf-out", "annotations", "SCPCS000843", "SCPCL001228-SCPCS000843_annotations.tsv"),
+    default = "",
     help = "Path to annotations file output from ews-nf with tumor cell annotations"
   ),
   make_option(

@@ -11,7 +11,7 @@
 
 #####################################################
 # This script is used to run the NMF part of the nextflow ews-nf workflow on a slurm cluster
-# It assumes that you have cloned the workflow into your home directory, use the `--project_dir` argument to specify a different location
+# It assumes that you have cloned the workflow into your home directory, use the `--ews_dir` argument to specify a different location
 
 # Any of the following parameters can be invoked at the command line:
 
@@ -22,13 +22,14 @@
 # outdir: Path to the output directory where the ews-nf results will be saved
 #  This should also be where the results from running the main ews-nf workflow live 
 #  as the annotations from that workflow are used as input here 
+# workdir: Path to the nextflow work directory
 # k_components_lower: Lower bound for number of components to use with cNMF, default: 5
 # k_components_upper: Upper bound for number of components to use with cNMF, default: 25
 # k_step_size: Step size for creating the range of components to use with cNMF, default: 5
 # skip_cnmf: Used to skip running cNMF for samples where cNMF results already exist in the output directory
 #  By default, cNMF will be run on all samples regardless of if results exist
 #  To skip, use --skip_cnmf 1
-# project_dir: Path to the ews-nf repo, default is $HOME/ews-nf
+# ews_dir: Path to the ews-nf repo, default is $HOME/ews-nf
 
 # To submit this script use the following example:
 # sbatch slurm-submit.sh
@@ -42,13 +43,18 @@ module load nextflow
 # module for using singularity
 module load singularity
 
-# Define the project directory for nextflow
-project_dir=$HOME/ews-nf
+# Define the path to ews-nf
+ews_dir=$HOME/ews-nf
+
+# path to input and output data 
+# default is a directory in the ix1 node for Cillo lab
+home_dir="/ix1/acillo/$USER"
 
 # set defaults for all arguments
 sample_ids=""
-scpca_nf_dir="/ix1/acillo/alhawk01/scpca-nf-out"
-outdir="/ix1/acillo/alhawk01/ews-nf-out"
+scpca_nf_dir="$home_dir/scpca-nf-out"
+outdir="$home_dir/ews-nf-out"
+workdir="$home_dir/work"
 skip_cnmf=${skip_cnmf:-0}
 k_components_lower=${k_components_lower:-5}
 k_components_upper=${k_components_upper:-25}
@@ -78,9 +84,10 @@ else
 fi
 
 # run ews-nf workflow with specified parameters
-nextflow run "$project_dir/main.nf" \
+nextflow run "$ews_dir/main.nf" \
   -profile "pitt_htc" \
   -entry nmf_metaprograms \
+  -work-dir "$workdir" \
   --scpca_nf_dir "$scpca_nf_dir" \
   --outdir "$outdir" \
   --k_components_lower $k_components_lower \
