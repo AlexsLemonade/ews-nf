@@ -121,7 +121,7 @@ all_cor_df <- mp_obj$spectra_cor_df
 
 ```{r}
 # get a single dataframe with all scores
-score_files <- stringr::str_split_1(params$scores_file_list)
+score_files <- stringr::str_split_1(params$scores_file_list, ",")
 score_df <- score_files |> 
   purrr::map(readr::read_tsv) |> 
   dplyr::bind_rows() |> 
