@@ -188,14 +188,14 @@ The first plot shows all the spectra that comprise the MPs correlation to all ot
 
 ```{r}
 # define colors for the cluster annotations
-cluster_colors <- palette.colors(n = length(mp_obj$cluster_list), palette = "alphabet") |> 
+mp_colors <- palette.colors(n = length(mp_obj$cluster_list), palette = "alphabet") |> 
   purrr::set_names(names(mp_obj$cluster_list))
 
 # metaprogram/cluster annotation
 annotation <- ComplexHeatmap::HeatmapAnnotation(
   metaprogram = sprintf("MP%02d", mp_obj$clusters),
   col = list(
-    metaprogram = cluster_colors
+    metaprogram = mp_colors
 ))
 
 
@@ -225,7 +225,7 @@ mp_cor_matrix <- cor(mp_mtx, method = "pearson", use = "pairwise.complete.obs")
 annotation <- ComplexHeatmap::HeatmapAnnotation(
   metaprogram = colnames(mp_mtx),
   col = list(
-    metaprogram = cluster_colors
+    metaprogram = mp_colors
 ))
 
 ComplexHeatmap::Heatmap(
@@ -366,9 +366,9 @@ ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
   ) +
   theme_bw() +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  ) +
-  scale_fill_manual(values = palette.colors("tableau", n = length(unique(mp_prop_df$sample_id))))
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  )
 ```
 
 ## Biological interpretability 
@@ -675,7 +675,7 @@ ggplot(score_df,
     axis.text.y = element_text(size = 8),
     legend.position = "none"
   ) +
-  scale_fill_manual(values = cluster_colors) +
+  scale_fill_manual(values = mp_colors) +
   labs(
     x = "Score",
     y = "Metaprogram",
