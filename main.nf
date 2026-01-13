@@ -138,7 +138,7 @@ workflow nmf_metaprograms {
 
   // channel of sce files and annotations to use as input for scoring metaprograms
   sce_ch = nmf_run_ch.map{ unique_id, sample_id, h5_file, annotations_file ->
-    def sce_file = file("${h5_file}".replace("_processed_rna.h5ad", "_processed.rds"), checkIfExists: true)
+    def sce_file = file("${h5_file}".replaceAll(/_processed_rna\.h5ad$/, "_processed.rds"), checkIfExists: true)
     [unique_id, sample_id, sce_file, annotations_file]
   }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-# This script is used to get a score for each MP in each cell in a sample
+# This script is used to get a score for each metaprogram in each cell in a sample
 # the output is a tsv containing the following columns: 
 # metaprogram, barcodes, mp_score, unique_id
 
