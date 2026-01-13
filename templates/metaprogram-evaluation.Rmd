@@ -10,17 +10,11 @@ output:
     code_folding: hide
 params:
   metaprograms_object_file: "../metaprograms.rds"
-  annotations_dir: "../ews-nf-out/annotations"
-  sce_data_dir: "../scpca-nf-out/SCPCP000026"
+  scores_file_list: NULL
   geneset_file: "../genesets/custom-gene-sets.tsv"
   msigdb_geneset_file: "../genesets/msigdb-gene-sets.tsv"
   category_file: "../genesets/gene-set-categories.tsv"
 ---
-
-<!--
-TODO: 
-- separate script for generating the scores for each sample/mp and read that into this notebook 
--->
 
 This notebook evaluates a single set of metaprograms for a group of samples.
 Metaprograms should be: 
@@ -84,51 +78,6 @@ ora_jaccard_heatmap <- function(results_df, title){
                           column_title = title,
                           col = circlize::colorRamp2(c(0, max(jaccard_matrix)), colors = c("white", "darkslateblue")))  
 }
-
-# function for getting a score for all tumor cells within a sce object
-# output is a dataframe with barcodes, sample id, mp, and score
-# the score is a dot product between the weights for top 200 genes and the logcounts 
-score_sce <- function(sce_file, id, annotations_df = annotations_df, universe = mp_obj$gene_universe){
-  
-  sce <- readr::read_rds(sce_file)
-  
-  # pull out just the tumor cells
-  tumor_cells <- annotations_df |> 
-    dplyr::filter(sample_id == id) |> 
-    dplyr::pull(barcodes)
-  
-  # extract counts for genes and cells of interest
-  expr <- logcounts(sce)[universe,tumor_cells] 
-  # TODO: Use quantile normalization instead? 
-  # move this into a separate script rather than happening in the notebook? 
-  # norm_expr <- preprocessCore::normalize.quantiles(sub_expr)
-  
-  # get a score for each MP 
-  df <- purrr::imap(
-    mp_top_list,
-    \(w, mp_name) {
-      
-      # mp genes 
-      mp_genes <- names(w)
-      
-      # expression subset: genes × cells
-      sub_expr <- expr[mp_genes, , drop = FALSE]
-      
-      # compute dot product for each cell (matrix multiply)
-      scores <- as.numeric(w %*% sub_expr)
-      
-      tibble::tibble(
-        sample_id = id,
-        barcodes = colnames(expr),
-        metaprogram = mp_name,
-        dot_score = scores
-      )
-    }
-  ) |> 
-    purrr::list_rbind()
-  
-  return(df)
-}
 ```
 
 
@@ -169,6 +118,18 @@ mp_obj <- readr::read_rds(params$metaprograms_object_file)
 cor_mtx <- mp_obj$cor_matrix
 all_cor_df <- mp_obj$spectra_cor_df
 ```
+
+```{r}
+# get a single dataframe with all scores
+score_files <- stringr::str_split_1(params$scores_file_list, ",")
+score_df <- score_files |> 
+  purrr::map(readr::read_tsv) |> 
+  dplyr::bind_rows() |> 
+  dplyr::mutate(
+    sample_id = stringr::word(unique_id, -1, sep = "-")
+  )
+```
+
 
 
 ## Parameters
