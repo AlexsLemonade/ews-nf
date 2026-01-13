@@ -9,11 +9,11 @@
 # function for getting a score for a single MP for all cells in an object
 score_mp <- function(mp_weights, norm_expr_mtx = norm_expr){
   
-  # make sure gene names are present
+  # make sure gene names are present and in the object
   stopifnot(
-    "Provided weights are missing gene names" = !is.null(names(mp_weights))
+    "Provided weights are missing gene names" = !is.null(names(mp_weights)),
+    "genes are not found in the SCE object" = all(names(mp_weights) %in% rownames(norm_expr_mtx))
   )
-  
   
   # mp genes 
   mp_genes <- names(mp_weights)
