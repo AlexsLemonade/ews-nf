@@ -368,7 +368,7 @@ ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1)
   ) +
-  scale_fill_manual(values = palette.colors("alphabet", n=13))
+  scale_fill_manual(values = palette.colors("tableau", n = length(unique(mp_prop_df$sample_id))))
 ```
 
 ## Biological interpretability 
@@ -675,7 +675,7 @@ ggplot(score_df,
     axis.text.y = element_text(size = 8),
     legend.position = "none"
   ) +
-  scale_fill_manual(values = palette.colors("alphabet", n=13)) +
+  scale_fill_manual(values = cluster_colors) +
   labs(
     x = "Score",
     y = "Metaprogram",
