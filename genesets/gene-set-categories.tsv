@@ -10,6 +10,6 @@ kinsey_down	KINSEY_TARGETS_OF_EWSR1_FLII_FUSION_DN	EF-repressed
 hallmark_EMT	HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION	EMT-ECM
 gobp_ECM	GOBP_REGULATION_OF_EXTRACELLULAR_MATRIX_ORGANIZATION	EMT-ECM
 aynaud_ews_targets	aynaud_ews_targets	EF-activated
-wrenn_nt5e_targets	wrenn_nt5e_targets	EMT-ECM
+wrenn_nt5e_targets	wrenn_nt5e_targets	EF-repressed
 grohar_ews_repressed	grohar_ews_repressed	EF-repressed
 grohar_ews_activated	grohar_ews_activated	EF-activated
