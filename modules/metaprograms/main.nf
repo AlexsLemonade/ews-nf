@@ -64,6 +64,37 @@ process score_metaprograms {
     """
 }
 
+process metaprogram_report {
+  container params.ews_nf_container
+  label 'mem_24'
+  time '2h'
+  publishDir "${params.outdir}/metaprograms"
+  input:
+    path score_files
+    path metaprograms_file
+    path template_file
+    path custom_genesets_file
+    path msigdb_genesets_file
+    path gene_set_category_file
+  output:
+    path "metaprograms-summary-report.html"
+  script:
+    def score_file_string = score_files.join(',')
+    """
+    Rscript -e "rmarkdown::render('${template_file}', \
+      output_file = 'metaprograms-summary-report.html',\
+      params = list(metaprograms_object_file = '${metaprograms_file}', \
+                    scores_file_list = '${score_file_string}', \
+                    geneset_file = '${custom_genesets_file}', \
+                    msigdb_geneset_file = '${msigdb_genesets_file}', \
+                    category_file = '${gene_set_category_file}'))"
+    """
+  stub:
+    """
+    touch "metaprograms-summary-report.html"
+    """
+}
+
 
 workflow metaprograms {
   take:
@@ -80,8 +111,20 @@ workflow metaprograms {
     // score metaprograms for each sample
     score_metaprograms(sce_ch, generate_metaprograms.out)
 
-    // TODO: render report
+    // render report
+    // define path to template report 
+    report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
+    score_ch = score_metaprograms.out.collect { unique_id, sample_id, score_files -> score_files }
+    metaprogram_report(
+      score_ch,
+      generate_metaprograms.out,
+      file(report_template_file),
+      file(params.custom_genesets_file),
+      file(params.msigdb_genesets_file),
+      file(params.gene_set_category_file)
+    )
 
   emit:
-    generate_metaprograms.out // ["metaprograms.rds"]
+    metaprograms = generate_metaprograms.out // ["metaprograms.rds"]
+    metaprogram_scores = score_metaprograms.out // [unique_id, sample_id, metaprogram scores tsv]
 }

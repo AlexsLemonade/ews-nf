@@ -35,7 +35,8 @@ build_spectra_mtx <- function(spectra_files){
       k_value <- sprintf("k%02d", k_value)
       
       # read in file and create dataframe
-      df <- read.table(file) |>
+      df <- data.table::fread(file, header = TRUE) |>
+        tibble::column_to_rownames("V1") |> 
         t() |>
         as.data.frame() |>
         tibble::rownames_to_column("gene_id")
@@ -53,7 +54,6 @@ build_spectra_mtx <- function(spectra_files){
   return(spectra_mtx)
   
 }
-
 
 # helper function to build correlation dataframe with one row per pair of spectra
 # duplicates are included to aid in calculation of statistics
