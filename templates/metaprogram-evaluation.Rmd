@@ -306,7 +306,8 @@ sample_diversity_df <- mp_prop_df |>
     ) |> 
   dplyr::arrange(desc(shannon_norm)) 
 
-sample_diversity_df
+sample_diversity_df |>
+  as.data.frame()
 ```
 
 The chart below shows the proportion of spectra from each metaprogram that are derived from individual samples. 
@@ -515,7 +516,8 @@ ora_results_df |>
     shannon_norm = shannon / log(num_mps),
     metaprograms = paste0(metaprogram, collapse = ",")
     ) |> 
-  dplyr::arrange(metaprograms)
+  dplyr::arrange(metaprograms) |> 
+  as.data.frame()
 ```
 
 Here we will look at the identified gene sets for each metaprogram. 
@@ -523,7 +525,7 @@ If multiple gene sets are returned, it's likely that they are biologically simil
 Having multiple gene sets that are biologically distinct is going to impede interpretation.
 This plot shows all gene sets, including EWS::FLI1 gene sets.
 
-```{r, fig.height=15, fig.width=15}
+```{r, fig.height=18, fig.width=15}
 # dot plots for all mps with at least 1 significant gene set
 ora_results |> 
   purrr::imap(\(result, mp){
@@ -585,7 +587,7 @@ ggplot(score_df,
 Now, look at the distribution of each sample individually. 
 Good MPs should show variability in multiple samples. 
 
-```{r, fig.height=10, message=FALSE, warning=FALSE}
+```{r, fig.height=30, message=FALSE, warning=FALSE}
 ggplot(score_df, 
        aes(x = mp_score, y = metaprogram, fill = metaprogram)) +
   ggridges::geom_density_ridges(alpha = 0.8, color = "white", bw = 0.5) +
