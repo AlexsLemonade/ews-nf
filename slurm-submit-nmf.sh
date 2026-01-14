@@ -29,6 +29,9 @@
 # skip_cnmf: Used to skip running cNMF for samples where cNMF results already exist in the output directory
 #  By default, cNMF will be run on all samples regardless of if results exist
 #  To skip, use --skip_cnmf 1
+# filter_spectra: Used to filter orphan spectra prior to generating metaprograms, default is 0 (false)
+#  to filter, use --filter_spectra 1
+# n_metaprograms: Number of metaprograms to generate, default is 10
 # ews_dir: Path to the ews-nf repo, default is $HOME/ews-nf
 
 # To submit this script use the following example:
@@ -59,6 +62,8 @@ skip_cnmf=${skip_cnmf:-0}
 k_components_lower=${k_components_lower:-5}
 k_components_upper=${k_components_upper:-25}
 k_step_size=${k_step_size:-5}
+filter_spectra=${filter_spectra:-0}
+n_metaprograms=${n_metaprograms:-10}
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
@@ -83,6 +88,13 @@ else
     cnmf_flag=""
 fi
 
+# flag for filtering spectra
+if [[ $filter_spectra -eq 1 ]]; then 
+    filter_spectra_flag="--filter_spectra"
+else 
+    filter_spectra_flag=""
+fi
+
 # run ews-nf workflow with specified parameters
 nextflow run "$ews_dir/main.nf" \
   -profile "pitt_htc" \
@@ -93,5 +105,7 @@ nextflow run "$ews_dir/main.nf" \
   --k_components_lower $k_components_lower \
   --k_components_upper $k_components_upper \
   --k_step_size $k_step_size \
+  --n_metaprograms $n_metaprograms \
   $sample_flag \
   $cnmf_flag \
+  $filter_spectra_flag
