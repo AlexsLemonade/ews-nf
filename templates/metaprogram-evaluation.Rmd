@@ -306,8 +306,7 @@ sample_diversity_df <- mp_prop_df |>
     ) |> 
   dplyr::arrange(desc(shannon_norm)) 
 
-sample_diversity_df |> 
-  DT::datatable()
+sample_diversity_df
 ```
 
 The chart below shows the proportion of spectra from each metaprogram that are derived from individual samples. 
@@ -516,8 +515,7 @@ ora_results_df |>
     shannon_norm = shannon / log(num_mps),
     metaprograms = paste0(metaprogram, collapse = ",")
     ) |> 
-  dplyr::arrange(metaprograms) |> 
-  DT::datatable()
+  dplyr::arrange(metaprograms)
 ```
 
 Here we will look at the identified gene sets for each metaprogram. 
