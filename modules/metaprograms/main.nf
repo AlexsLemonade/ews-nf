@@ -7,7 +7,7 @@ process generate_metaprograms {
   label 'mem_96'
   cpus 2
   time '12h'
-  publishDir "${params.outdir}/metaprograms/${metaprograms_publish_dir}", mode: 'copy'
+  publishDir "${metaprograms_publish_dir}", mode: 'copy'
   input:
     path cnmf_results_dirs
     val metaprograms_publish_dir
@@ -38,7 +38,7 @@ process score_metaprograms {
   label 'mem_24'
   cpus 2
   time '12h'
-  publishDir "${params.outdir}/metaprograms/${metaprograms_publish_dir}/${sample_id}", mode: 'copy'
+  publishDir "${metaprograms_publish_dir}/${sample_id}", mode: 'copy'
   input:
     tuple val(unique_id),
           val(sample_id),
@@ -70,7 +70,7 @@ process metaprogram_report {
   container params.ews_nf_container
   label 'mem_24'
   time '2h'
-  publishDir "${params.outdir}/metaprograms/${metaprograms_publish_dir}", mode: 'copy'
+  publishDir "${metaprograms_publish_dir}", mode: 'copy'
   input:
     path score_files
     path metaprograms_file
@@ -109,7 +109,8 @@ workflow metaprograms {
     cnmf_k_range_str = params.cnmf_k_range.replaceAll(",", "-")
     filter_str = params.filter_spectra ? "filtered" : "unfiltered"
 
-    metaprograms_publish_dir = "metaprograms-${params.n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
+    // define the publish directory for metaprograms
+    metaprograms_publish_dir = "${params.outdir}/metaprograms/metaprograms-${params.n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
 
     // get all directories as one list
     metaprograms_input_ch = cnmf_ch.collect{ unique_id, sample_id, cnmf_output -> cnmf_output }
