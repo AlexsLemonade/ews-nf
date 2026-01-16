@@ -7,9 +7,10 @@ process generate_metaprograms {
   label 'mem_96'
   cpus 2
   time '12h'
-  publishDir "${params.outdir}/metaprograms", mode: 'copy'
+  publishDir "${params.outdir}/metaprograms/${metaprograms_publish_dir}", mode: 'copy'
   input:
     path cnmf_results_dirs
+    val metaprograms_publish_dir
   output:
     path "metaprograms.rds"
   script:
@@ -37,13 +38,14 @@ process score_metaprograms {
   label 'mem_24'
   cpus 2
   time '12h'
-  publishDir "${params.outdir}/metaprograms/${sample_id}", mode: 'copy'
+  publishDir "${params.outdir}/metaprograms/${metaprograms_publish_dir}/${sample_id}", mode: 'copy'
   input:
     tuple val(unique_id),
           val(sample_id),
           path(sce_file),
           path(annotations_file)
     path metaprograms_rds
+    val metaprograms_publish_dir
   output:
     tuple val(unique_id),
           val(sample_id),
@@ -68,7 +70,7 @@ process metaprogram_report {
   container params.ews_nf_container
   label 'mem_24'
   time '2h'
-  publishDir "${params.outdir}/metaprograms"
+  publishDir "${params.outdir}/metaprograms/${metaprograms_publish_dir}", mode: 'copy'
   input:
     path score_files
     path metaprograms_file
@@ -76,6 +78,7 @@ process metaprogram_report {
     path custom_genesets_file
     path msigdb_genesets_file
     path gene_set_category_file
+    val metaprograms_publish_dir
   output:
     path "metaprograms-summary-report.html"
   script:
@@ -102,14 +105,20 @@ workflow metaprograms {
     sce_ch   // [unique_id, sample_id, sce_file, annotations_file]
   main:
 
+    // prepare strings for nanming the metaprogram output directory
+    cnmf_k_range_str = params.cnmf_k_range.replaceAll(",", "-")
+    filter_str = params.filter_spectra ? "filtered" : "unfiltered"
+
+    metaprograms_publish_dir = "metaprograms-${params.n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
+
     // get all directories as one list
     metaprograms_input_ch = cnmf_ch.collect{ unique_id, sample_id, cnmf_output -> cnmf_output }
 
     // generate metaprograms
-    generate_metaprograms(metaprograms_input_ch)
+    generate_metaprograms(metaprograms_input_ch, metaprograms_publish_dir)
 
     // score metaprograms for each sample
-    score_metaprograms(sce_ch, generate_metaprograms.out)
+    score_metaprograms(sce_ch, generate_metaprograms.out, metaprograms_publish_dir)
 
     // render report
     // define path to template report 
@@ -121,7 +130,8 @@ workflow metaprograms {
       file(report_template_file),
       file(params.custom_genesets_file),
       file(params.msigdb_genesets_file),
-      file(params.gene_set_category_file)
+      file(params.gene_set_category_file),
+      metaprograms_publish_dir
     )
 
   emit:
