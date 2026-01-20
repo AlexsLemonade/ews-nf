@@ -36,14 +36,20 @@ We expect these targets to have increased expression in cells with low EWS-FLI1 
 
 The original gene list sent by Patrick Grohar can be found in `Grohar_BESTLIST_forothers2.xlsx`. 
 
+* `stag2_loss_down` and `stag2_loss_up`: A list of 232 genes differentially expressed in A673 cells with and without STAG2 as characterized in [Gim enez-Llorente _et al._](https://doi.org/10.1038/s44319-024-00303-6). 
+Genes included here were listed in Dataset EV1C.
+`stag2_loss_down` includes genes that are downregulated with knock out of STAG2 and `stag2_loss_up` includes genes that were upregulated with knock out of STAG2.
+
 ## Gene set categories 
 
-The `gene-set-categories.tsv` file assigns an overall category to all gene sets (both from `MSigDB` and custom) that are used with `AUCell`. 
+The `gene-set-categories.tsv` file assigns an overall category to all gene sets (both from `MSigDB` and custom) that are used with `AUCell` and for over representation analysis of metaprograms. 
 The categories are described below: 
 
 * `EF-activated`: These gene sets contain genes that are activated by the fusion gene, `EWS-FLI1`. 
 * `EF-repressed`: These gene sets contain genes that are repressed by the fusion gene, `EWS-FLI1`. 
 * `EMT-ECM`: These gene sets contain genes that are found to be highly expressed in tumor cells with low expression of `EWS-FLI`.
+* `STAG2-loss`: These gene sets are associated with loss of STAG2 in A673 cells.
+* `chemo-resistance`: These gene sets are associated with resistance to chemotherapy drugs typically included in standard of care Ewing sarcoma treatment.
  
 ## EwS multiome gene sets 
 
