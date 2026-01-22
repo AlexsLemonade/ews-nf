@@ -142,8 +142,7 @@ max_jaccard <- function(results_df){
     # get the max jaccard
     dplyr::slice_max(jaccard, by = id1, with_ties = FALSE) |>
     dplyr::rename(metaprogram = id1, max_jaccard = jaccard) |> 
-    dplyr::select(metaprogram, max_jaccard) |> 
-    unique()
+    dplyr::select(metaprogram, max_jaccard)
   
   return(jaccard_df)
 }
