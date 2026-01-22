@@ -66,6 +66,35 @@ process score_metaprograms {
     """
 }
 
+process metaprogram_metrics {
+  container params.ews_nf_container
+  label 'mem_24'
+  time '2h'
+  publishDir "${metaprograms_publish_dir}", mode: 'copy'
+  input:
+    path metaprograms_file
+    path custom_genesets_file
+    path msigdb_genesets_file
+    path gene_set_category_file
+    val metaprograms_publish_dir
+  output:
+    path "metaprograms-metrics.rds"
+  script:
+    """
+    03-metaprogram-metrics.R \
+      --metaprograms_file ${metaprograms_file} \
+      --custom_geneset_file ${custom_genesets_file} \
+      --msigdb_geneset_file ${msigdb_genesets_file} \
+      --category_file ${gene_set_category_file} \
+      --output_file "metaprograms-metrics.rds" \
+      --seed ${params.seed}
+    """
+  stub:
+    """
+    touch "metaprograms-metrics.rds"
+    """
+}
+
 process metaprogram_report {
   container params.ews_nf_container
   label 'mem_24'
@@ -121,6 +150,15 @@ workflow metaprograms {
     // score metaprograms for each sample
     score_metaprograms(sce_ch, generate_metaprograms.out, metaprograms_publish_dir)
 
+    // calculate metrics 
+    metaprogram_metrics(
+      generate_metaprograms.out, 
+      file(params.custom_genesets_file),
+      file(params.msigdb_genesets_file),
+      file(params.gene_set_category_file),
+      metaprograms_publish_dir
+    )
+
     // render report
     // define path to template report 
     report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
@@ -138,4 +176,5 @@ workflow metaprograms {
   emit:
     metaprograms = generate_metaprograms.out // ["metaprograms.rds"]
     metaprogram_scores = score_metaprograms.out // [unique_id, sample_id, metaprogram scores tsv]
+    metaprogram_metrics = metaprogram_metrics.out // ["metaprogram-metrics.rds"]
 }
