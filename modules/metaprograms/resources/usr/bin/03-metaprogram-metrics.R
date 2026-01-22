@@ -43,20 +43,12 @@ prep_msigdb_genesets <- function(msigdb_df){
     purrr::set_names(msigdb_df$name)
   
   # first pull out info for each category and then pull out specific genes for geneset
-  msigdb_geneset_df <- msigdb_category_list |>
-    purrr::map(\(category_list){
-      # replace subcategory with default NULL
-      # can't use NULL in tsv since it gets read in as a character
-      if (is.na(category_list$subcategory)) {
-        subcategory <- NULL
-      } else {
-        subcategory <- category_list$subcategory
-      }
-      
+  msigdb_geneset_df <- msigdb_category_df |>
+    purrr::pmap(\(category, subcategory){
       msigdbr::msigdbr(
         species = "Homo sapiens",
-        collection = category_list$category,
-        subcollection = subcategory
+        collection = category,
+        subcollection = ifelse(is.na(subcategory), NULL, subcategory)
       )
     }) |>
     dplyr::bind_rows() |>
@@ -84,11 +76,8 @@ run_ora <- function(mp_list, gene_universe, term2gene_df, num_genes=200){
   # run ORA using the top 200 genes
   ora_results <- mp_top_list |> 
     purrr::map(\(weights){
-      
-      genes <- names(weights)
-      
       clusterProfiler::enricher(
-        gene = genes,
+        gene = names(weights),
         universe = gene_universe,
         TERM2GENE = term2gene_df
       )
@@ -97,12 +86,9 @@ run_ora <- function(mp_list, gene_universe, term2gene_df, num_genes=200){
   # combine ora results into a single dataframe
   # only include genesets with pvalue < 0.05, the default by enricher 
   ora_results_df <- ora_results |> 
-    purrr::imap(\(result, mp_name) {
-      result@result |> 
-        dplyr::mutate(metaprogram = mp_name) |> 
-        dplyr::filter(p.adjust <= 0.05) 
-    }) |>
-    purrr::list_rbind()
+    purrr::map(\(ora) ora@result ) |> 
+    purrr::list_rbind(names_to = metaprogram) |>
+    dplyr::filter(p.adjust <= 0.05) 
   
   return(ora_results_df)
   
@@ -138,28 +124,13 @@ max_jaccard <- function(results_df){
   cross_df <- tidyr::expand_grid(id1 = names(id1_list), id2 = names(id1_list))
   
   # calculate a single Jaccard index for each combination using split lists & ids
-  jaccard_scores <- cross_df |>
-    purrr::pmap_dbl(\(id1, id2){
-      calc_jaccard(id1_list[[id1]], id1_list[[id2]])
-    })
-  
-  # add scores to the comparison grid and convert to matrix
+  # then convert to matrix
   jaccard_matrix <- cross_df |>
-    dplyr::mutate(jaccard = jaccard_scores) |>
+    dplyr::mutate(jaccard = calc_jaccard(id1_list[[id1]], id1_list[[id2]])) |>
     # convert to matrix
-    tidyr::pivot_wider(
-      names_from = "id2",
-      values_from = "jaccard"
-    ) |>
-    tibble::column_to_rownames(var = "id1") |>
-    as.matrix()
-  
-  # we want the off diagonal max so first set diagonal to 0
-  diag(jaccard_matrix) <- 0
-  max_jaccard <- data.frame(
-    metaprogram = rownames(jaccard_matrix),
-    max_jaccard = rowMax(jaccard_matrix)
-  )
+    dplyr::filter(id1 != id2) |>
+    dplyr::slice_max(jaccard, by = id1) |>
+    dplyr::rename(metaprogram = id1, max_jaccard = jaccard)
   
   return(max_jaccard)
 }
@@ -353,7 +324,7 @@ ews_fli1_genesets <- ef_category_df |>
 
 # filter out EF gene sets and recalculate jaccard
 filtered_ora_results_df <- ora_results_df |> 
-  dplyr::filter(!ID %in% c(ews_fli1_genesets))
+  dplyr::filter(!(ID %in% ews_fli1_genesets))
 
 max_jaccard_no_ews <- max_jaccard(filtered_ora_results_df) |> 
   dplyr::rename(max_jaccard_no_ews = max_jaccard)
