@@ -140,7 +140,7 @@ max_jaccard <- function(results_df){
     dplyr::mutate(jaccard = calc_jaccard(id1_list[[id1]], id1_list[[id2]])) |>
     dplyr::ungroup() |> # remove rowwise prior to getting max
     # get the max jaccard
-    dplyr::slice_max(jaccard, by = id1) |>
+    dplyr::slice_max(jaccard, by = id1, with_ties = FALSE) |>
     dplyr::rename(metaprogram = id1, max_jaccard = jaccard) |> 
     dplyr::select(metaprogram, max_jaccard) |> 
     unique()
@@ -263,7 +263,7 @@ mp_medians_df <- mp_cor_df |>
     values_from = group_median
   ) |> 
   dplyr::mutate(
-    median_difference = round(within - between, 2)
+    median_difference = within - between
   ) |> 
   dplyr::select(metaprogram = mp1, median_difference)
 
@@ -280,7 +280,7 @@ mp_prop_df <- mp_lookup |>
   dplyr::group_by(metaprogram) |>
   dplyr::summarize(
     num_samples = length(sample_id),
-    proportion_of_samples = round(num_samples / total_samples, 2)
+    proportion_of_samples = num_samples / total_samples
   )
 
 # ORA --------------------------------------------------------------------------
@@ -319,7 +319,7 @@ geneset_prop_df <- ora_results_df |>
     # get the num mps and proportion that each gene set is significant in
     num_mps = dplyr::n_distinct(metaprogram), 
     proportion_mps = num_mps/mp_object$n_metaprograms,
-    metaprograms = paste0(metaprogram, collapse = ",")
+    metaprograms = list(metaprogram)
   ) |> 
   dplyr::arrange(desc(proportion_mps)) |> 
   as.data.frame()
