@@ -58,10 +58,15 @@ sample_ids=""
 scpca_nf_dir="$home_dir/scpca-nf-out"
 outdir="$home_dir/ews-nf-out"
 workdir="$home_dir/work"
+
+# cnmf parameters
 skip_cnmf=${skip_cnmf:-0}
 k_components_lower=${k_components_lower:-5}
 k_components_upper=${k_components_upper:-25}
 k_step_size=${k_step_size:-5}
+
+# metaprogram parameters
+cnmf_k_range=${cnmf_k_range:-"all"}
 filter_spectra=${filter_spectra:-0}
 n_metaprograms=${n_metaprograms:-10}
 
@@ -106,6 +111,7 @@ nextflow run "$ews_dir/main.nf" \
   --k_components_upper $k_components_upper \
   --k_step_size $k_step_size \
   --n_metaprograms $n_metaprograms \
+  --cnmf_k_range $cnmf_k_range \
   $sample_flag \
   $cnmf_flag \
   $filter_spectra_flag
