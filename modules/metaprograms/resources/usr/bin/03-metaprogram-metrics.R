@@ -4,7 +4,8 @@
 # The output is a RDS file with 
 
 # mp_metrics_df: A dataframe of metrics calculated for each MP
-# geneset_entropy_df: A dataframe with gene set entropies as determined by ORA
+# geneset_prop_df: A dataframe with the proportion of total MPs that each 
+#  gene set is associated with as determined by ORA
 # ora_results_df: A dataframe of all results output from ORA
 
 # mp_metrics_df contains the following metrics: 
@@ -309,19 +310,18 @@ num_genesets_df <- ora_results_df |>
   dplyr::group_by(metaprogram) |> 
   dplyr::summarise(num_sig_genesets = length(ID))
 
-# Gene set entropy -------------------------------------------------------------
+# Gene set proportion ---------------------------------------------------------_
 
-# table of geneset entropy
-geneset_entropy_df <- ora_results_df |> 
+# table of genesets and the proportion of MPs 
+geneset_prop_df <- ora_results_df |> 
   dplyr::group_by(ID) |>
-  # now the shannon index for each geneset 
   dplyr::summarise(
-    shannon = -sum(pvalue * log(pvalue)), # entropy
-    num_mps = dplyr::n_distinct(metaprogram), # get unique value for printing
-    shannon_norm = shannon / log(num_mps),
+    # get the num mps and proportion that each gene set is significant in
+    num_mps = dplyr::n_distinct(metaprogram), 
+    proportion_mps = num_mps/mp_object$n_metaprograms,
     metaprograms = paste0(metaprogram, collapse = ",")
   ) |> 
-  dplyr::arrange(shannon_norm) |> 
+  dplyr::arrange(desc(proportion_mps)) |> 
   as.data.frame()
 
 # Jaccard index ----------------------------------------------------------------
@@ -354,7 +354,7 @@ mp_metrics_df <- max_cor_df |>
 # create an object for exporting with mp metrics, gene set entropy, and ora results
 metrics_obj <- list(
   mp_metrics_df = mp_metrics_df,
-  geneset_entropy_df = geneset_entropy_df,
+  geneset_prop_df = geneset_prop_df,
   ora_results_df = ora_results_df,
   # add some key parameters which will help when we combine these TSV files across different parameters
   n_metaprograms = mp_object$n_metaprograms,
