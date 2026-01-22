@@ -101,7 +101,6 @@ else
     filter_spectra_flag=""
 fi
 
-$n_metaprograms="5,6,7"
 # get array of n_metaprograms to run the workflow with 
 IFS=',' read -ra n_array <<< "$n_metaprograms"
 
