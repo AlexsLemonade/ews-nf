@@ -31,10 +31,9 @@
 prep_msigdb_genesets <- function(msigdb_df){
   
   # get list of categories that we need to grab from msigdb
-  msigdb_category_list <- msigdb_df |>
+  msigdb_category_df <- msigdb_df |>
     dplyr::select(category, subcategory) |>
-    unique() |>
-    purrr::transpose()
+    unique() 
   
   # list of msig genesets names
   # we have to pull all genesets from a specific category/subcategory 
@@ -45,10 +44,19 @@ prep_msigdb_genesets <- function(msigdb_df){
   # first pull out info for each category and then pull out specific genes for geneset
   msigdb_geneset_df <- msigdb_category_df |>
     purrr::pmap(\(category, subcategory){
+      
+      # ifelse complains about null so need to use a full if statement 
+      # to replace missing subcategory with NULL 
+      if(is.na(subcategory)){
+        subcategory <- NULL
+      } else {
+        subcategory <- subcategory
+      }
+
       msigdbr::msigdbr(
         species = "Homo sapiens",
         collection = category,
-        subcollection = ifelse(is.na(subcategory), NULL, subcategory)
+        subcollection = subcategory
       )
     }) |>
     dplyr::bind_rows() |>
@@ -87,7 +95,7 @@ run_ora <- function(mp_list, gene_universe, term2gene_df, num_genes=200){
   # only include genesets with pvalue < 0.05, the default by enricher 
   ora_results_df <- ora_results |> 
     purrr::map(\(ora) ora@result ) |> 
-    purrr::list_rbind(names_to = metaprogram) |>
+    purrr::list_rbind(names_to = "metaprogram") |>
     dplyr::filter(p.adjust <= 0.05) 
   
   return(ora_results_df)
@@ -123,16 +131,20 @@ max_jaccard <- function(results_df){
   # create the grid of comparisons
   cross_df <- tidyr::expand_grid(id1 = names(id1_list), id2 = names(id1_list))
   
-  # calculate a single Jaccard index for each combination using split lists & ids
-  # then convert to matrix
-  jaccard_matrix <- cross_df |>
+  jaccard_df <- cross_df |>
+    # remove comparisons to self
+    dplyr::filter(id1 != id2) |> 
+    dplyr::rowwise() |> 
+    # calculate a single Jaccard index for each combination using split lists & ids
     dplyr::mutate(jaccard = calc_jaccard(id1_list[[id1]], id1_list[[id2]])) |>
-    # convert to matrix
-    dplyr::filter(id1 != id2) |>
+    dplyr::ungroup() |> # remove rowwise prior to getting max
+    # get the max jaccard
     dplyr::slice_max(jaccard, by = id1) |>
-    dplyr::rename(metaprogram = id1, max_jaccard = jaccard)
+    dplyr::rename(metaprogram = id1, max_jaccard = jaccard) |> 
+    dplyr::select(metaprogram, max_jaccard) |> 
+    unique()
   
-  return(max_jaccard)
+  return(jaccard_df)
 }
 
 # Read in arguments ------------------------------------------------------------
@@ -236,7 +248,7 @@ mp_cor_df <- mp_object$spectra_cor_df |>
   dplyr::left_join(mp_lookup, by = c("spectra2" = "spectra")) |> 
   dplyr::rename(mp2 = metaprogram) |>
   # add a column indicating if the spectra are assigned to the same or different mps
-  dplyr::mutate(within_mp = mp1 == mp2)
+  dplyr::mutate(within_mp = ifelse(mp1 == mp2, "within", "between"))
 
 # calculate the difference in medians between the two groups to display on the plot
 mp_medians_df <- mp_cor_df |> 
@@ -250,7 +262,7 @@ mp_medians_df <- mp_cor_df |>
     values_from = group_median
   ) |> 
   dplyr::mutate(
-    median_difference = round(`TRUE` - `FALSE`, 2)
+    median_difference = round(within - between, 2)
   ) |> 
   dplyr::select(metaprogram = mp1, median_difference)
 
