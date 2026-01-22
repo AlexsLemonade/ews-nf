@@ -68,7 +68,12 @@ k_step_size=${k_step_size:-5}
 # metaprogram parameters
 cnmf_k_range=${cnmf_k_range:-"all"}
 filter_spectra=${filter_spectra:-0}
+# can be a single value or a comma separated list of values
 n_metaprograms=${n_metaprograms:-10}
+
+# use this to construct job names
+date=$(date "+%Y-%m-%d")
+datetime=$(date "+%Y-%m-%dT%H%M")
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
@@ -100,18 +105,30 @@ else
     filter_spectra_flag=""
 fi
 
-# run ews-nf workflow with specified parameters
-nextflow run "$ews_dir/main.nf" \
-  -profile "pitt_htc" \
-  -entry nmf_metaprograms \
-  -work-dir "$workdir" \
-  --scpca_nf_dir "$scpca_nf_dir" \
-  --outdir "$outdir" \
-  --k_components_lower $k_components_lower \
-  --k_components_upper $k_components_upper \
-  --k_step_size $k_step_size \
-  --n_metaprograms $n_metaprograms \
-  --cnmf_k_range $cnmf_k_range \
-  $sample_flag \
-  $cnmf_flag \
-  $filter_spectra_flag
+$n_metaprograms="5,6,7"
+# get array of n_metaprograms to run the workflow with 
+IFS=',' read -ra n_array <<< "$n_metaprograms"
+
+for n in "${n_array[@]}"; do 
+    echo "Generating metaprograms with k=$n"
+
+    job_name="k${n}-metaprogs_${datetime}"
+
+    # run ews-nf workflow with specified parameters
+    nextflow run "$ews_dir/main.nf" \
+      -profile "pitt_htc" \
+      -entry nmf_metaprograms \
+      -work-dir "$workdir" \
+      -name "$job_name" \
+      --scpca_nf_dir "$scpca_nf_dir" \
+      --outdir "$outdir" \
+      --k_components_lower $k_components_lower \
+      --k_components_upper $k_components_upper \
+      --k_step_size $k_step_size \
+      --n_metaprograms $n \
+      --cnmf_k_range $cnmf_k_range \
+      $sample_flag \
+      $cnmf_flag \
+      $filter_spectra_flag
+
+done
