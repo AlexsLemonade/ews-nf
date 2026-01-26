@@ -33,7 +33,7 @@
 #  can be either "all" or a comma separated string, default is "5,10,15"
 # filter_spectra: Used to filter orphan spectra prior to generating metaprograms, default is 1 (true)
 #  to keep all spectra, use --filter_spectra 0
-# n_metaprograms: Number of metaprograms to generate, default is 10
+# n_metaprograms: Number of metaprograms to generate, can be a single number (as a string) or a comma separated list, default is 10
 # ews_dir: Path to the ews-nf repo, default is $HOME/ews-nf
 
 # To submit this script use the following example:
@@ -71,7 +71,7 @@ k_step_size=${k_step_size:-5}
 cnmf_k_range=${cnmf_k_range:-"5,10,15"}
 filter_spectra=${filter_spectra:-1}
 # can be a single value or a comma separated list of values
-n_metaprograms=${n_metaprograms:-10}
+n_metaprograms=${n_metaprograms:-"10"}
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
@@ -103,26 +103,20 @@ else
     filter_spectra_flag=""
 fi
 
-# get array of n_metaprograms to run the workflow with 
-IFS=',' read -ra n_array <<< "$n_metaprograms"
 
-for n in "${n_array[@]}"; do 
-    echo "Generating metaprograms with k=$n"
+# run ews-nf workflow with specified parameters
+nextflow run "$ews_dir/main.nf" \
+  -profile "pitt_htc" \
+  -entry nmf_metaprograms \
+  -work-dir "$workdir" \
+  --scpca_nf_dir "$scpca_nf_dir" \
+  --outdir "$outdir" \
+  --k_components_lower $k_components_lower \
+  --k_components_upper $k_components_upper \
+  --k_step_size $k_step_size \
+  --n_metaprograms $n_metaprograms \
+  --cnmf_k_range $cnmf_k_range \
+  $sample_flag \
+  $cnmf_flag \
+  $filter_spectra_flag
 
-    # run ews-nf workflow with specified parameters
-    nextflow run "$ews_dir/main.nf" \
-      -profile "pitt_htc" \
-      -entry nmf_metaprograms \
-      -work-dir "$workdir" \
-      --scpca_nf_dir "$scpca_nf_dir" \
-      --outdir "$outdir" \
-      --k_components_lower $k_components_lower \
-      --k_components_upper $k_components_upper \
-      --k_step_size $k_step_size \
-      --n_metaprograms $n \
-      --cnmf_k_range $cnmf_k_range \
-      $sample_flag \
-      $cnmf_flag \
-      $filter_spectra_flag
-
-done

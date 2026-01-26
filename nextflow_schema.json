@@ -187,9 +187,9 @@
           "description": "Set of k values used with cNMF to keep when clustering spectra into metaprograms, comma separated. Use 'all' to use all available k."
         },
         "n_metaprograms": {
-          "type": "number",
-          "default": 10,
-          "description": "Number of metaprograms to create"
+          "type": "string",
+          "default": "10",
+          "description": "Number of metaprograms to create. Can be a single number or comma separated string of numbers."
         },
         "filter_spectra": {
           "type": "boolean",
