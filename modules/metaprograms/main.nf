@@ -121,7 +121,9 @@ process metaprogram_report {
     path msigdb_genesets_file
     path gene_set_category_file
   output:
-    path "metaprograms-summary-report.html"
+    tuple val(n_metaprograms), 
+          val(metaprograms_publish_dir),
+          path("metaprograms-summary-report.html")
   script:
     def score_file_string = score_files.join(',')
     """
@@ -202,7 +204,7 @@ workflow metaprograms {
     )
 
   emit:
-    metaprograms = generate_metaprograms.out // ["metaprograms.rds"]
-    metaprogram_scores = score_metaprograms.out // [unique_id, sample_id, metaprogram scores tsv]
-    metaprogram_metrics = metaprogram_metrics.out // ["metaprogram-metrics.rds"]
+    metaprograms = generate_metaprograms.out // [n_metaprograms, metaprograms_publish_dir, "metaprograms.rds"]
+    metaprogram_scores = score_metaprograms.out // [n_metaprograms, unique_id, sample_id, metaprogram scores tsv]
+    metaprogram_metrics = metaprogram_metrics.out // [n_metaprograms, metaprograms_publish_dir, "metaprogram-metrics.rds"]
 }
