@@ -4,22 +4,26 @@
 
 process generate_metaprograms {
   container params.ews_nf_container
+  tag "${n_metaprograms}_metaprograms"
   label 'mem_96'
   cpus 2
   time '12h'
   publishDir "${metaprograms_publish_dir}", mode: 'copy'
   input:
     path cnmf_results_dirs
-    val metaprograms_publish_dir
+    tuple val(n_metaprograms), 
+          val(metaprograms_publish_dir)
   output:
-    path "metaprograms.rds"
+    tuple val(n_metaprograms), 
+          val(metaprograms_publish_dir), 
+          path("metaprograms.rds")
   script:
     def cnmf_results_string = cnmf_results_dirs.join(',')
     """
     01-generate-metaprograms.R \
       --cnmf_results_dirs ${cnmf_results_string} \
       --cnmf_k_range ${params.cnmf_k_range} \
-      --n_metaprograms ${params.n_metaprograms} \
+      --n_metaprograms ${n_metaprograms} \
       --filter_spectra ${params.filter_spectra} \
       --orphan_cutoff ${params.orphan_cutoff} \
       --output_file "metaprograms.rds" \
@@ -34,7 +38,7 @@ process generate_metaprograms {
 
 process score_metaprograms {
   container params.ews_nf_container
-  tag "${unique_id}"
+  tag "${unique_id}-${n_metaprograms}_metaprograms"
   label 'mem_24'
   cpus 2
   time '12h'
@@ -43,11 +47,13 @@ process score_metaprograms {
     tuple val(unique_id),
           val(sample_id),
           path(sce_file),
-          path(annotations_file)
-    path metaprograms_rds
-    val metaprograms_publish_dir
+          path(annotations_file),
+          val(n_metaprograms), 
+          val(metaprograms_publish_dir), 
+          path("metaprograms.rds")
   output:
-    tuple val(unique_id),
+    tuple val(n_metaprograms),
+          val(unique_id),
           val(sample_id),
           path("${unique_id}_metaprogram_scores.tsv")
   script:
@@ -66,21 +72,58 @@ process score_metaprograms {
     """
 }
 
-process metaprogram_report {
+process metaprogram_metrics {
   container params.ews_nf_container
+  tag "${n_metaprograms}_metaprograms"
   label 'mem_24'
   time '2h'
   publishDir "${metaprograms_publish_dir}", mode: 'copy'
   input:
-    path score_files
-    path metaprograms_file
+    tuple val(n_metaprograms), 
+          val(metaprograms_publish_dir), 
+          path("metaprograms.rds")
+    path custom_genesets_file
+    path msigdb_genesets_file
+    path gene_set_category_file
+  output:
+    tuple val(n_metaprograms), 
+          val(metaprograms_publish_dir), 
+          path("metaprograms-metrics.rds")
+  script:
+    """
+    03-metaprogram-metrics.R \
+      --metaprograms_file ${metaprograms_file} \
+      --custom_geneset_file ${custom_genesets_file} \
+      --msigdb_geneset_file ${msigdb_genesets_file} \
+      --category_file ${gene_set_category_file} \
+      --output_file "metaprograms-metrics.rds" \
+      --seed ${params.seed}
+    """
+  stub:
+    """
+    touch "metaprograms-metrics.rds"
+    """
+}
+
+process metaprogram_report {
+  container params.ews_nf_container
+  tag "${n_metaprograms}_metaprograms"
+  label 'mem_24'
+  time '2h'
+  publishDir "${metaprograms_publish_dir}", mode: 'copy'
+  input:
+    tuple val(n_metaprograms),
+          val(metaprograms_publish_dir),
+          path(metaprograms_file),
+          path(score_files)
     path template_file
     path custom_genesets_file
     path msigdb_genesets_file
     path gene_set_category_file
-    val metaprograms_publish_dir
   output:
-    path "metaprograms-summary-report.html"
+    tuple val(n_metaprograms), 
+          val(metaprograms_publish_dir),
+          path("metaprograms-summary-report.html")
   script:
     def score_file_string = score_files.join(',')
     """
@@ -109,33 +152,58 @@ workflow metaprograms {
     cnmf_k_range_str = params.cnmf_k_range.replaceAll(",", "-")
     filter_str = params.filter_spectra ? "filtered" : "unfiltered"
 
-    // define the publish directory for metaprograms
-    metaprograms_publish_dir = "${params.outdir}/metaprograms/metaprograms-${params.n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
+    // channel of n_metaprograms and publish directory for each version of metaprograms
+    n_metaprograms_ch = channel.fromList(params.n_metaprograms.tokenize(","))
+      .map{n_metaprograms -> 
+        // define the publish directory for metaprograms
+        def metaprograms_publish_dir = "${params.outdir}/metaprograms/metaprograms-${n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
+        [n_metaprograms, metaprograms_publish_dir]
+      }
 
     // get all directories as one list
     metaprograms_input_ch = cnmf_ch.collect{ unique_id, sample_id, cnmf_output -> cnmf_output }
 
     // generate metaprograms
-    generate_metaprograms(metaprograms_input_ch, metaprograms_publish_dir)
+    generate_metaprograms(metaprograms_input_ch, n_metaprograms_ch)
 
     // score metaprograms for each sample
-    score_metaprograms(sce_ch, generate_metaprograms.out, metaprograms_publish_dir)
+    // make sure to score for each sample for each value of n_metaprograms
+    score_input_ch = sce_ch.combine(generate_metaprograms.out)
+    score_metaprograms(score_input_ch)
+
+    // calculate metrics 
+    metaprogram_metrics(
+      generate_metaprograms.out, 
+      file(params.custom_genesets_file),
+      file(params.msigdb_genesets_file),
+      file(params.gene_set_category_file)
+    )
 
     // render report
     // define path to template report 
     report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
-    score_ch = score_metaprograms.out.collect { unique_id, sample_id, score_files -> score_files }
+    report_ch = generate_metaprograms.out
+      // joining on n_metaprograms
+      .join(score_metaprograms.out, by: 0)
+      .map{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, unique_id, sample_id, score_files -> 
+        [
+          n_metaprograms, 
+          metaprograms_publish_dir, 
+          metaprograms_file,
+          score_files
+        ]
+      }
+
     metaprogram_report(
-      score_ch,
-      generate_metaprograms.out,
+      report_ch,
       file(report_template_file),
       file(params.custom_genesets_file),
       file(params.msigdb_genesets_file),
-      file(params.gene_set_category_file),
-      metaprograms_publish_dir
+      file(params.gene_set_category_file)
     )
 
   emit:
-    metaprograms = generate_metaprograms.out // ["metaprograms.rds"]
-    metaprogram_scores = score_metaprograms.out // [unique_id, sample_id, metaprogram scores tsv]
+    metaprograms = generate_metaprograms.out // [n_metaprograms, metaprograms_publish_dir, "metaprograms.rds"]
+    metaprogram_scores = score_metaprograms.out // [n_metaprograms, unique_id, sample_id, metaprogram scores tsv]
+    metaprogram_metrics = metaprogram_metrics.out // [n_metaprograms, metaprograms_publish_dir, "metaprogram-metrics.rds"]
 }
