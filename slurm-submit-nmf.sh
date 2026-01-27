@@ -29,9 +29,11 @@
 # skip_cnmf: Used to skip running cNMF for samples where cNMF results already exist in the output directory
 #  By default, cNMF will be run on all samples regardless of if results exist
 #  To skip, use --skip_cnmf 1
-# filter_spectra: Used to filter orphan spectra prior to generating metaprograms, default is 0 (false)
-#  to filter, use --filter_spectra 1
-# n_metaprograms: Number of metaprograms to generate, default is 10
+# cnmf_k_range:  List of k values to use from existing cNMF results when generating metaprograms
+#  can be either "all" or a comma separated string, default is "5,10,15"
+# filter_spectra: Used to filter orphan spectra prior to generating metaprograms, default is 1 (true)
+#  to keep all spectra, use --filter_spectra 0
+# n_metaprograms: Number of metaprograms to generate, can be a single number (as a string) or a comma separated list, default is 10
 # ews_dir: Path to the ews-nf repo, default is $HOME/ews-nf
 
 # To submit this script use the following example:
@@ -58,12 +60,18 @@ sample_ids=""
 scpca_nf_dir="$home_dir/scpca-nf-out"
 outdir="$home_dir/ews-nf-out"
 workdir="$home_dir/work"
+
+# cnmf parameters
 skip_cnmf=${skip_cnmf:-0}
 k_components_lower=${k_components_lower:-5}
 k_components_upper=${k_components_upper:-25}
 k_step_size=${k_step_size:-5}
-filter_spectra=${filter_spectra:-0}
-n_metaprograms=${n_metaprograms:-10}
+
+# metaprogram parameters
+cnmf_k_range=${cnmf_k_range:-"5,10,15"}
+filter_spectra=${filter_spectra:-1}
+# can be a single value or a comma separated list of values
+n_metaprograms=${n_metaprograms:-"10"}
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
@@ -95,6 +103,7 @@ else
     filter_spectra_flag=""
 fi
 
+
 # run ews-nf workflow with specified parameters
 nextflow run "$ews_dir/main.nf" \
   -profile "pitt_htc" \
@@ -106,6 +115,8 @@ nextflow run "$ews_dir/main.nf" \
   --k_components_upper $k_components_upper \
   --k_step_size $k_step_size \
   --n_metaprograms $n_metaprograms \
+  --cnmf_k_range $cnmf_k_range \
   $sample_flag \
   $cnmf_flag \
   $filter_spectra_flag
+
