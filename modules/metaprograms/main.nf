@@ -155,11 +155,9 @@ workflow metaprograms {
     // channel of n_metaprograms and publish directory for each version of metaprograms
     n_metaprograms_ch = channel.fromList(params.n_metaprograms.tokenize(","))
       .map{n_metaprograms -> 
-        [
-          n_metaprograms,
-          // define the publish directory for metaprograms
-          metaprograms_publish_dir = "${params.outdir}/metaprograms/metaprograms-${n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
-        ]
+        // define the publish directory for metaprograms
+        def metaprograms_publish_dir = "${params.outdir}/metaprograms/metaprograms-${n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
+        [n_metaprograms, metaprograms_publish_dir]
       }
 
     // get all directories as one list
@@ -185,6 +183,7 @@ workflow metaprograms {
     // define path to template report 
     report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
     report_ch = generate_metaprograms.out
+      // joining on n_metaprograms
       .join(score_metaprograms.out, by: 0)
       .map{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, unique_id, sample_id, score_files -> 
         [
