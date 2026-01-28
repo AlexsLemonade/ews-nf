@@ -190,7 +190,7 @@ workflow metaprograms {
           n_metaprograms, 
           metaprograms_publish_dir, 
           metaprograms_file,
-          score_files
+          score_files.collect()
         ]
       }
 
