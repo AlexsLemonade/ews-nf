@@ -150,7 +150,7 @@ This notebook shows results for the following parameters:
 
 ```{r}
 missing_samples <- mp_obj$removed_unique_ids
-if(length(missing_samples) == 0){
+if(length(missing_samples) > 0){
   
   missing_samples_bullets <- paste0("<li>", paste(missing_samples, collapse = "</li><li>", "</li>"))
 

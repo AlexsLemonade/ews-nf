@@ -250,7 +250,9 @@ mp_list <- mp_cluster_list |>
   })
 
 # get a vector of any samples that might not be represented in the output spectra
-spectra_unique_ids <- names(clusters)
+spectra_unique_ids <- names(clusters) |> 
+  # grab just the unique ids from the spectra names that are remaining
+  stringr::word(1, sep = "_")
 removed_unique_ids <- setdiff(unique_ids, spectra_unique_ids)
 
 # Export MPs -------------------------------------------------------------------
