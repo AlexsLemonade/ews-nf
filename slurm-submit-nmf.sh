@@ -114,7 +114,7 @@ nextflow run "$ews_dir/main.nf" \
   --k_components_lower $k_components_lower \
   --k_components_upper $k_components_upper \
   --k_step_size $k_step_size \
-  --n_metaprograms $n_metaprograms \
+  --n_metaprograms "$n_metaprograms" \
   --cnmf_k_range $cnmf_k_range \
   $sample_flag \
   $cnmf_flag \
