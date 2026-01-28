@@ -50,7 +50,7 @@ process score_metaprograms {
           path(annotations_file),
           val(n_metaprograms), 
           val(metaprograms_publish_dir), 
-          path("metaprograms.rds")
+          path(metaprograms_file)
   output:
     tuple val(n_metaprograms),
           val(unique_id),
@@ -61,7 +61,7 @@ process score_metaprograms {
     02-score-metaprograms.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
-      --metaprograms_file ${metaprograms_rds} \
+      --metaprograms_file ${metaprograms_file} \
       --output_file "${unique_id}_metaprogram_scores.tsv" \
       --seed ${params.seed}
     """
@@ -81,7 +81,7 @@ process metaprogram_metrics {
   input:
     tuple val(n_metaprograms), 
           val(metaprograms_publish_dir), 
-          path("metaprograms.rds")
+          path(metaprograms_file)
     path custom_genesets_file
     path msigdb_genesets_file
     path gene_set_category_file
