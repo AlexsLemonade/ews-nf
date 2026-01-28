@@ -182,17 +182,17 @@ workflow metaprograms {
     // render report
     // define path to template report 
     report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
+
+    grouped_score_ch = score_metaprograms.out
+      .map{ n_metaprograms, unique_id, sample_id, score_file -> 
+        [n_metaprograms, score_file]
+      }
+      // group by n_metaprograms to get list of score files for each n_metaprograms
+      .groupTuple(by: 0)
+
     report_ch = generate_metaprograms.out
       // joining on n_metaprograms
-      .join(score_metaprograms.out, by: 0)
-      .map{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, unique_id, sample_id, score_files -> 
-        [
-          n_metaprograms, 
-          metaprograms_publish_dir, 
-          metaprograms_file,
-          score_files.collect()
-        ]
-      }
+      .join(grouped_score_ch, by: 0)
 
     metaprogram_report(
       report_ch,
