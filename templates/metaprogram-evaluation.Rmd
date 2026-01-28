@@ -148,7 +148,7 @@ This notebook shows results for the following parameters:
 * Oprhan spectra cutoff (max cross sample correlation): `r mp_obj$orphan_cutoff`
 * Range of k used with cNMF (`all` indicates 5, 10, 15, 20, and 25 were used): `r mp_obj$cnmf_k_range`
 
-```{r}
+```{r, results='asis'}
 missing_samples <- mp_obj$removed_unique_ids
 if(length(missing_samples) > 0){
   
