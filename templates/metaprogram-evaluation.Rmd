@@ -148,6 +148,26 @@ This notebook shows results for the following parameters:
 * Oprhan spectra cutoff (max cross sample correlation): `r mp_obj$orphan_cutoff`
 * Range of k used with cNMF (`all` indicates 5, 10, 15, 20, and 25 were used): `r mp_obj$cnmf_k_range`
 
+```{r, results='asis'}
+missing_samples <- mp_obj$removed_unique_ids
+if(length(missing_samples) > 0){
+  
+  missing_samples_bullets <- paste0("<li>", paste(missing_samples, collapse = "</li><li>", "</li>"))
+
+    glue::glue("
+      <div class=\"alert alert-info\">
+
+      Metaprograms do not contain cNMF spectra from all samples.
+      All spectra from the following samples were removed during filtering. 
+
+      {missing_samples_bullets}
+
+      </div>
+    ")
+}
+```
+
+
 ## Redundancy of metaprograms
 
 Here we look at the correlation of all MPs to all other MPs. 

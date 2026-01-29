@@ -15,6 +15,7 @@
 # orphan_cutoff: If orphan spectra were removed, the minimum cross sample correlation
 # to keep the spectra. If no filtering, this is -1 
 # unique_ids: Vector of unique IDs associated with the MPs
+# removed_unique_ids: Vector of unique IDs that are removed when filtering the spectra
 
 # Functions --------------------------------------------------------------------
 
@@ -248,6 +249,12 @@ mp_list <- mp_cluster_list |>
     rowMeans(spectra_mtx[, cluster_spectra, drop = FALSE], na.rm = TRUE)
   })
 
+# get a vector of any samples that might not be represented in the output spectra
+spectra_unique_ids <- names(clusters) |> 
+  # grab just the unique ids from the spectra names that are remaining
+  stringr::word(1, sep = "_")
+removed_unique_ids <- setdiff(unique_ids, spectra_unique_ids)
+
 # Export MPs -------------------------------------------------------------------
 
 # build a list with MPs, clustered spectra, cor mtx and parameters used to export
@@ -263,7 +270,8 @@ mp_info_list <- list(
   "filter_spectra" = opt$filter_spectra,
   # if no filtering, this is -1 which means everything was kept
   "orphan_cutoff" = ifelse(opt$filter_spectra, opt$orphan_cutoff, -1),
-  "unique_ids" = unique(unique_ids)
+  "unique_ids" = unique(unique_ids),
+  "removed_unique_ids" = removed_unique_ids
 )
 
 readr::write_rds(mp_info_list, opt$output_file)

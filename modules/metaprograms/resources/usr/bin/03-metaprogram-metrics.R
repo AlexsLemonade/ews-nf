@@ -269,7 +269,8 @@ mp_medians_df <- mp_cor_df |>
 # Sample proportion ------------------------------------------------------------
 
 # get the total number of samples to use as the denominator for proportion
-total_samples <- length(unique(mp_cor_df$sample1))
+# use all samples even if they are not all present in the spectra after filtering
+total_samples <- length(mp_object$unique_ids)
 
 # count the total number and proportion of samples per mp
 mp_prop_df <- mp_lookup |>
@@ -359,7 +360,8 @@ metrics_obj <- list(
   n_metaprograms = mp_object$n_metaprograms,
   cnmf_k_range = mp_object$cnmf_k_range,
   filter_spectra = mp_object$filter_spectra,
-  orphan_cutoff = mp_object$orphan_cutoff
+  orphan_cutoff = mp_object$orphan_cutoff,
+  removed_unique_ids = mp_object$removed_unique_ids
 )
 
 readr::write_rds(metrics_obj, opt$output_file)
