@@ -153,7 +153,7 @@ workflow metaprograms {
     filter_str = params.filter_spectra ? "filtered" : "unfiltered"
 
     // channel of n_metaprograms and publish directory for each version of metaprograms
-    n_metaprograms_ch = channel.fromList(params.n_metaprograms.tokenize(","))
+    n_metaprograms_ch = channel.fromList(params.n_metaprograms.toString().tokenize(","))
       .map{n_metaprograms -> 
         // define the publish directory for metaprograms
         def metaprograms_publish_dir = "${params.outdir}/metaprograms/metaprograms-${n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"

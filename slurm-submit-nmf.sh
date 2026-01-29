@@ -119,5 +119,5 @@ nextflow run "$ews_dir/main.nf" \
   $cnmf_flag \
   $filter_spectra_flag \
   # ensure n_metaprograms is always a string even when it's a single number as expected by NF
-  --n_metaprograms "'"$n_metaprograms"
+  --n_metaprograms "$n_metaprograms"
 
