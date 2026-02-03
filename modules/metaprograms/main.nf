@@ -50,7 +50,7 @@ process score_metaprograms {
           path(annotations_file),
           val(n_metaprograms), 
           val(metaprograms_publish_dir), 
-          path("metaprograms.rds")
+          path(metaprograms_file)
   output:
     tuple val(n_metaprograms),
           val(unique_id),
@@ -61,7 +61,7 @@ process score_metaprograms {
     02-score-metaprograms.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
-      --metaprograms_file ${metaprograms_rds} \
+      --metaprograms_file ${metaprograms_file} \
       --output_file "${unique_id}_metaprogram_scores.tsv" \
       --seed ${params.seed}
     """
@@ -81,7 +81,7 @@ process metaprogram_metrics {
   input:
     tuple val(n_metaprograms), 
           val(metaprograms_publish_dir), 
-          path("metaprograms.rds")
+          path(metaprograms_file)
     path custom_genesets_file
     path msigdb_genesets_file
     path gene_set_category_file
@@ -153,7 +153,7 @@ workflow metaprograms {
     filter_str = params.filter_spectra ? "filtered" : "unfiltered"
 
     // channel of n_metaprograms and publish directory for each version of metaprograms
-    n_metaprograms_ch = channel.fromList(params.n_metaprograms.tokenize(","))
+    n_metaprograms_ch = channel.fromList(params.n_metaprograms.toString().tokenize(","))
       .map{n_metaprograms -> 
         // define the publish directory for metaprograms
         def metaprograms_publish_dir = "${params.outdir}/metaprograms/metaprograms-${n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
@@ -182,17 +182,17 @@ workflow metaprograms {
     // render report
     // define path to template report 
     report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
+
+    grouped_score_ch = score_metaprograms.out
+      .map{ n_metaprograms, unique_id, sample_id, score_file -> 
+        [n_metaprograms, score_file]
+      }
+      // group by n_metaprograms to get list of score files for each n_metaprograms
+      .groupTuple(by: 0)
+
     report_ch = generate_metaprograms.out
       // joining on n_metaprograms
-      .join(score_metaprograms.out, by: 0)
-      .map{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, unique_id, sample_id, score_files -> 
-        [
-          n_metaprograms, 
-          metaprograms_publish_dir, 
-          metaprograms_file,
-          score_files
-        ]
-      }
+      .join(grouped_score_ch, by: 0)
 
     metaprogram_report(
       report_ch,
