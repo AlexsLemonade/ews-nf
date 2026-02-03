@@ -338,13 +338,11 @@ First, let's just look at the variance of the scores across all samples.
 ```{r}
 var_df <- scores_df |> 
   dplyr::group_by(n_metaprograms, metaprogram) |> 
-  # get the variance for each mp 
-  dplyr::mutate(
-    score_var = stats::var(mp_score, na.rm = TRUE),
-  ) |> 
-  dplyr::ungroup() |> 
-  dplyr::select(n_metaprograms, score_var) |> 
-  dplyr::distinct()
+  summarize(
+    score_var = var(mp_score, na.rm = TRUE),
+    score_cv = sqrt(score_var) / mean(mp_score)
+  ) |>
+  dplyr::ungroup() 
 
 ggplot(var_df, aes(x = n_metaprograms, y = score_var)) +
   ggforce::geom_sina()
@@ -471,7 +469,11 @@ mp_metrics_mtx <- mp_metrics_df |>
   tibble::column_to_rownames("n_metaprograms") |> 
   as.matrix()
 
-ComplexHeatmap::Heatmap(mp_metrics_mtx, name = "Proportion of passing \nmetaprograms")
+ComplexHeatmap::Heatmap(
+  mp_metrics_mtx, 
+  name = "Proportion of passing \nmetaprograms",
+  cluster_rows = FALSE
+)
 ```
 
 What if we just take the mean of all values and sort them. 
