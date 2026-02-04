@@ -1,0 +1,685 @@
+---
+title: "Comparison of metaprograms across values of k"
+author: "Ally Hawkins"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    number_sections: false
+---
+
+This notebook will look at comparing metaprograms generated with a different value of k or number of metaprograms. 
+We'll use a set of metrics to look at this: 
+
+- Max correlation: The maximum correlation of the metaprogram to all other metaprograms using gene weights and cell scores. 
+- Difference of medians: The median value for the correlation of spectra in the same metaprograms subtracted by the median value for the correlation of spectra in different metaprograms. 
+- Max Jaccard index: The max Jaccard index of the metaprogram to all other metaprograms calculated by looking at the overlap in identified gene sets or pathways after performing over-representation analysis on the top 200 genes in each metaprogram. 
+- Unique gene sets: The proportion of gene sets identified using ORA for each metaprogram that are unique to that metaprogram.
+- Proportion of samples: The proportion of total samples represented in each metaprogram. 
+- Variance of cell scores: The variance of scores across all samples.
+
+## Set Up
+
+```{r setup, message = FALSE, echo = FALSE}
+library(ggplot2)
+
+# Set default ggplot theme
+theme_set(
+  theme_bw() +
+    theme(
+      strip.background = element_rect(fill = "transparent", linewidth = 0.5),
+    )
+)
+
+# some helpful settings
+options(
+  dplyr.summarise.inform = FALSE
+)
+
+set.seed(2026)
+```
+
+
+```{r}
+# paths to gene set category file
+# use this to color points based on EF or hallmarks gene set in plots
+category_file <- here::here("genesets", "gene-set-categories.tsv")
+geneset_category_df <- readr::read_tsv(category_file, col_types = list(.default = "c"))
+```
+
+
+```{r}
+# metaprograms results directory
+results_dir <- here::here("ews-nf-out", "metaprograms")
+
+# params we are looking at in this particular notebook 
+# use these to construct the file paths 
+n_metaprograms <- seq(5, 15, 1)
+
+# directories with metaprogram results 
+# one directory per n_metaprogram
+metaprogram_output_dirs <- file.path(
+  results_dir, 
+  glue::glue("metaprograms-{n_metaprograms}_cnmf-5-10-15_filtered")
+) |> 
+  # set names here so we can use them to read in the score files
+  purrr::set_names(sprintf("k_%02d", n_metaprograms))
+
+
+# path to files with each of the metrics
+metrics_files <- file.path(metaprogram_output_dirs, "metaprograms-metrics.rds") |> 
+  # file.path doesn't keep the names so set them again 
+  purrr::set_names(sprintf("k_%02d", n_metaprograms))
+```
+
+
+```{r, message=FALSE}
+# path to files with the scores for each of the outputs
+# each sample with each k/n_metaprograms has it's own file
+# so go through each of the directories and find the score files to join together
+# note that trying to read in all the files and then join at once caused R to crash 
+scores_df <- metaprogram_output_dirs |> 
+  purrr::map(\(dir){
+    
+    files <- list.files(
+      path = dir,
+      pattern = "_metaprogram_scores.tsv",
+      recursive = TRUE,
+      full.names = TRUE
+    )
+    
+    # read in dataframe with metaprogra(e.g., MP01), barcodes, mp_score, and unique_id
+    # one row per cell per mp
+    files |> 
+      purrr::map(\(f) {
+        readr::read_tsv(
+          f, 
+          col_types = 
+            list(metaprogram = "c", barcodes = "c", mp_score = "n", unique_id = "c")
+        )
+      })|> 
+      dplyr::bind_rows()
+    
+  }) |> 
+  dplyr::bind_rows(.id = "n_metaprograms")
+```
+
+```{r, message=FALSE}
+# get the metrics files 
+mp_metrics_list <- metrics_files |> 
+  purrr::map(readr::read_rds)
+
+# create dataframe with one row per metaprogram/n_metaprogram (k) combination 
+# each column is a metric for that metaprograms
+mp_metrics_df <- mp_metrics_list |> 
+  purrr::map(\(metrics_list) metrics_list$mp_metrics_df) |> 
+  dplyr::bind_rows(.id = "n_metaprograms")
+```
+
+
+## Max correlation 
+
+Here we look at the max correlation of each metaprogram to all other metaprograms. 
+We calculate correlation in two ways: 
+
+1. Correlation of metaprogram gene weights - Here the weights across all genes in each metaprogram are used as input. 
+This reports correlation of the genes in the metaprogram.
+2. Correlation of metaprogram scores - Here we calculate a score for each metaprogram in each cell in the original dataset using the dot product of the top 200 genes and the quantile-normalized counts.
+This reports correlation of the cell scores for each metaprogram. 
+
+Good metaprograms should be unique and have low correlation to other metaprograms. 
+
+
+```{r}
+ggplot(mp_metrics_df, aes(x = n_metaprograms, y = max_correlation)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(color = "red") +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Max correlation of metaprogram gene weights"
+  ) 
+```
+
+Not surprisingly, the lower values of k have more MPs with lower correlations. 
+As you increase k, the correlations tend to increase. 
+
+Let's look at the correlation of cell scores for each metaprogram. 
+
+
+```{r}
+# split by value of k
+split_scores_list <- split(scores_df, scores_df$n_metaprograms)
+
+# separately calculate the correlation of metaprograms for each value of k 
+# then get the max for each metaprogram and combine back into a single df for plotting
+score_correlation_df <- split_scores_list |> 
+  purrr::map(\(df){
+    mtx <- df |>
+      tidyr::pivot_wider(
+        names_from = "metaprogram",
+        values_from = "mp_score"
+      ) |> 
+      dplyr::mutate(cell_id = glue::glue("{unique_id}_{barcodes}")) |> 
+      dplyr::select(-c(n_metaprograms, unique_id, barcodes)) |> 
+      tibble::column_to_rownames("cell_id") |> 
+      as.matrix()
+    
+    # correlation of scores for each cell 
+    cor_mtx <- cor(mtx, method = "pearson", use = "pairwise.complete.obs")
+    
+    # get the non-self max
+    diag(cor_mtx) <- 0
+    max_cor_df <- data.frame(
+      metaprogram = rownames(cor_mtx),
+      max_correlation_cells = MatrixGenerics::rowMaxs(cor_mtx)
+    )
+    
+  }) |> 
+  dplyr::bind_rows(.id = "n_metaprograms")
+```
+
+```{r}
+ggplot(score_correlation_df, aes(x = n_metaprograms, y = max_correlation_cells)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(color = "red") +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Max correlation of cell scores"
+  ) 
+```
+
+Similar to looking at the correlation of gene weights, the scores show a similar trend with lower correlations with lower values of k. 
+I will note that the range here is much higher than the correlations of the genes in the plot above and we see some metaprograms with correlations > 0.8 in higher values of k. 
+These are likely very similar programs or at least programs that are biologically related. 
+
+Ultimately, we want to find a way to quantify how many usable metaprograms are identified with a value of k. 
+If cell scores are similar to each other and the metaprogram gene weights are correlated to each other then it's likely that metaprogram is emitting the same biological signal. 
+If cell scores are similar to each other but the metaprogram gene weights are not correlated to each other (e.g. different top 200 genes) then it's hard to tell if they are biologically distinct or not. 
+Many genes have coordinated expression so it could be that the top genes from two different metaprograms are in different, but coordinated pathways or that they are different genes in the same path. 
+So I don't think we can use that value alone to define a usable or "good" metaprogram. 
+
+What I do think we can do here is identify MPs that have both high gene and high cell correlations, indicating they are likely duplicates. 
+Let's look at the range of values for each metric. 
+I think to start it makes sense to use the 3rd quartile number for a maximum correlation value in both measures. 
+
+
+```{r}
+# gene metrics
+summary(mp_metrics_df$max_correlation)
+```
+
+```{r}
+# cell metrics
+summary(score_correlation_df$max_correlation_cells)
+```
+
+Looking at this, I would flag metaprograms that have > 0.35 gene correlation AND > 0.7 cell correlation max values as potentially "bad". 
+
+## Difference in medians of spectra correlation
+
+Below we look at the difference in the median correlation of spectra within metaprograms subtracted by the median correlation of spectra in other metaprograms. 
+Good MPs should have high differences. 
+
+```{r}
+ggplot(mp_metrics_df, aes(x = n_metaprograms, y = median_difference)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(color = "red") +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Difference in medians of correlation \n within - between metaprograms"
+  )
+```
+
+Interestingly, there is always 1 MP that has a very low difference close to 0. 
+This MP is probably picking up noise. 
+As you increase k, the differences increase until you get around k=10 and then the values stay around the same. 
+
+```{r}
+# gene metrics
+summary(mp_metrics_df$median_difference)
+```
+
+Using the same strategy as above, we can use the 1st quartile to define the minimum value, which would be a value of < 0.22 to identify "bad" MPs. 
+
+## Max Jaccard index 
+
+Here we look at the max Jaccard index calculated by looking at the overlap in gene sets or pathways identified using ORA.
+Good metaprograms will have unique lists of gene sets with Jaccard closer to 0. 
+
+I would expect EWS-FLI1 gene sets to potentially be found in multiple MPs, so let's look at all gene sets together and then break up the gene sets based on if they are EWS-FLI1 targets or not. 
+
+```{r}
+# combine with/without ef gene sets into a single column to plot together
+jaccard_df <- mp_metrics_df |> 
+  tidyr::pivot_longer(
+    cols = c("max_jaccard", "max_jaccard_no_ews"),
+    names_to = "jaccard_type",
+    values_to = "max_jaccard"
+  ) |> 
+  dplyr::mutate(
+    jaccard_type = dplyr::if_else(jaccard_type == "max_jaccard_no_ews", "Without EF gene sets", "All gene sets")
+  )
+```
+
+```{r}
+ggplot(mp_metrics_df, aes(x = n_metaprograms, y = max_jaccard)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(color = "red") +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Max Jaccard index of each metaprogram \n to all other metaprograms"
+  )
+```
+
+The lower values of k tend to have lower Jaccard index for each MP indicating that those MPs are more unique. 
+Interestingly, once you reach k=8, you have MPs that have more overlap, with Jaccard ~ 0.6-0.8. 
+It's not obvious to me what exactly we should expect here as some gene sets are related or may even have similar genes. 
+I think this particular metric might benefit from using permutation testing to get a null distribution to confidently pull out "good" metaprograms.
+
+Just to check, what if we break this up by EWS-FLI1 and other gene sets.
+
+```{r}
+ggplot(jaccard_df, aes(x = n_metaprograms, y = max_jaccard, color = jaccard_type)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm() +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Max Jaccard index of each metaprogram \n to all other metaprograms",
+    color = ""
+  )
+```
+
+In general, I don't see a huge difference in the distribution of Jaccard index values with and without EWS::FLI1 gene sets. 
+
+Finally, we have some cases where we get 0 gene sets returned. 
+Let's look at how many metaprograms have no gene sets for each case.
+
+```{r}
+# number of metaprograms with no assigned gene sets 
+mp_metrics_df |>
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarise(mps_without_genesets = sum(is.na(max_jaccard)))
+```
+
+I think knowing this number is important to look at as I would favor values of k where we can assign some sort of biological meaning to all metaprograms. 
+The exception is if the metaprogram that is unable to be annotated is also the one noise metaprogram where we see no difference in median values. 
+In this case we would throw out that metaprogram anyway. 
+
+## Proportion of samples
+
+Here we look at the proportion of total samples are represented in each metaprogram.
+We want to avoid picking conditions where we get metaprograms that correspond to a very small cohort of samples. 
+The line on the plot indicates the point where 10% of the samples are represented.
+
+```{r}
+ggplot(mp_metrics_df, aes(x = n_metaprograms, y = proportion_of_samples)) +
+  geom_boxplot() +
+  ggbeeswarm::geom_beeswarm() +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Proportion of total samples \n contributing to each metaprogram"
+  ) +
+  geom_hline(yintercept = 0.1, linetype = "dashed")
+```
+
+In general, we get pretty good coverage of samples throughout.
+
+Let's look at how many metaprograms are represented by > 50% of samples for each value of k. 
+
+```{r}
+mp_metrics_df |> 
+  dplyr::filter(proportion_of_samples > .5) |> 
+  dplyr::mutate(k = stringr::str_extract(n_metaprograms, "[0-9]+") |>
+                  as.numeric()) |> 
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarize(
+    num_passing_mps = dplyr::n_distinct(metaprogram),
+    prop_passing_mps = num_passing_mps/k
+  ) |> 
+  dplyr::distinct()
+```
+
+As you increase k, the number of metaprograms that have > 50% samples decreases. 
+Any values of k > 10 have ~50% or less of metaprograms that are not represented by at least half the samples. 
+
+## Uniqueness of gene sets
+
+One thing that these metrics does not capture is how biologically interpretable these MPs will be. 
+In an attempt to quantify that, I wanted to look at how unique the gene sets for each MP are. 
+
+The first plot just looks at the number of metaprograms each gene set is associated with. 
+Ideally, we would see that most gene sets only map to a single metaprogram. 
+Again, EWS::FLI1 gene sets are likely to be found across the MPs, so we'll look at all gene sets and then pull out the EWS::FLI1 gene sets. 
+
+
+```{r}
+geneset_metrics_df <- mp_metrics_list |> 
+  purrr::map(\(metrics_list) metrics_list$geneset_prop_df) |> 
+  dplyr::bind_rows(.id = "n_metaprograms") |> 
+  dplyr::left_join(geneset_category_df, by = c("ID" = "full_geneset_name")) |> 
+  dplyr::mutate(
+    # use this to color points by Ewing specific gene sets
+    ef_classification = dplyr::if_else(
+      geneset_category %in% c("EF-activated", "EF-repressed"),
+      "Ewing sarcoma specific",
+      "Other"
+    )
+  )
+```
+
+```{r}
+ggplot(geneset_metrics_df, aes(x = n_metaprograms, y = num_mps)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggforce::geom_sina(color = "red") +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Number of metaprograms the gene set is associated with"
+  )
+```
+
+```{r}
+ggplot(geneset_metrics_df, aes(x = n_metaprograms, y = num_mps)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggforce::geom_sina(color = "red") +
+  facet_wrap(vars(ef_classification)) +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Number of metaprograms the gene set is associated with"
+  )
+```
+
+The trends look pretty similar across most values, except the really low values of k. 
+
+Alternatively, let's look at the percentage of gene sets mapped to each MP that are unique to that MP. 
+
+```{r}
+# get the original ora results since this has one row per metaprogram/ geneset combination 
+# makes it easier to total the gene sets in each MP than the other table we have been using
+mp_genesets_df <- mp_metrics_list |> 
+  purrr::map(\(metrics_list) metrics_list$ora_results_df) |> 
+  dplyr::bind_rows(.id = "n_metaprograms") 
+
+unique_genesets_df <- mp_genesets_df |> 
+  dplyr::group_by(n_metaprograms, ID) |> 
+  dplyr::mutate(
+    # get how many mps each gene set is in
+    num_mps = dplyr::n_distinct(metaprogram)
+  ) |>
+  dplyr::ungroup() |> 
+  dplyr::group_by(n_metaprograms, metaprogram) |> 
+  dplyr::summarize(
+    # get the total unique mps and percentage
+    total_genesets = length(ID),
+    percent_unique_genesets = sum(num_mps == 1)/total_genesets
+  ) |> 
+  # select only necessary columns to make things easier later
+  dplyr::select(n_metaprograms, metaprogram, percent_unique_genesets, total_genesets)
+
+ggplot(unique_genesets_df, aes(x = n_metaprograms, y = percent_unique_genesets)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggforce::geom_sina(color = "red") +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Proportion of gene sets that are unique to a metaprogram"
+  )
+```
+
+Here we see that lower values of k, have more MPs with higher proportions of unique gene sets. 
+But we also have some cases in the higher values of k, where the proportion is 1. 
+This is probably a case where there is only 1 gene set for that MP. 
+
+It would be helpful to account for the total number of gene sets in some way. 
+I would naively expect that having a list of 16 over-represented gene sets for a single metaprogram, even if they are all unique to that metaprogram, to be hard to interpret. 
+And if we only get one gene set back that's very broad (like myogenesis, which I've seen a lot), then that also seems hard to interpret. 
+
+```{r}
+ggplot(unique_genesets_df, aes(x = n_metaprograms, y = total_genesets)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(color = "red") +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Total gene sets per metaprogram"
+  )
+```
+
+It looks like other than the one MP with 16 gene sets in k=5, this distribution looks pretty similar across all values of k, so maybe this isn't worth pursuing. 
+
+## Variance of scores across all samples
+
+The last thing we want to measure, is if these MPs can be used in the original data to look at biological variability. 
+We expect good MPs to have a high variance in the scores across all samples. 
+We also might expect some variation within samples. 
+
+First, let's just look at the variance of the scores across all samples. 
+
+```{r}
+var_df <- scores_df |> 
+  dplyr::group_by(n_metaprograms, metaprogram) |> 
+  dplyr::summarize(
+    score_var = var(mp_score, na.rm = TRUE),
+    score_cv = sqrt(score_var) / mean(mp_score)
+  ) |>
+  dplyr::ungroup() 
+
+ggplot(var_df, aes(x = n_metaprograms, y = score_var)) +
+  ggforce::geom_sina() +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Variation of scores across all samples"
+  )
+```
+
+I don't know that these distributions are all that helpful? 
+They all look very similar with most of the MPs having between 0 and 0.1 variance and then 1 MP with a very high variance.
+
+```{r}
+ggplot(var_df, aes(x = n_metaprograms, y = score_cv)) +
+  ggforce::geom_sina() +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Coefficient of variation of scores across all samples"
+  )
+```
+
+This might be slightly more helpful! 
+We still would have to define what a "good" value is but it looks like there's always one program that has a really low value < 1 and in the higher values of k we see a few more MPs with very low CVs < 1.
+
+## Variance of scores within samples
+
+Another idea is to look at variance of scores within samples. 
+In other words, does the distribution of scores for a MP within a set of samples differ from the distribution of scores in other samples. 
+
+
+One way to do this is with the Kruskal-Wallis test where we can look at the score for all cells for all samples in each MP. 
+The caveat here is that we have a large amount of cells, so we are probably going to inflate the p-values. 
+Let's try it and print out some of the results. 
+
+
+```{r}
+scores_df |> 
+  dplyr::group_by(metaprogram, n_metaprograms) |> 
+  rstatix::kruskal_test(mp_score ~ unique_id) |> 
+  head(n=20)
+```
+
+Yea, as expected all the p-values are 0 because we are looking at a lot of cells. 
+Maybe we could look at the effect size for each MP as that is not dependent on sample size? 
+
+```{r}
+kw_effect <- scores_df |> 
+  dplyr::group_by(metaprogram, n_metaprograms) |>
+  rstatix::kruskal_effsize(mp_score ~ unique_id)
+
+ggplot(kw_effect, aes(x = n_metaprograms, y = effsize)) +
+  ggforce::geom_sina()
+```
+
+Maybe this is helpful, but honestly the effect sizes look pretty similar across the board. 
+I'm not sure this is informative. 
+One idea I had was to use Dunn's test to identify the samples that are different from other samples in each MP and pull out MPs with high proportions of total samples that are different, but running that locally with all cells was very time intensive. 
+
+Another thought is to pseudobulk in some way to minimize the large sample size effect. 
+I tried running the test after getting the means of each sample with 
+```
+mean_scores_df |> 
+  dplyr::group_by(n_metaprograms, metaprogram) |> 
+  rstatix::kruskal_test(mean_score ~ unique_id)
+```
+
+But this gave me all p values of 0.46 across the board which seemed off. 
+I think pseudobulking might work better if we incorporate sample metadata and compare scores for primary vs. met (or some other variable) within a MP? 
+
+Another idea I had was to look at the distribution of mean scores across all MPs in a sample. 
+I think theoretically we might see samples with high values of scores in one MP but not others. 
+I do this below and then follow it up with Dunn's test.
+
+```{r}
+# for each group of mps do we see differences in the distribution of mean scores across samples? 
+mean_scores_df <- scores_df |> 
+  dplyr::group_by(n_metaprograms, metaprogram, unique_id) |> 
+  dplyr::summarise(
+    mean_score = mean(mp_score)
+  ) |>
+  dplyr::ungroup()
+
+mean_scores_df |> 
+  dplyr::group_by(n_metaprograms) |> 
+  rstatix::kruskal_test(mean_score ~ unique_id)
+
+mean_scores_df |> 
+  dplyr::group_by(n_metaprograms) |>
+  rstatix::kruskal_effsize(mean_score ~ unique_id)
+```
+
+Here we see the p-values aren't 0, but they are all significant, but to varying degrees. 
+We can do Dunn's test, to see which samples are different. 
+
+```{r}
+posthoc_dunns <- mean_scores_df |> 
+  dplyr::group_by(n_metaprograms) |> 
+  rstatix::dunn_test(mean_score ~ unique_id)
+
+posthoc_dunns |> 
+  dplyr::filter(p.adj <= 0.05) |> 
+  tidyr::pivot_longer(cols = c("group1", "group2"),
+                      names_to = "group", 
+                      values_to = "unique_id") |> 
+  dplyr::select(n_metaprograms, unique_id) |> 
+  unique() |>
+  dplyr::count(n_metaprograms)
+```
+
+Looking at this I think this might be directly impacted by the number of MPs. 
+As you increase k, the p-value and number of samples increases, so I'm not sure this is the best approach. 
+Perhaps we should revisit scoring separately and consider using permutation testing. 
+
+## Combine metrics 
+
+One thing we've talked about is trying to output a single number that can be used to identify the optimal value of k. 
+The goal is to find the value of k with the highest proportion of viable or useful MPs. 
+Let's first just use the metrics that seemed helpful and define cutoffs for what we think a good MP would be. 
+We can then get the proportion of MPs that are "good" for each metric and look at that in a heatmap. 
+
+Here are the metrics and cutoffs we'll use for now: 
+
+- Max correlation for genes <= 0.35
+- Max correlation for cell scores <= 0.7
+- Median difference >= 0.2.
+- Percent unique gene sets >= 0.3
+
+```{r}
+all_metrics_df <- mp_metrics_df |> 
+  # add in unique gene set percentage
+  dplyr::left_join(unique_genesets_df, by = c("n_metaprograms", "metaprogram")) |> 
+  # add score correlation
+  dplyr::left_join(score_correlation_df, by = c("n_metaprograms", "metaprogram")) 
+
+# make a matrix with % of mps passing for each metric
+mp_metrics_mtx <- all_metrics_df |> 
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarise(
+    num_metaprograms = dplyr::n_distinct(metaprogram),
+    max_correlation_genes = sum(max_correlation <= 0.35)/num_metaprograms,
+    max_correlation_cells = sum(max_correlation_cells <= 0.7)/num_metaprograms,
+    diff_of_medians = sum(median_difference >= 0.22)/num_metaprograms,
+    percent_unique_genesets = sum(percent_unique_genesets >= 0.3, na.rm = TRUE)/num_metaprograms
+  ) |> 
+  dplyr::select(-num_metaprograms) |>
+  tibble::column_to_rownames("n_metaprograms") |> 
+  as.matrix()
+
+ComplexHeatmap::Heatmap(
+  mp_metrics_mtx, 
+  name = "Proportion of passing \nmetaprograms",
+  cluster_rows = FALSE
+)
+```
+
+What if we just take the mean of all values and sort them. 
+The value of k with the highest total mean would be the "best" k? 
+
+```{r}
+rowMeans(mp_metrics_mtx) |> 
+  sort(decreasing = TRUE)
+```
+
+This is one way to do it, but I think a better way would be to use these metrics to classify each MP has passing or not and then get the total proportion of passing MPs per value of k. 
+
+In the below table we show the percentage of MPs for each value of k that pass each of the metrics thresholds and then the percentage that pass all three thresholds.
+
+```{r}
+all_metrics_df |> 
+  dplyr::mutate(
+    # first make sure the missing gene sets MPs are set to 0 for these metrics
+    percent_unique_genesets = dplyr::if_else(is.na(percent_unique_genesets), 0, percent_unique_genesets),
+    # does the MP meet our criteria?
+    correlation_genes_passing = max_correlation <= 0.35,
+    correlation_cells_passing = max_correlation_cells <= 0.7,
+    median_diff_passing = median_difference >= 0.22,
+    unique_geneset_passing = percent_unique_genesets >= 0.3,
+    n_passing = correlation_genes_passing + correlation_cells_passing + median_diff_passing + unique_geneset_passing,
+    passing_mp = n_passing >= 4
+  ) |> 
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarise(
+    correlation_genes_passing = mean(correlation_genes_passing),
+    correlation_cells_passing = mean(correlation_cells_passing),
+    median_diff_passing = mean(median_diff_passing),
+    unique_geneset_passing = mean(unique_geneset_passing),
+    n_passing = mean(n_passing),
+    all_passing = mean(passing_mp)
+  ) |> 
+  dplyr::arrange(desc(all_passing)) |>
+  as.data.frame()
+```
+
+Using this, I see that k=7 has the most passing MPs with k=5 closely behind.
+It looks like only 42% of MPs meet all the criteria though.
+We probably need to adjust our cutoffs or figure out a way to pick more data driven ones that are less arbitrary. 
+We could also alter this to weight each of the metrics. 
+
+Another idea I have is to maybe rank values of k in each of these categories and then take the average of the ranks? 
+We could rank based on the median value for each metric rather than choosing cutoffs? 
+Something we should think about moving forward. 
+
+
+## Conclusions
+
+- I think we could use the correlation metrics (both gene and cell), the difference in medians, and the percentage of unique gene sets to help identify potentially usable metaprograms. 
+However, we would need to define cutoffs or some strategy to decide what is "usable" for each metric, which is obvious for some but not all metrics. 
+- It would be helpful to look at the proportion of samples for each metaprogram as a complementary metric, but not required. 
+- We might consider throwing out values of k where there are metaprograms with 0 gene sets identified with ORA. 
+The caveat here is that at least one MP is noise in all scenarios so if the only MP with 0 gene sets is the noise MP that seems fine. 
+We'll throw it out anyways. 
+- For the overlap in gene sets and Jaccard index calculations we should consider how we might want to use permutation testing to define a null distribution. 
+- I'm not sure the Kruskal-Wallis test will help us identify variance in score distributions across samples in the way we originally intended. 
+I think this might be another place we will want to use permutation testing to define the null distribution of variance in scores.
+
+
+## Session info
+
+```{r}
+sessionInfo()
+```
