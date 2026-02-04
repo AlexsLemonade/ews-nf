@@ -46,7 +46,7 @@ set.seed(2026)
 # paths to gene set category file
 # use this to color points based on EF or hallmarks gene set in plots
 category_file <- here::here("genesets", "gene-set-categories.tsv")
-geneset_category_df <- readr::read_tsv(category_file)
+geneset_category_df <- readr::read_tsv(category_file, col_types = list(.default = "c"))
 ```
 
 
@@ -93,7 +93,7 @@ scores_df <- metaprogram_output_dirs |>
     # read in dataframe with metaprogra(e.g., MP01), barcodes, mp_score, and unique_id
     # one row per cell per mp
     files |> 
-      purrr::map(readr::read_tsv) |> 
+      purrr::map(\(f) readr::read_tsv(f, col_types = list(.default = "c", mp_score = "n") |> 
       dplyr::bind_rows()
     
   }) |> 
@@ -424,7 +424,7 @@ Here we see that lower values of k, have more MPs with higher proportions of uni
 But we also have some cases in the higher values of k, where the proportion is 1. 
 This is probably a case where there is only 1 gene set for that MP. 
 
-It would be helpful to account for the total number of gene sets in someway. 
+It would be helpful to account for the total number of gene sets in some way. 
 I would naively expect that having a list of 16 over-represented gene sets for a single metaprogram, even if they are all unique to that metaprogram, to be hard to interpret. 
 And if we only get one gene set back that's very broad (like myogenesis, which I've seen a lot), then that also seems hard to interpret. 
 
@@ -620,17 +620,15 @@ all_metrics_df |>
     correlation_passing = (max_correlation <= 0.35 & max_correlation_cells <= 0.7),
     median_diff_passing = median_difference >= 0.22,
     unique_geneset_passing = percent_unique_genesets >= 0.3,
-    passing_mp = 
-      (correlation_passing
-       & median_diff_passing
-       & unique_geneset_passing)
+    n_passing = correlation_passing + median_diff_passing + unique_geneset_passing
+    passing_mp = n_passing >= 3
   ) |> 
   dplyr::group_by(n_metaprograms) |> 
   dplyr::summarise(
-    total_mps = dplyr::n_distinct(metaprogram),
-    corelation_passing = sum(correlation_passing)/total_mps,
+    correlation_passing = mean(correlation_passing)
     median_diff_passing = sum(median_diff_passing)/total_mps,
     unique_geneset_passing = sum(unique_geneset_passing)/total_mps,
+    n_passing = sum(n_passing)/total_mps,
     all_passing = sum(passing_mp)/total_mps
   ) |> 
   dplyr::select(-total_mps) |> 
