@@ -648,7 +648,7 @@ all_metrics_df |>
     correlation_cells_passing = mean(correlation_cells_passing),
     median_diff_passing = mean(median_diff_passing),
     unique_geneset_passing = mean(unique_geneset_passing),
-    max_passing = max(correlation_genes_passing, correlation_cells_passing, median_diff_passing, unique_geneset_passing),
+    n_passing = mean(n_passing),
     all_passing = mean(passing_mp)
   ) |> 
   dplyr::arrange(desc(all_passing)) |>

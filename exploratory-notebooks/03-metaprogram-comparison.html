@@ -2186,7 +2186,7 @@ pass all three thresholds.</p>
     correlation_cells_passing = mean(correlation_cells_passing),
     median_diff_passing = mean(median_diff_passing),
     unique_geneset_passing = mean(unique_geneset_passing),
-    max_passing = max(correlation_genes_passing, correlation_cells_passing, median_diff_passing, unique_geneset_passing),
+    n_passing = mean(n_passing),
     all_passing = mean(passing_mp)
   ) |&gt; 
   dplyr::arrange(desc(all_passing)) |&gt;
@@ -2203,18 +2203,18 @@ pass all three thresholds.</p>
 ## 9            k_15                 0.7333333                 0.6000000
 ## 10           k_13                 0.6923077                 0.6923077
 ## 11           k_14                 0.7142857                 0.5714286
-##    median_diff_passing unique_geneset_passing max_passing all_passing
-## 1            0.5714286              0.7142857   1.0000000   0.4285714
-## 2            0.4000000              1.0000000   1.0000000   0.4000000
-## 3            0.7500000              0.5000000   0.7500000   0.3750000
-## 4            0.8181818              0.4545455   0.8181818   0.3636364
-## 5            0.5000000              0.8333333   1.0000000   0.3333333
-## 6            0.7777778              0.4444444   0.7777778   0.3333333
-## 7            0.8333333              0.5000000   0.8333333   0.2500000
-## 8            0.8000000              0.4000000   0.8000000   0.2000000
-## 9            0.8666667              0.3333333   0.8666667   0.2000000
-## 10           0.8461538              0.3076923   0.8461538   0.1538462
-## 11           0.8571429              0.2857143   0.8571429   0.1428571</code></pre>
+##    median_diff_passing unique_geneset_passing n_passing all_passing
+## 1            0.5714286              0.7142857  3.000000   0.4285714
+## 2            0.4000000              1.0000000  3.400000   0.4000000
+## 3            0.7500000              0.5000000  2.500000   0.3750000
+## 4            0.8181818              0.4545455  2.727273   0.3636364
+## 5            0.5000000              0.8333333  3.000000   0.3333333
+## 6            0.7777778              0.4444444  2.555556   0.3333333
+## 7            0.8333333              0.5000000  2.666667   0.2500000
+## 8            0.8000000              0.4000000  2.600000   0.2000000
+## 9            0.8666667              0.3333333  2.533333   0.2000000
+## 10           0.8461538              0.3076923  2.538462   0.1538462
+## 11           0.8571429              0.2857143  2.428571   0.1428571</code></pre>
 <p>Using this, I see that k=7 has the most passing MPs with k=5 closely
 behind. It looks like only 42% of MPs meet all the criteria though. We
 probably need to adjust our cutoffs or figure out a way to pick more
