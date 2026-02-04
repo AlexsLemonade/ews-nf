@@ -93,7 +93,13 @@ scores_df <- metaprogram_output_dirs |>
     # read in dataframe with metaprogra(e.g., MP01), barcodes, mp_score, and unique_id
     # one row per cell per mp
     files |> 
-      purrr::map(\(f) readr::read_tsv(f, col_types = list(.default = "c", mp_score = "n") |> 
+      purrr::map(\(f) {
+        readr::read_tsv(
+          f, 
+          col_types = 
+            list(metaprogram = "c", barcodes = "c", mp_score = "n", unique_id = "c")
+        )
+      })|> 
       dplyr::bind_rows()
     
   }) |> 
@@ -329,8 +335,8 @@ mp_metrics_df |>
                   as.numeric()) |> 
   dplyr::group_by(n_metaprograms) |> 
   dplyr::summarize(
-    num_mps = dplyr::n_distinct(metaprogram),
-    prop_passing_mps = num_mps/k
+    num_passing_mps = dplyr::n_distinct(metaprogram),
+    prop_passing_mps = num_passing_mps/k
   ) |> 
   dplyr::distinct()
 ```
@@ -468,6 +474,18 @@ ggplot(var_df, aes(x = n_metaprograms, y = score_var)) +
 I don't know that these distributions are all that helpful? 
 They all look very similar with most of the MPs having between 0 and 0.1 variance and then 1 MP with a very high variance.
 
+```{r}
+ggplot(var_df, aes(x = n_metaprograms, y = score_cv)) +
+  ggforce::geom_sina() +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Coefficient of variation of scores across all samples"
+  )
+```
+
+This might be slightly more helpful! 
+We still would have to define what a "good" value is but it looks like there's always one program that has a really low value < 1 and in the higher values of k we see a few more MPs with very low CVs < 1.
+
 ## Variance of scores within samples
 
 Another idea is to look at variance of scores within samples. 
@@ -506,8 +524,8 @@ Another thought is to pseudobulk in some way to minimize the large sample size e
 I tried running the test after getting the means of each sample with 
 ```
 mean_scores_df |> 
-  dplyr::group_by(n_metaprograms) |> 
-  rstatix::kruskal_test(mean_score ~ metaprogram)
+  dplyr::group_by(n_metaprograms, metaprogram) |> 
+  rstatix::kruskal_test(mean_score ~ unique_id)
 ```
 
 But this gave me all p values of 0.46 across the board which seemed off. 
@@ -524,8 +542,7 @@ mean_scores_df <- scores_df |>
   dplyr::summarise(
     mean_score = mean(mp_score)
   ) |>
-  dplyr::ungroup() |> 
-  dplyr::group_by(n_metaprograms) 
+  dplyr::ungroup()
 
 mean_scores_df |> 
   dplyr::group_by(n_metaprograms) |> 
@@ -567,7 +584,8 @@ We can then get the proportion of MPs that are "good" for each metric and look a
 
 Here are the metrics and cutoffs we'll use for now: 
 
-- Max correlation for genes <= 0.35 AND max correlation for cell scores <= 0.7
+- Max correlation for genes <= 0.35
+- Max correlation for cell scores <= 0.7
 - Median difference >= 0.2.
 - Percent unique gene sets >= 0.3
 
@@ -617,22 +635,24 @@ all_metrics_df |>
     # first make sure the missing gene sets MPs are set to 0 for these metrics
     percent_unique_genesets = dplyr::if_else(is.na(percent_unique_genesets), 0, percent_unique_genesets),
     # does the MP meet our criteria?
-    correlation_passing = (max_correlation <= 0.35 & max_correlation_cells <= 0.7),
+    correlation_genes_passing = max_correlation <= 0.35,
+    correlation_cells_passing = max_correlation_cells <= 0.7,
     median_diff_passing = median_difference >= 0.22,
     unique_geneset_passing = percent_unique_genesets >= 0.3,
-    n_passing = correlation_passing + median_diff_passing + unique_geneset_passing
-    passing_mp = n_passing >= 3
+    n_passing = correlation_genes_passing + correlation_cells_passing + median_diff_passing + unique_geneset_passing,
+    passing_mp = n_passing >= 4
   ) |> 
   dplyr::group_by(n_metaprograms) |> 
   dplyr::summarise(
-    correlation_passing = mean(correlation_passing)
-    median_diff_passing = sum(median_diff_passing)/total_mps,
-    unique_geneset_passing = sum(unique_geneset_passing)/total_mps,
-    n_passing = sum(n_passing)/total_mps,
-    all_passing = sum(passing_mp)/total_mps
+    correlation_genes_passing = mean(correlation_genes_passing),
+    correlation_cells_passing = mean(correlation_cells_passing),
+    median_diff_passing = mean(median_diff_passing),
+    unique_geneset_passing = mean(unique_geneset_passing),
+    max_passing = max(correlation_genes_passing, correlation_cells_passing, median_diff_passing, unique_geneset_passing),
+    all_passing = mean(passing_mp)
   ) |> 
-  dplyr::select(-total_mps) |> 
-  dplyr::arrange(desc(all_passing))
+  dplyr::arrange(desc(all_passing)) |>
+  as.data.frame()
 ```
 
 Using this, I see that k=7 has the most passing MPs with k=5 closely behind.
