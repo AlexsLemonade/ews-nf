@@ -69,24 +69,34 @@ prep_msigdb_genesets <- function(msigdb_df){
   
 }
 
-# function for running ORA with clusterProfiler::enricher on each metaprogram
-# uses the top 200 genes for each metaprogram by default 
-# returns a df with all gene sets for each metaprogram with p.adjust <= 0.05
-run_ora <- function(mp_list, gene_universe, term2gene_df, num_genes=200){
+
+# function to extract the top genes from each MP 
+# returns a nested list with the genes for each MP
+# grabs top 200 genes by default
+extract_top_genes <- function(mp_list, num_genes = 200){
   
-  # get the top 200 genes for each mp as a list to use with ora
+  # get the top X number of genes for each MP
   mp_top_list <- mp_list |> 
     purrr::map(\(weights){
       weights |> 
         sort(decreasing = TRUE) |> 
-        head(n=num_genes)
+        head(n=num_genes) |> 
+        names() # return gene ids not weights
     })
+  
+  return(mp_top_list)
+}
+
+# function for running ORA with clusterProfiler::enricher on each metaprogram
+# uses the top 200 genes for each metaprogram by default 
+# returns a df with all gene sets for each metaprogram with p.adjust <= 0.05
+run_ora <- function(mp_top_list, gene_universe, term2gene_df, num_genes=200){
   
   # run ORA using the top 200 genes
   ora_results <- mp_top_list |> 
-    purrr::map(\(weights){
+    purrr::map(\(genes){
       clusterProfiler::enricher(
-        gene = names(weights),
+        gene = genes,
         universe = gene_universe,
         TERM2GENE = term2gene_df
       )
@@ -108,36 +118,20 @@ calc_jaccard <- function(vec1, vec2) {
   length(intersect(vec1, vec2)) / length(union(vec1, vec2))
 }
 
-# function for getting the jaccard index between two gene sets
-geneset_jaccard <- function(geneset1, geneset2, geneset_map = all_term_df) {
-  
-  genes1 <- geneset_map |> 
-    dplyr::filter(gs_name == geneset1) |> 
-    dplyr::pull(ensembl_gene)
-  
-  genes2 <- geneset_map |> 
-    dplyr::filter(gs_name == geneset2) |> 
-    dplyr::pull(ensembl_gene)
-  
-  jaccard <- calc_jaccard(genes1, genes2)
-  
-  return(jaccard)
-}
-
-# get the max jaccard for overlap in gene sets identified using ORA
+# get the max jaccard for overlap between two groups for a set of metaprograms
+# groups_to_compare is a nested list of items to compare with names of the list corresponding to MPs 
 # returns a df with the off diagonal max jaccard for each metaprogram
-max_jaccard <- function(results_df){
-  # only one list here since we will compare each MP to all other MPs
-  id1_list <- split(results_df$ID, results_df$metaprogram)
+max_jaccard <- function(groups_to_compare){
+
   # create the grid of comparisons
-  cross_df <- tidyr::expand_grid(id1 = names(id1_list), id2 = names(id1_list))
+  cross_df <- tidyr::expand_grid(id1 = names(groups_to_compare), id2 = names(groups_to_compare))
   
   jaccard_df <- cross_df |>
     # remove comparisons to self
     dplyr::filter(id1 != id2) |> 
     dplyr::rowwise() |> 
     # calculate a single Jaccard index for each combination using split lists & ids
-    dplyr::mutate(jaccard = calc_jaccard(id1_list[[id1]], id1_list[[id2]])) |>
+    dplyr::mutate(jaccard = calc_jaccard(groups_to_compare[[id1]], groups_to_compare[[id2]])) |>
     dplyr::ungroup() |> # remove rowwise prior to getting max
     # get the max jaccard
     dplyr::slice_max(jaccard, by = id1, with_ties = FALSE) |>
@@ -283,6 +277,16 @@ mp_prop_df <- mp_lookup |>
     proportion_of_samples = num_samples / total_samples
   )
 
+# Overlap in top genes ---------------------------------------------------------
+
+# get list of top genes for each mp 
+top_genes <- extract_top_genes(mp_list = mp_object$metaprogram_list)
+
+# get the max jaccard between top 200 genes for each MP 
+mp_genes_overlap_df <- max_jaccard(top_genes) |> 
+  dplyr::rename(top_genes_max_jaccard = max_jaccard)
+
+
 # ORA --------------------------------------------------------------------------
 
 # grab hallmarks to use in addition to the custom and Ews specific gene lists 
@@ -300,7 +304,7 @@ all_term_df <- ef_msigdb_geneset_df |>
 
 # get ora results
 ora_results_df <- run_ora(
-  mp_list = mp_object$metaprogram_list,
+  mp_top_list = top_genes,
   gene_universe = mp_object$gene_universe,
   term2gene_df = all_term_df
 )
@@ -327,7 +331,9 @@ geneset_prop_df <- ora_results_df |>
 # Jaccard index ----------------------------------------------------------------
 
 # max jaccard between all gene sets identified for each MP
-max_jaccard_df <- max_jaccard(ora_results_df)
+# get a nested list of groups to compare with names as the MPs and gene sets for each MP
+geneset_groups <- split(ora_results_df$ID, ora_results_df$metaprogram)
+max_jaccard_df <- max_jaccard(groups_to_compare = geneset_groups)
 
 # get the EF activated and EF repressed gene sets to remove from the results
 ews_fli1_genesets <- ef_category_df |> 
@@ -337,8 +343,9 @@ ews_fli1_genesets <- ef_category_df |>
 # filter out EF gene sets and recalculate jaccard
 filtered_ora_results_df <- ora_results_df |> 
   dplyr::filter(!(ID %in% ews_fli1_genesets))
+filtered_geneset_groups <- split(filtered_ora_results_df$ID, filtered_ora_results_df$metaprogram)
 
-max_jaccard_no_ews <- max_jaccard(filtered_ora_results_df) |> 
+max_jaccard_no_ews <- max_jaccard(filtered_geneset_groups) |> 
   dplyr::rename(max_jaccard_no_ews = max_jaccard)
 
 # Combine and export -----------------------------------------------------------
@@ -347,9 +354,10 @@ max_jaccard_no_ews <- max_jaccard(filtered_ora_results_df) |>
 mp_metrics_df <- max_cor_df |> 
   dplyr::left_join(mp_medians_df, by = "metaprogram") |> 
   dplyr::left_join(mp_prop_df, by = "metaprogram") |> 
+  dplyr::left_join(mp_genes_overlap_df, by = "metaprogram") |> 
   dplyr::left_join(num_genesets_df, by = "metaprogram") |>
   dplyr::left_join(max_jaccard_df, by = "metaprogram") |> 
-  dplyr::left_join(max_jaccard_no_ews, by = "metaprogram")
+  dplyr::left_join(max_jaccard_no_ews, by = "metaprogram") 
 
 # create an object for exporting with mp metrics, gene set entropy, and ora results
 metrics_obj <- list(
