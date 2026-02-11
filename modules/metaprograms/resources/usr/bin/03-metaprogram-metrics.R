@@ -71,7 +71,7 @@ prep_msigdb_genesets <- function(msigdb_df){
 
 
 # function to extract the top genes from each MP 
-# returns a nested list with the genes for each MP
+# returns a list of vectors with the genes for each MP
 # grabs top 200 genes by default
 extract_top_genes <- function(mp_list, num_genes = 200){
   
@@ -90,7 +90,7 @@ extract_top_genes <- function(mp_list, num_genes = 200){
 # function for running ORA with clusterProfiler::enricher on each metaprogram
 # uses the top 200 genes for each metaprogram by default 
 # returns a df with all gene sets for each metaprogram with p.adjust <= 0.05
-run_ora <- function(mp_top_list, gene_universe, term2gene_df, num_genes=200){
+run_ora <- function(mp_top_list, gene_universe, term2gene_df){
   
   # run ORA using the top 200 genes
   ora_results <- mp_top_list |> 
