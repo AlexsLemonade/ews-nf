@@ -119,19 +119,20 @@ calc_jaccard <- function(vec1, vec2) {
 }
 
 # get the max jaccard for overlap between two groups for a set of metaprograms
-# groups_to_compare is a nested list of items to compare with names of the list corresponding to MPs 
+# e.g., a list of genes or a list of gene sets assigned to each metaprogram 
+# groups_list is a list of vectors containing the groups assigned to each metaprogram
 # returns a df with the off diagonal max jaccard for each metaprogram
-max_jaccard <- function(groups_to_compare){
+max_jaccard <- function(groups_list){
 
   # create the grid of comparisons
-  cross_df <- tidyr::expand_grid(id1 = names(groups_to_compare), id2 = names(groups_to_compare))
+  cross_df <- tidyr::expand_grid(id1 = names(groups_list), id2 = names(groups_list))
   
   jaccard_df <- cross_df |>
     # remove comparisons to self
     dplyr::filter(id1 != id2) |> 
     dplyr::rowwise() |> 
     # calculate a single Jaccard index for each combination using split lists & ids
-    dplyr::mutate(jaccard = calc_jaccard(groups_to_compare[[id1]], groups_to_compare[[id2]])) |>
+    dplyr::mutate(jaccard = calc_jaccard(groups_list[[id1]], groups_list[[id2]])) |>
     dplyr::ungroup() |> # remove rowwise prior to getting max
     # get the max jaccard
     dplyr::slice_max(jaccard, by = id1, with_ties = FALSE) |>
@@ -333,7 +334,7 @@ geneset_prop_df <- ora_results_df |>
 # max jaccard between all gene sets identified for each MP
 # get a nested list of groups to compare with names as the MPs and gene sets for each MP
 geneset_groups <- split(ora_results_df$ID, ora_results_df$metaprogram)
-max_jaccard_df <- max_jaccard(groups_to_compare = geneset_groups)
+max_jaccard_df <- max_jaccard(groups_list = geneset_groups)
 
 # get the EF activated and EF repressed gene sets to remove from the results
 ews_fli1_genesets <- ef_category_df |> 
