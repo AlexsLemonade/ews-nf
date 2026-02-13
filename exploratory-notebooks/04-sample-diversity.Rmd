@@ -335,7 +335,7 @@ p_value_df |>
   dplyr::arrange(desc(proportion_sig))
 ```
 
-If we rank the values based on the proportion of significant metaprograms, we see that k=7 and k=14 are tied. 
+If we rank the values based on the proportion of significant metaprograms, we see that k=10 has the most. 
 Note that if we just used the median of the effective sample size, k=11 and k=12 had the highest values. 
 
 Another thought I had was to try and use permutation testing with the weighted mean to get a single pvalue for each value of k. 
