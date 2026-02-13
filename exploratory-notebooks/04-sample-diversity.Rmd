@@ -95,10 +95,9 @@ calculate_sample_stats <- function(mp_clusters_df){
       proportion_of_total_samples = total_samples_per_mp/total_samples,
       sample_frequency = num_spectra_per_sample / total_spectra_per_mp, # frequency of a given sample in a single mp
       shannon_entropy = -sum(sample_frequency * log(sample_frequency)), # entropy
-      # TODO: should this be normalized by the total number of samples per mp or total samples across all MPs? 
-      shannon_entropy_norm = shannon_entropy / log(total_samples),# normalize by total possible samples
+      shannon_entropy_norm = shannon_entropy / log(total_samples_per_mp),# normalize by total possible samples in that mp
       eff_number = exp(shannon_entropy), # effective species size or Hill number order of 1
-      eff_number_norm = eff_number/length(sample_id) # eff number should be close to the total possible samples in that mp
+      eff_number_norm = eff_number/total_samples_per_mp # eff number should be close to the total possible samples in that mp
     ) |> 
     dplyr::select(-sample_frequency) |>
     dplyr::distinct()
@@ -191,10 +190,11 @@ mp_entropy_df |>
   DT::datatable()
 ```
 
-* If you rank each of these individually, the only one that does not appear to go in order of increasing k is the normalized effective sample size. 
-This indicates to me that the other metrics may be dependent on the value of k, which is something to keep in mind. 
+* If you rank each of these individually, the proportion of samples and the weighted mean of the effective size seem to decrease as k increases. 
+In contrast, the entropy and effective size seem to be more useful and not dependent on the value of k.
 * One approach would be to just choose a lenient cutoff for minimum proportion and minimum entropy and/or effective size for a "good" MP.
-* Alternatively, we could order the median values for normalized effective sample size to get a rank and find the best k for this specific metric. 
+* Alternatively, we could order the median values for normalized effective sample size and/or normalized entropy to get a rank and find the best k for this specific metric. 
+It looks like ordering by either of these give the same results of k=11 and k=12 being the best values of k.
 * Another idea I have is to use permutation testing to show that the observed effective size is greater than what is observed by chance. 
 I will explore that in the next section. 
 
