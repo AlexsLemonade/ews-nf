@@ -142,6 +142,153 @@ max_jaccard <- function(groups_list){
   return(jaccard_df)
 }
 
+# helper function to get a table with the total number of genesets per metaprogram 
+get_total_genesets <- function(mps, ora_results_df){
+  
+  # table of number of gene sets per metaprogram 
+  num_genesets_df <- ora_results_df |> 
+    dplyr::group_by(metaprogram) |> 
+    dplyr::summarise(num_sig_genesets = length(ID))
+  
+  df <- data.frame(
+    metaprogram = mps
+  ) |> 
+    dplyr::left_join(num_genesets_df, by = "metaprogram") |> 
+    dplyr::mutate(
+      num_sig_genesets = dplyr::if_else(is.na(num_sig_genesets), 0, num_sig_genesets)
+    )
+  
+  return(df)
+  
+}
+
+
+# function to randomly shuffle genes assigned to metaprograms, recalculate the top scores, 
+# and then redo ORA and calculate stats
+# mp_mtx is a matrix with rownames as genes and columns as metaprograms
+# here we report both the num of significant gene sets and the max jaccard for each metaprogram
+permute_ora <- function(mp_mtx, nreps, gene_universe, term2gene_df) {
+  
+  reps <- seq(1, nreps)
+  
+  background <- reps |> 
+    purrr::map(\(n){
+      
+      # shuffle the genes (rownames) in the matrix 
+      rownames(mp_mtx) <- sample(rownames(mp_mtx))
+      
+      # extract top 200 genes for each mp 
+      # first turn matrix into a list of vector weights where the names are gene ids
+      mp_list <- asplit(mp_mtx, MARGIN = 2)
+      top_genes <- extract_top_genes(mp_list)
+      
+      # run ORA 
+      ora_results_df <- run_ora(
+        top_genes,
+        gene_universe,
+        term2gene_df
+      )
+      
+      # table of number of gene sets per metaprogram 
+      num_genesets_df <- get_total_genesets(names(mp_list), ora_results_df)
+      
+      # get a list of all gene sets for each MP
+      geneset_groups <- split(ora_results_df$ID, ora_results_df$metaprogram)
+      
+      # if there's at least 2 MPs then calculate Jaccard
+      if(length(geneset_groups) > 1){
+        
+        max_jaccard_df <- max_jaccard(groups_list = geneset_groups) 
+        
+      } else {
+        # otherwise just make a dataframe with NA for max jaccard
+        max_jaccard_df <- data.frame(
+          "metaprogram" = names(mp_list),
+          "max_jaccard" = NA
+        )
+        
+      }
+      
+      # make sure we have one row per MP regardless of if sig gene sets were returned 
+      all_mps <- data.frame(
+        "metaprogram" = names(mp_list)
+      ) |> 
+        # join with number of gene sets and max jaccard
+        dplyr::left_join(num_genesets_df, by = "metaprogram") |> 
+        dplyr::left_join(max_jaccard_df, by = "metaprogram") |>
+        # add in a nreps column
+        dplyr::mutate(nreps = n)
+      
+      return(all_mps)
+      
+      
+    }) |>
+    dplyr::bind_rows()
+  
+  return(background)
+  
+}
+
+# calculate significance for permutation testing
+# reports a pvalue for number of gene sets and max jaccard for overlap in gene sets
+# omit NAs when calculating
+get_ora_significance <- function(observed_df, background_df, nreps){
+  
+  # combine the observed values with the background
+  combined_df <- observed_df |> 
+    dplyr::select(
+      metaprogram,
+      obs_num_sig_genesets = num_sig_genesets,
+      obs_max_jaccard = max_jaccard
+    ) |> 
+    dplyr::left_join(background_df, by = c("metaprogram")) |> 
+    dplyr::select(-nreps)
+  
+  # first calculate the pvalue for num genesets 
+  # we don't want to remove NA here since all MPs will be assigned a number of genesets of 0 or greater 
+  num_genesets_pvalue_df <- combined_df |> 
+    dplyr::mutate(
+      # indicate which rows have background > obs
+      greater_than_obs_num_genesets = num_sig_genesets > obs_num_sig_genesets
+    ) |> 
+    dplyr::group_by(metaprogram) |> 
+    dplyr::summarize(
+      # calculate p values and retain a column with the observed value
+      num_sig_genesets = unique(obs_num_sig_genesets),
+      num_genesets_perm_pvalue = (sum(greater_than_obs_num_genesets) +1)/(nreps + 1)
+    ) |> 
+    # add adjusted pvalue 
+    dplyr::mutate(
+      num_genesets_adj_pvalue = p.adjust(num_genesets_perm_pvalue, method = "BH")
+    )
+  
+  # separately calculate the pvalue for max jaccard 
+  # here we remove NAs from either the observed or background 
+  # NAs mean no genesets were found so there's nothing to compare 
+  max_jaccard_pvalue_df <- combined_df |> 
+    na.omit() |>
+    dplyr::mutate(
+      # indicate which rows have background > obs
+      greater_than_obs_max_jaccard = max_jaccard > obs_max_jaccard
+    ) |> 
+    dplyr::group_by(metaprogram) |> 
+    dplyr::summarize(
+      max_jaccard = unique(obs_max_jaccard),
+      # calculate pvalue and only consider any rows that are still present in the total count 
+      # still need to add one for observation 
+      max_jaccard_perm_pvalue = (sum(greater_than_obs_max_jaccard) +1)/(length(greater_than_obs_max_jaccard) + 1)
+    ) |> 
+    dplyr::mutate(
+      max_jaccard_adj_pvalue = p.adjust(max_jaccard_perm_pvalue, method = "BH")
+    )
+  
+  all_pvalue_df <- num_genesets_pvalue_df |> 
+    dplyr::left_join(max_jaccard_pvalue_df, by = "metaprogram")
+  
+  return(all_pvalue_df)
+  
+}
+
 # Read in arguments ------------------------------------------------------------
 
 library(optparse)
@@ -173,6 +320,12 @@ option_list <- list(
     help = "Path to TSV file with categories for all gene sets"
   ),
   make_option(
+    opt_str = c("--nreps"),
+    type = "integer",
+    default = 1000, 
+    help = "Number of replicates to perform for permutation testing"
+  ),
+  make_option(
     opt_str = c("--output_file"),
     type = "character",
     default = "mp_metrics.rds", 
@@ -188,6 +341,9 @@ option_list <- list(
 
 # Parse options
 opt <- parse_args(OptionParser(option_list = option_list))
+
+#TODO: remove before committing
+opt$metaprograms_file <- "ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/metaprograms.rds"
 
 # Main script ------------------------------------------------------------------
 
@@ -311,9 +467,7 @@ ora_results_df <- run_ora(
 )
 
 # table of number of gene sets per metaprogram 
-num_genesets_df <- ora_results_df |> 
-  dplyr::group_by(metaprogram) |> 
-  dplyr::summarise(num_sig_genesets = length(ID))
+num_genesets_df <- get_total_genesets(names(mp_object$metaprogram_list), ora_results_df)
 
 # Gene set proportion ---------------------------------------------------------_
 
@@ -349,6 +503,26 @@ filtered_geneset_groups <- split(filtered_ora_results_df$ID, filtered_ora_result
 max_jaccard_no_ews <- max_jaccard(filtered_geneset_groups) |> 
   dplyr::rename(max_jaccard_no_ews = max_jaccard)
 
+# Permute ORA ------------------------------------------------------------------
+
+# combine the num genesets and max jaccard for all MPs into a single dataframe
+observed_df <- data.frame(
+  metaprogram = names(mp_object$metaprogram_list)
+) |> 
+  dplyr::left_join(num_genesets_df, by = "metaprogram") |> 
+  dplyr::left_join(max_jaccard_df, by = "metaprogram")
+
+# get the backround distribution 
+background_df <- permute_ora(
+  mp_mtx, 
+  nreps = opt$nreps, 
+  gene_universe = mp_object$gene_universe, 
+  term2gene_df = all_term_df
+)
+
+# calculate pvalues 
+all_pvalue_df <- get_ora_significance(observed_df, background_df, opt$nreps)
+
 # Combine and export -----------------------------------------------------------
 
 # join all mp metrics 
@@ -356,8 +530,8 @@ mp_metrics_df <- max_cor_df |>
   dplyr::left_join(mp_medians_df, by = "metaprogram") |> 
   dplyr::left_join(mp_prop_df, by = "metaprogram") |> 
   dplyr::left_join(mp_genes_overlap_df, by = "metaprogram") |> 
-  dplyr::left_join(num_genesets_df, by = "metaprogram") |>
-  dplyr::left_join(max_jaccard_df, by = "metaprogram") |> 
+  # includes both max jaccard, num genesets, and associated pvalues 
+  dplyr::left_join(all_pvalue_df, by = "metaprogram") |> 
   dplyr::left_join(max_jaccard_no_ews, by = "metaprogram") 
 
 # create an object for exporting with mp metrics, gene set entropy, and ora results
@@ -365,6 +539,7 @@ metrics_obj <- list(
   mp_metrics_df = mp_metrics_df,
   geneset_prop_df = geneset_prop_df,
   ora_results_df = ora_results_df,
+  background_df = background_df, # add in background stats for plotting
   # add some key parameters which will help when we combine these TSV files across different parameters
   n_metaprograms = mp_object$n_metaprograms,
   cnmf_k_range = mp_object$cnmf_k_range,
