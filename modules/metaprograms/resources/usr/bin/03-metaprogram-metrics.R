@@ -342,9 +342,6 @@ option_list <- list(
 # Parse options
 opt <- parse_args(OptionParser(option_list = option_list))
 
-#TODO: remove before committing
-opt$metaprograms_file <- "ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/metaprograms.rds"
-
 # Main script ------------------------------------------------------------------
 
 # set the seed
