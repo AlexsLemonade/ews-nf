@@ -71,10 +71,16 @@ mp_clusters_to_df <- function(metaprogram_file){
 
 
 ```{r}
+# helper function for calculating entropy
+entropy <- function(sample_n){
+  sample_freq <- sample_n / sum(sample_n)
+  -sum(sample_freq * log(sample_freq))
+}
+
 # calculate stats for all metaprograms 
 # returns a dataframe with metaprogram, total_spectra_per_mp, total_samples_per_mp
 # proportion_of_total_samples, sample_frequency, shannon_entropy
-# shannon_entropy_norm, eff_number, eff_number_norm, eff_weighted_mean
+# shannon_entropy_norm, eff_number, eff_number_norm
 calculate_sample_stats <- function(mp_clusters_df){
   
   # how many total possible samples do we have
@@ -84,33 +90,17 @@ calculate_sample_stats <- function(mp_clusters_df){
   # calculates total spectra, entropy, norm entropy, eff species size
   mp_entropy_df <- mp_clusters_df |> 
     dplyr::group_by(metaprogram, sample_id) |>
-    dplyr::summarise(num_spectra_per_sample = dplyr::n(), # total spectra per sample in a given mp
-    ) |> 
+    dplyr::summarize(num_spectra_per_sample = dplyr::n(), .groups = "drop_last") |>  # total spectra per sample in a given mp |> 
     # use reframe because we calculate multiple rows per group
     # avoids warning messages from summarize 
-    dplyr::reframe(
+    dplyr::summarize(
       total_spectra_per_mp = sum(num_spectra_per_sample),
       total_samples_per_mp = length(sample_id),
       proportion_of_total_samples = total_samples_per_mp/total_samples,
-      sample_frequency = num_spectra_per_sample / total_spectra_per_mp, # frequency of a given sample in a single mp
-      shannon_entropy = -sum(sample_frequency * log(sample_frequency)), # entropy
+      shannon_entropy = entropy(num_spectra_per_sample), # entropy
       shannon_entropy_norm = shannon_entropy / log(total_samples_per_mp),# normalize by total possible samples in that mp
       eff_number = exp(shannon_entropy), # effective species size or Hill number order of 1
       eff_number_norm = eff_number/total_samples_per_mp # eff number should be close to the total possible samples in that mp
-    ) |> 
-    dplyr::select(-sample_frequency) |>
-    dplyr::distinct()
-  
-  # get weighted mean 
-  # weight each eff number by the total spectra in the mp
-  eff_numbers <- mp_entropy_df$eff_number
-  weights <- mp_entropy_df$total_spectra_per_mp
-  eff_weighted_mean <- weighted.mean(eff_numbers, weights)
-  
-  # add weighted mean to dataframe 
-  mp_entropy_df <- mp_entropy_df |> 
-    dplyr::mutate(
-      eff_weighted_mean = eff_weighted_mean
     )
   
   return(mp_entropy_df)
@@ -135,8 +125,6 @@ Values close to 1 indicate samples contribute the metaprogram equally.
 - Normalized effective species size or Hill number of order 1: The exponential of Shannon's entropy representing the effective number of common or abundant species. 
 Here we are looking for a number close to the total possible samples in that metaprogram. 
 The values are normalized by the total number of samples in the metaprogram such that values close to 1 indicate all samples are equally abundant.
-- Weighted mean of the effective species size: Here we get a single mean effective species size across all metaprograms for a single value of k. 
-The values are weighted by the total number of spectra in the metaprogram. 
 
 
 ```{r}
@@ -153,14 +141,14 @@ mp_entropy_df <- mp_clusters_df_list |>
 We'll look at the distribution of the stats that are calculated for each metaprogram. 
 
 ```{r, fig.height=7}
-stats_to_plot <- c(
+stat_columns <- c(
   "proportion_of_total_samples",
   "shannon_entropy_norm",
   "eff_number_norm"
 )
 
 stats_plot_df <- mp_entropy_df |> 
-  tidyr::pivot_longer(cols = stats_to_plot,
+  tidyr::pivot_longer(cols = stat_columns,
                       names_to = "statistic",
                       values_to = "value")
 
@@ -174,13 +162,12 @@ ggplot(stats_plot_df, aes(x = n_metaprograms, y = value)) +
   ) 
 ```
 
-Now let's make a table with one row per value of k to show the weighted mean of the effective sample size and the median of the other stats shown in the plots above. 
+Now let's make a table with one row per value of k to show the median of the stats shown in the plots above. 
 
 ```{r}
 mp_entropy_df |> 
   dplyr::group_by(n_metaprograms) |> 
   dplyr::summarize(
-    eff_weighted_mean = unique(eff_weighted_mean), # add for printing
     median_proportion = median(proportion_of_total_samples),
     median_entropy_norm = median(shannon_entropy_norm),
     median_eff_norm = mean(eff_number_norm),
@@ -189,38 +176,35 @@ mp_entropy_df |>
   DT::datatable()
 ```
 
-* If you rank each of these individually, the proportion of samples and the weighted mean of the effective size seem to decrease as k increases. 
+* If you rank each of these individually, the proportion of samples seems to decrease as k increases. 
 In contrast, the entropy and effective size seem to be more useful and not dependent on the value of k.
 * One approach would be to just choose a lenient cutoff for minimum proportion and minimum entropy and/or effective size for a "good" MP.
 * Alternatively, we could order the median values for normalized effective sample size and/or normalized entropy to get a rank and find the best k for this specific metric. 
 It looks like ordering by either of these give the same results of k=11 and k=12 being the best values of k.
-* Another idea I have is to use permutation testing to show that the observed effective size is greater than what is observed by chance. 
+* Another idea I have is to use permutation testing to show that the observed entropy and effective size is greater than what is observed by chance. 
 I will explore that in the next section. 
 
-## Permutation testing of effective sample size
+## Permutation testing
 
-In order to define a cutoff or possible range of what a "good" metaprogram is in regards to effective sample size, I thought it could be helpful to show that the number is greater than what you would expect by random chance with the given metaprograms. 
+In order to define a cutoff or possible range of what a "good" metaprogram is in regards to these stats, like shannon's entropy and/or effective sample size, I thought it could be helpful to show that the number is greater than what you would expect by random chance with the given metaprograms. 
 So here I am shuffling the spectra assigned to each metaprogram while preserving the number of spectra assigned to each metaprogram. 
-I then recalculate the effective sample size creating a null distribution. 
+I then recalculate the statistics creating a null distribution. 
 I then compare the observed value to the null distribution to get an empirical pvalue. 
-This produces a single pvalue for each metaprogram within a value of k. 
+This produces a single pvalue for each metaprogram within a value of k for each stat. 
 We can then count how many metaprograms have a significant pvalue for that k.
+
 
 ```{r}
 # function to randomly shuffle spectra assignments and recalculate metrics
-permute_entropy <- function(mp_df, nreps){
-  
-  reps <- seq(1, nreps)
+permute_stats <- function(mp_df, n_reps){
   
   # for each rep, shuffle the spectra
   # keep the distribution of num spectra/ mp the same
-  background <- replicate(
-    n_reps, 
-    dplyr::mutate(mp_df, metaprograms = sample(metaprograms)
-  ) |>
-    purrr::map(calculate_sample_stats) |>
+  background <- purrr::map(1:n_reps, \(n) {
+    dplyr::mutate(mp_df, metaprogram = sample(metaprogram)) |>
+      calculate_sample_stats()
+  }) |>
     dplyr::bind_rows(.id = "rep_n")
-
   
   return(background)
 }
@@ -231,140 +215,136 @@ permute_entropy <- function(mp_df, nreps){
 # define the number of reps for permutation 
 num_reps <- 50
 
+stat_columns <- c("shannon_entropy_norm", "eff_number_norm")
+
 # get a dataframe of all background points
 # do permutation on each value of k separately 
 background_df <- mp_clusters_df_list |> 
-  purrr::map(permute_entropy, nreps = num_reps) |> 
+  purrr::map(permute_stats, n_reps = num_reps) |> 
   dplyr::bind_rows(.id = "n_metaprograms") |> 
-  dplyr::select(-rep_n)
+  dplyr::select(-rep_n) |> 
+  # pivot to have one column with all stats 
+  tidyr::pivot_longer(
+    cols = stat_columns, 
+    values_to = "background_value",
+    names_to = "statistic"
+  ) |> 
+  dplyr::select(n_metaprograms, metaprogram, statistic, background_value)
 
 # assign a pvalue for each metaprogram for each value of k using the background
 p_value_df <- mp_entropy_df |> 
-  # select the columns we care about and rename eff number to indicate the observed value 
-  dplyr::select(
-    n_metaprograms,
-    metaprogram,
-    "obs_value" = eff_number_norm
-  ) |>
+  # create a single obs value column for the stats we want to calculate pvalues for
+  tidyr::pivot_longer(
+    cols = stat_columns, 
+    values_to = "obs_value",
+    names_to = "statistic"
+  ) |> 
   # join with background data points
-  dplyr::left_join(background_df, by = c("n_metaprograms", "metaprogram")) |>
+  dplyr::left_join(background_df, by = c("n_metaprograms", "metaprogram", "statistic")) |>
   dplyr::mutate(
     # boolean column indicating if the background value is > observed
-    greater_than_obs = eff_number_norm > obs_value
+    greater_than_obs = background_value > obs_value
   ) |> 
-  dplyr::group_by(n_metaprograms, metaprogram) |> 
+  dplyr::group_by(n_metaprograms, metaprogram, total_spectra_per_mp, statistic) |> 
   # calculate empirical pvalue for each metaprogram
   dplyr::summarize(
-    eff_number_norm = unique(obs_value), # retain this value for including it in the plot
-    p_value = (sum(greater_than_obs)+1)/(num_reps + 1))
-
-# add adjusted pvalues and significance
-p_value_df$adj_p_value <- p.adjust(p_value_df$p_value, method = "BH")
-p_value_df$sig = dplyr::if_else(p_value_df$adj_p_value <= 0.05, "sig", "ns")
-```
-
-Below we will plot the observed values in relation to the background distribution for each value of k. 
-The density plot corresponds to the background and the vertical lines indicate the observed values with one shown for each metaprogram. 
-The color of the bar indicates if the adjusted pvalue is considered significant or not (<= 0.05).
-
-```{r}
-ggplot(background_df, aes(x = eff_number_norm)) +
-  # Null density ridges
-  geom_density(
-    fill = "grey80",
-    color = "grey40",
-    alpha = 0.8
-  ) +
-  # Observed vertical lines
-  geom_segment(
-    data = p_value_df,
-    aes(
-      x = eff_number_norm,
-      xend = eff_number_norm,
-      y = 0,
-      yend = 10,
-      color = sig
-    ),
-    linewidth = 1
-  ) +
-  # facet by number of metaprograms
-  facet_grid(rows = vars(n_metaprograms), switch = "y") +
-  # color the lines
-  scale_color_manual(
-    values = c(
-      "sig" = "red",
-      "ns"  = "black"
-    )
-  ) +
-  labs(
-    x = "Normalized effective sample size",
-    y = "Number of metaprograms (k)",
-    color = "Observed values"
-  )+
-  # remove some tick marks
-  theme(
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.grid.major.y = element_blank(),
-    panel.spacing = unit(0.02, "in")
+    obs_value = unique(obs_value), # retain this value for including it in the plot
+    p_value = (sum(greater_than_obs)+1)/(num_reps + 1)
+  ) |> 
+  # add adjusted pvalues and significance
+  dplyr::mutate(
+    adj_pvalue = p.adjust(p_value, method = "BH"),
+    significance = dplyr::if_else(adj_pvalue <= 0.05, "sig", "ns")
   )
 ```
+
+Below we will look at the results. 
+Each row is a metaprogram for a given value of k. 
+We will show the total spectra per metaprogam alongside each of the adjusted pvalues for a given statistic. 
+
+```{r}
+p_value_df |> 
+  dplyr::select(-c("p_value", "significance")) |> 
+  tidyr::pivot_wider(
+    names_from = "statistic",
+    values_from = c("obs_value", "adj_pvalue")
+  ) |> 
+  DT::datatable(options = list(scrollX = TRUE))
+```
+
+
+Below we will plot the observed values in relation to the background distribution for each metaprogram for each value of k. 
+The sina plot corresponds to the background and the diamond indicate the observed values for each metaprogram. 
+Red diamonds indicate that the adjusted pvalue is <= 0.05. 
+One plot is shown for each statistic. 
+
+```{r, fig.height=10, fig.width=10}
+plots <- purrr::map(stat_columns, \(stat) {
+    
+    bg  <- background_df |> dplyr::filter(statistic == stat)
+    obs <- p_value_df |> dplyr::filter(statistic == stat)
+    
+    ggplot(bg, aes(x = metaprogram, y = background_value)) +
+      ggforce::geom_sina(
+        color = "black",
+        alpha = 0.3,
+        size  = 0.8
+      ) +
+      geom_point(
+        data = obs,
+        aes(
+          x = metaprogram,
+          y = obs_value,
+          color = significance
+        ),
+        size  = 3,
+        shape = 18  # diamond
+      ) +
+      facet_wrap(
+        vars(n_metaprograms),
+        scales = "free_x",
+        ncol = 3
+      ) +
+        scale_color_manual(
+          values = c("sig" = "red", "ns" = "black")
+        ) +
+        labs(
+          x = "Metaprogram",
+          y = stat,
+          color = "Significance",
+          title = stat
+        ) +
+      theme(
+        strip.background = element_rect(fill = "transparent"),
+        axis.text.x = element_blank(),
+      )
+})
+
+purrr::walk(plots, print)
+```
+
 
 It looks like around half of the metaprograms have a significant p-value and are greater than the null distribution. 
 This looks like it might be promising to consider? 
 I don't know that we want to throw out metaprograms on this metric alone, but we could count the number of significant metaprograms per k to get an "optimal" k, at least for this metric. 
+Also, the results look very similar to each other, which makes sense since effective sample size is calculated from entropy. 
+We probably only need to use one of these metrics moving forward. 
 
 ```{r}
 # how many MPs are significant per value of k? 
 p_value_df |> 
-  dplyr::group_by(n_metaprograms) |> 
+  dplyr::group_by(n_metaprograms, statistic) |> 
   dplyr::summarise(
     total_programs = length(metaprogram),
-    sig_programs = sum(sig == "sig"),
+    sig_programs = sum(significance == "sig"),
     proportion_sig = sig_programs/total_programs
   ) |> 
-  dplyr::arrange(desc(proportion_sig))
+  dplyr::arrange(desc(proportion_sig)) |>
+  DT::datatable()
 ```
 
 If we rank the values based on the proportion of significant metaprograms, we see that k=10 has the most. 
 Note that if we just used the median of the effective sample size, k=11 and k=12 had the highest values. 
-
-Another thought I had was to try and use permutation testing with the weighted mean to get a single pvalue for each value of k. 
-Let's look at that quickly to see if its worth pursuing. 
-
-```{r}
-# pull out one just the weighted mean from the background distribution 
-weighted_mean_background_df <- background_df |> 
-  dplyr::select(n_metaprograms, eff_weighted_mean) |> 
-  dplyr::distinct()
-
-# assign a pvalue for each metaprogram for each value of k using the background
-p_value_df <- mp_entropy_df |> 
-  # select the columns we care about and rename eff number to indicate the observed value 
-  dplyr::select(
-    n_metaprograms,
-    "obs_value" = eff_weighted_mean
-  ) |>
-  dplyr::distinct() |>
-  # join with background data points
-  dplyr::left_join(weighted_mean_background_df, by = c("n_metaprograms")) |>
-  dplyr::mutate(
-    # boolean column indicating if the background value is > observed
-    greater_than_obs = eff_weighted_mean > obs_value
-  ) |> 
-  dplyr::group_by(n_metaprograms) |> 
-  # calculate empirical pvalue for each value of k
-  dplyr::summarize(
-    eff_weighted_mean = unique(obs_value),
-    p_value = (sum(greater_than_obs)+1)/(num_reps +1),
-    sig = dplyr::if_else(p_value <= 0.05, "sig", "ns")
-  ) 
-
-p_value_df
-```
-
-Hmm well that doesn't look very promising. 
 
 ## Conclusions
 
