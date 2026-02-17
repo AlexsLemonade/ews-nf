@@ -190,36 +190,10 @@ permute_ora <- function(mp_mtx, nreps, gene_universe, term2gene_df) {
       )
       
       # table of number of gene sets per metaprogram 
-      num_genesets_df <- get_total_genesets(names(mp_list), ora_results_df)
-      
-      # get a list of all gene sets for each MP
-      geneset_groups <- split(ora_results_df$ID, ora_results_df$metaprogram)
-      
-      # if there's at least 2 MPs then calculate Jaccard
-      if(length(geneset_groups) > 1){
-        
-        max_jaccard_df <- max_jaccard(groups_list = geneset_groups) 
-        
-      } else {
-        # otherwise just make a dataframe with NA for max jaccard
-        max_jaccard_df <- data.frame(
-          "metaprogram" = names(mp_list),
-          "max_jaccard" = NA
-        )
-        
-      }
-      
-      # make sure we have one row per MP regardless of if sig gene sets were returned 
-      all_mps <- data.frame(
-        "metaprogram" = names(mp_list)
-      ) |> 
-        # join with number of gene sets and max jaccard
-        dplyr::left_join(num_genesets_df, by = "metaprogram") |> 
-        dplyr::left_join(max_jaccard_df, by = "metaprogram") |>
-        # add in a nreps column
+      num_genesets_df <- get_total_genesets(names(mp_list), ora_results_df) |> 
         dplyr::mutate(nreps = n)
       
-      return(all_mps)
+      return(num_genesets_df)
       
       
     }) |>
@@ -229,10 +203,94 @@ permute_ora <- function(mp_mtx, nreps, gene_universe, term2gene_df) {
   
 }
 
+# shuffle gene sets assigned to each MP using ORA
+# we shuffle geneset assignments ensuring no duplicates per mp
+# and calculate one background per number of gene sets
+permute_jaccard <- function(ora_results_df, nreps) {
+  
+  # pool of all significant gene sets across all metaprograms
+  all_genesets <- unique(ora_results_df$ID)
+  
+  # get the size (number of sig gene sets) for each metaprogram
+  mp_sizes <- ora_results_df |>
+    dplyr::group_by(metaprogram) |>
+    dplyr::summarise(size = dplyr::n_distinct(ID), .groups = "drop")
+  
+  # get the unique sizes so we only compute one distribution per size
+  unique_sizes <- unique(mp_sizes$size)
+  
+  # mp names
+  mp_names <- unique(ora_results_df$metaprogram)
+  
+  reps <- seq(1, nreps)
+  
+  # for each unique size, generate a background distribution of max jaccard
+  # this keeps things efficient because we reuse the same distribution for all mps
+  # that have the same number of sig gene sets
+  size_distributions <- purrr::map(unique_sizes, \(size) {
+    
+    purrr::map(reps, \(n) {
+      
+      # sample without replacement from the full pool
+      # ensuring no duplicate gene sets within a metaprogram
+      sampled_genesets <- sample(all_genesets, size, replace = FALSE)
+      
+      data.frame(
+        size = size,
+        nreps = n,
+        geneset = sampled_genesets
+      )
+      
+    }) |> dplyr::bind_rows()
+    
+  }) |> 
+    purrr::set_names(unique_sizes) |>
+    dplyr::bind_rows()
+  
+  # for each rep, calculate max jaccard across metaprograms using shuffled assignments
+  background <- reps |>
+    purrr::map(\(n) {
+      
+      # for this rep, reconstruct geneset groups per mp using their observed size
+      # but with randomly sampled gene sets
+      shuffled_groups <- mp_names |> 
+        purrr::map( \(mp) {
+          
+          mp_size <- mp_sizes |> 
+            dplyr::filter(metaprogram == mp) |> 
+            dplyr::pull(size)
+          
+          size_distributions |>
+            dplyr::filter(size == mp_size, nreps == n) |>
+            dplyr::pull(geneset)
+        }
+      ) |> 
+        purrr::set_names(mp_names)
+        
+      
+      # only calculate jaccard if we have at least 2 mps with gene sets
+      if(length(shuffled_groups) > 1) {
+        max_jaccard_df <- max_jaccard(groups_list = shuffled_groups)
+      } else {
+        max_jaccard_df <- data.frame(
+          metaprogram = mp_sizes$metaprogram,
+          max_jaccard = NA
+        )
+      }
+      
+      max_jaccard_df |> 
+        dplyr::mutate(nreps = n)
+      
+    }) |>
+    dplyr::bind_rows()
+  
+  return(background)
+}
+
 # calculate significance for permutation testing
 # reports a pvalue for number of gene sets and max jaccard for overlap in gene sets
 # omit NAs when calculating
-get_ora_significance <- function(observed_df, background_df, nreps){
+get_permutation_significance <- function(observed_df, background_df, nreps){
   
   # combine the observed values with the background
   combined_df <- observed_df |> 
@@ -341,6 +399,9 @@ option_list <- list(
 
 # Parse options
 opt <- parse_args(OptionParser(option_list = option_list))
+
+# TODO: REMOVE BEFORE COMMITTING
+opt$metaprograms_file <- "ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/metaprograms.rds"
 
 # Main script ------------------------------------------------------------------
 
@@ -509,16 +570,23 @@ observed_df <- data.frame(
   dplyr::left_join(num_genesets_df, by = "metaprogram") |> 
   dplyr::left_join(max_jaccard_df, by = "metaprogram")
 
-# get the backround distribution 
-background_df <- permute_ora(
+# get the backround distribution for num genesets from ORA
+ora_background_df <- permute_ora(
   mp_mtx, 
   nreps = opt$nreps, 
   gene_universe = mp_object$gene_universe, 
   term2gene_df = all_term_df
 )
 
+# background distribution for overlap in gene sets
+jaccard_background_df <- permute_jaccard(ora_results_df, opt$nreps)
+
+# combine background
+background_df <- ora_background_df |> 
+  dplyr::left_join(jaccard_background_df, by = c("metaprogram", "nreps"))
+
 # calculate pvalues 
-all_pvalue_df <- get_ora_significance(observed_df, background_df, opt$nreps)
+all_pvalue_df <- get_permutation_significance(observed_df, background_df, opt$nreps)
 
 # Combine and export -----------------------------------------------------------
 
