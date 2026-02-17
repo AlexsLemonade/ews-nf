@@ -85,8 +85,7 @@ calculate_sample_stats <- function(mp_clusters_df){
   mp_entropy_df <- mp_clusters_df |> 
     dplyr::group_by(metaprogram, sample_id) |>
     dplyr::summarise(num_spectra_per_sample = dplyr::n(), # total spectra per sample in a given mp
-                     .groups = "drop") |> 
-    dplyr::group_by(metaprogram) |> 
+    ) |> 
     # use reframe because we calculate multiple rows per group
     # avoids warning messages from summarize 
     dplyr::reframe(
@@ -215,20 +214,13 @@ permute_entropy <- function(mp_df, nreps){
   
   # for each rep, shuffle the spectra
   # keep the distribution of num spectra/ mp the same
-  background <- reps |> 
-    purrr::map(\(n){
-      
-      mp_df |> 
-        # shuffle spectra assigned to each metaprogram
-        dplyr::mutate(spectra = sample(spectra),
-                      # make sure the sample id column matches the new shuffled spectra
-                      sample_id = stringr::str_extract(spectra, "SCPCS[0-9]{6}")) |>
-        # get the metrics
-        calculate_sample_stats() |> 
-        dplyr::mutate(rep_n = n)
-      
-    }) |> 
-    dplyr::bind_rows()
+  background <- replicate(
+    n_reps, 
+    dplyr::mutate(mp_df, metaprograms = sample(metaprograms)
+  ) |>
+    purrr::map(calculate_sample_stats) |>
+    dplyr::bind_rows(.id = "rep_n")
+
   
   return(background)
 }
