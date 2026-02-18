@@ -220,7 +220,7 @@ permute_jaccard <- function(ora_results_df, nreps) {
   unique_sizes <- unique(mp_sizes$size)
   
   # mp names
-  mp_names <- unique(ora_results_df$metaprogram)
+  mp_names <- mp_sizes$metaprogram
   
   reps <- seq(1, nreps)
   
@@ -237,7 +237,7 @@ permute_jaccard <- function(ora_results_df, nreps) {
       
       data.frame(
         size = size,
-        nreps = n,
+        replicate = n,
         geneset = sampled_genesets
       )
       
