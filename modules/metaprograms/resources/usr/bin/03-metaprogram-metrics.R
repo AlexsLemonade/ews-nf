@@ -171,8 +171,7 @@ permute_ora <- function(mp_mtx, nreps, gene_universe, term2gene_df) {
   
   reps <- seq(1, nreps)
   
-  background <- reps |> 
-    purrr::map(\(n){
+  background <- replicate(nreps, {
       
       # shuffle the genes (rownames) in the matrix 
       rownames(mp_mtx) <- sample(rownames(mp_mtx))
@@ -190,14 +189,9 @@ permute_ora <- function(mp_mtx, nreps, gene_universe, term2gene_df) {
       )
       
       # table of number of gene sets per metaprogram 
-      num_genesets_df <- get_total_genesets(names(mp_list), ora_results_df) |> 
-        dplyr::mutate(nreps = n)
-      
-      return(num_genesets_df)
-      
-      
-    }) |>
-    dplyr::bind_rows()
+      get_total_genesets(names(mp_list), ora_results_df) 
+    }, simplify = FALSE) |> # return as a dataframe not mtx
+    dplyr::bind_rows(.id = "replicate")
   
   return(background)
   
