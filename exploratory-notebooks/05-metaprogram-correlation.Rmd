@@ -201,7 +201,8 @@ ggplot(score_correlation_df, aes(x = n_metaprograms, y = max_correlation_cells))
   labs(
     x = "Number of metaprograms (k)",
     y = "Max correlation of cell scores"
-  ) 
+  ) +
+  geom_hline(yintercept = 0.8, linetype = "dashed")
 ```
 
 Again, we'll look at the distribution of all points together. 
@@ -293,7 +294,8 @@ ggplot(mp_metrics_df, aes(x = n_metaprograms, y = median_difference)) +
   scale_color_manual(values = c("black", "red")) +
   labs(
     x = "Number of metaprograms (k)",
-    y = "Max correlation of cell scores"
+    y = "Difference in medians of correlation \n within - between metaprograms",
+    color = "Outlier"
   ) 
 ```
 
@@ -323,6 +325,33 @@ all_stats_df |>
   dplyr::filter(median_diff_is_outlier) |> 
   dplyr::select(n_metaprograms, metaprogram, max_correlation, max_correlation_cells, median_difference)
 ```
+
+We can also plot where the noisey metaprogram is in relation to the rest of the metaprograms for gene and cell correlation. 
+
+```{r}
+ggplot(mp_metrics_df, aes(x = n_metaprograms, y = max_correlation)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(aes(color = median_diff_is_outlier)) +
+  scale_color_manual(values = c("black", "red")) +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Max correlation of metaprogram gene weights",
+    color = "Outlier"
+  ) 
+```
+
+```{r}
+ggplot(all_stats_df, aes(x = n_metaprograms, y = max_correlation_cells)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(aes(color = median_diff_is_outlier)) +
+  scale_color_manual(values = c("black", "red")) +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Max correlation of cell scores",
+    color = "Outlier"
+  ) 
+```
+
 
 Interestingly, the values for the other metrics for that program are below the thresholds we had picked. 
 Maybe correlation between metaprograoms isn't the best metric for choosing "good" metaprograms since inherently they should be different from each other. 
