@@ -208,7 +208,7 @@ ora_permutation_significance <- function(observed_df, background_df, nreps){
       obs_num_sig_genesets = num_sig_genesets
     ) |> 
     dplyr::left_join(background_df, by = c("metaprogram")) |> 
-    dplyr::select(-nreps)
+    dplyr::select(-replicate)
   
   # calculate the pvalue for num genesets 
   pvalue_df <- combined_df |> 
@@ -556,16 +556,14 @@ ora_pvalue_df <- ora_permutation_significance(num_genesets_df, ora_background_df
 observed_unique_genesets <- prop_unique_mapped_genesets(geneset_groups)
 
 # background distribution for total unique gene sets
-unique_geneset_background_df <- permute_unique_genesets(ora_results_df, opt$nreps)
-
-# get a single pvalue 
-unique_genesets_pvalue <- unique_geneset_background_df |> 
+unique_geneset_background_df <- permute_unique_genesets(ora_results_df, opt$nreps) |> 
   dplyr::mutate(
     # indicate which rows have background > obs
-    greater_than_obs = num_unique_genesets > observed_unique_genesets_df$num_unique_genesets,
-    pvalue = (sum(greater_than_obs) +1)/(nreps + 1)
+    greater_than_obs = num_unique_genesets > observed_unique_genesets$num_unique_genesets
   )
 
+# get a single pvalue 
+unique_genesets_pvalue <- (sum(unique_geneset_background_df$greater_than_obs) +1)/(opt$nreps + 1)
 
 # Combine and export -----------------------------------------------------------
 
