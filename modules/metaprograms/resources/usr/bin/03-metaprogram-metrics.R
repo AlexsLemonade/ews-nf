@@ -16,6 +16,11 @@
 # num_samples: Number of samples represented in the metaprogram
 # proportion_of_samples: Proportion of the total samples represented in the metaprogram
 # num_sig_genesets: Total number of gene sets identified as significant by ORA
+# num_sig_genesets_pvalue: P value associated with permutation testing for number of observed gene sets after ORA
+# num_sig_genesets_adj_pvalue: Adjusted pvalue associated with permutation testing for number of gene sets after ORA
+# num_unique_genesets: Total number of gene sets uniquely mapped to a single metaprogram 
+# proportion_unique_genesetss: Total proportion of gene sets uniquely mapped to a single metaprogram
+# unique_genesets_pvolue: P value associated with permutation testing for unique gene sets
 # max_jaccard: Max Jaccard index for each metaprogram calculated by comparing 
 #  the list of gene sets for each metaprogram after ORA
 #  this column includes all gene sets
@@ -220,11 +225,11 @@ ora_permutation_significance <- function(observed_df, background_df, nreps){
     dplyr::summarize(
       # calculate p values and retain a column with the observed value
       num_sig_genesets = unique(obs_num_sig_genesets),
-      num_genesets_perm_pvalue = (sum(greater_than_obs_num_genesets) +1)/(nreps + 1)
+      num_sig_genesets_pvalue = (sum(greater_than_obs_num_genesets) +1)/(nreps + 1)
     ) |> 
     # add adjusted pvalue 
     dplyr::mutate(
-      num_genesets_adj_pvalue = p.adjust(num_genesets_perm_pvalue, method = "BH")
+      num_sig_genesets_adj_pvalue = p.adjust(num_sig_genesets_pvalue, method = "BH")
     )
   
   return(pvalue_df)
@@ -377,9 +382,6 @@ option_list <- list(
 
 # Parse options
 opt <- parse_args(OptionParser(option_list = option_list))
-
-# TODO: REMOVE BEFORE COMMITTING
-opt$metaprograms_file <- "ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/metaprograms.rds"
 
 # Main script ------------------------------------------------------------------
 
