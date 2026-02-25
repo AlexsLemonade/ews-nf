@@ -195,7 +195,7 @@ permute_ora <- function(mp_mtx, nreps, gene_universe, term2gene_df) {
       
       # table of number of gene sets per metaprogram 
       get_total_genesets(names(mp_list), ora_results_df) 
-    }, simplify = FALSE) |> # return as a dataframe not mtx
+    }, simplify = FALSE) |> # return as a list not mtx
     dplyr::bind_rows(.id = "replicate")
   
   return(background)
@@ -265,12 +265,12 @@ permute_unique_genesets <- function(ora_results_df, nreps) {
   total_genesets <- length(all_genesets)
   
   # get the size (number of sig gene sets) for each metaprogram
-  mp_sizes <- ora_results_df |>
+  mp_geneset_counts <- ora_results_df |>
     dplyr::group_by(metaprogram) |>
-    dplyr::summarise(size = dplyr::n_distinct(ID), .groups = "drop")
+    dplyr::summarise(geneset_count = dplyr::n_distinct(ID), .groups = "drop")
   
-  # get the unique sizes so we only compute one distribution per size
-  unique_sizes <- unique(mp_sizes$size)
+  # get the unique geneset counts so we only compute one distribution per count
+  unique_counts <- unique(mp_sizes$geneset_count)
   
   # mp names
   mp_names <- mp_sizes$metaprogram
