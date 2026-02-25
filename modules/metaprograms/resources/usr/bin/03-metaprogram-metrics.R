@@ -262,69 +262,32 @@ permute_unique_genesets <- function(ora_results_df, nreps) {
   
   # pool of all significant gene sets across all metaprograms
   all_genesets <- unique(ora_results_df$ID)
-  total_genesets <- length(all_genesets)
   
   # get the size (number of sig gene sets) for each metaprogram
   mp_geneset_counts <- ora_results_df |>
     dplyr::group_by(metaprogram) |>
     dplyr::summarise(geneset_count = dplyr::n_distinct(ID), .groups = "drop")
   
-  # get the unique geneset counts so we only compute one distribution per count
-  unique_counts <- unique(mp_sizes$geneset_count)
-  
-  # mp names
-  mp_names <- mp_sizes$metaprogram
-  
-  # for each unique size, generate a background distribution of max jaccard
-  # this keeps things efficient because we reuse the same distribution for all mps
-  # that have the same number of sig gene sets
-  size_distributions <- purrr::map(unique_sizes, \(size) {
-    
-    replicate(nreps, {
-      
-      # sample without replacement from the full pool
-      # ensuring no duplicate gene sets within a metaprogram
-      sampled_genesets <- sample(all_genesets, size, replace = FALSE)
-      
-      data.frame(
-        size = size,
-        geneset = sampled_genesets
-      )
-    }, simplify = FALSE) |> # return as a dataframe not mtx
-      dplyr::bind_rows(.id = "replicate")
-    
-  }) |> 
-    purrr::set_names(unique_sizes) |>
-    dplyr::bind_rows()
-  
-  # for each rep, calculate max jaccard across metaprograms using shuffled assignments
+  # shuffle genesets assigned to each metaprogram
   background <- replicate(
-    nreps,
+    nreps, 
     {
-      # for this rep, reconstruct geneset groups per mp using their observed size
-      # but with randomly sampled gene sets
-      shuffled_groups <- mp_names |>
-        purrr::map(\(mp) {
-          mp_size <- mp_sizes |>
-            dplyr::filter(metaprogram == mp) |>
-            dplyr::pull(size)
-          
-          size_distributions |>
-            dplyr::filter(size == mp_size) |>
-            dplyr::slice_sample(n = 1) |>
-            dplyr::pull(geneset)
-        }) |>
-        purrr::set_names(mp_names)
-      
-      # get unique gene sets as data frame
+      # keep the total number of genesets the same
+      shuffled_groups <- mp_geneset_counts$geneset_count |> 
+        purrr::set_names(mp_geneset_counts$metaprogram) |>
+        purrr::map(\(count){
+          # sample without replacement from the full pool
+          # ensuring no duplicate gene sets within a metaprogram
+          sample(all_genesets, count, replace = FALSE)
+        })
+    
+      # get unique gene sets as a data frame
       unique_stats <- prop_unique_mapped_genesets(shuffled_groups) |> 
         as.data.frame()
       
-    },
-    simplify = FALSE
-  ) |> 
+    }, simplify = FALSE
+  ) |>
     dplyr::bind_rows(.id = "replicate")
-  
   
   return(background)
 }
