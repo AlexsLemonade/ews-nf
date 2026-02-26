@@ -451,6 +451,10 @@ mp_genes_overlap_df <- max_jaccard(top_genes) |>
 hallmarks_msigdb_df <- msigdbr::msigdbr(species = "Homo sapiens", collection = "H") |> 
   dplyr::select(gs_name, ensembl_gene)
 
+# grab 3CA (Curated Cancer Cell Atlas from https://www.weizmann.ac.il/sites/3CA/)
+cca_msigdb_df <- msigdbr::msigdbr(species = "Homo sapiens", collection = "C4", subcollection = "3CA") |> 
+  dplyr::select(gs_name, ensembl_gene)
+
 # get genes in the EwS specific gene sets from MSigDB
 ef_msigdb_geneset_df <- prep_msigdb_genesets(ef_msigdb_df)
 
@@ -458,6 +462,7 @@ ef_msigdb_geneset_df <- prep_msigdb_genesets(ef_msigdb_df)
 all_term_df <- ef_msigdb_geneset_df |>
   dplyr::bind_rows(custom_geneset_df) |> 
   dplyr::bind_rows(hallmarks_msigdb_df) |> 
+  dplyr::bind_rows(cca_msigdb_df) |> 
   tidyr::drop_na()
 
 # get ora results
