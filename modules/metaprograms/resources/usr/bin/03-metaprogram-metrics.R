@@ -524,7 +524,7 @@ observed_unique_genesets <- prop_unique_mapped_genesets(geneset_groups)
 unique_geneset_background_df <- permute_unique_genesets(ora_results_df, opt$nreps) |> 
   dplyr::mutate(
     # indicate which rows have background > obs
-    greater_than_obs = num_unique_genesets > observed_unique_genesets$num_unique_genesets
+    greater_than_obs = num_unique_genesets >= observed_unique_genesets$num_unique_genesets
   )
 
 # get a single pvalue 
