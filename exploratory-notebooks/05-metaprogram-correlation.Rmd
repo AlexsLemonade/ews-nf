@@ -13,6 +13,7 @@ I am repeating it here to have everything related to correlation metrics in the 
 
 ```{r}
 library(ggplot2)
+library(patchwork)
 
 # Set default ggplot theme
 theme_set(
@@ -120,7 +121,10 @@ ggplot(mp_metrics_df, aes(x = n_metaprograms, y = max_correlation)) +
   labs(
     x = "Number of metaprograms (k)",
     y = "Max correlation of metaprogram gene weights"
-  ) 
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
 ```
 
 Let's look at the distribution of all points together regardless of the value of k to see if we can identify any obvious inflection points. 
@@ -128,6 +132,7 @@ Let's look at the distribution of all points together regardless of the value of
 ```{r}
 plot_distribution(mp_metrics_df, max_correlation)
 ```
+
 It looks like we have a bimodal distribution with an inflection point around 0.5. 
 When we looked at the smaller range of k (5-15), all the correlations were < 0.4 and it was hard to define a cutoff but as we increase the range of k, we start to see metaprograms with much higher correlations all the way up to 0.8. 
 
@@ -135,6 +140,7 @@ I would feel comfortable saying that "good" metaprograms are those with a max co
 
 One way to do apply that threshold is to count the proportion of metaprograms with max correlation < 0.5 for each value of k. 
 Let's do that and then plot the proportion as we increase k to see at what value of k do we introduce metaprograms with high correlation. 
+Perhaps once we see metaprograms with correlation > 0.5, we've gone too high and should not consider that value of k.
 
 ```{r}
 correlation_elbow_df <- mp_metrics_df |> 
@@ -223,13 +229,7 @@ ggplot(score_correlation_df, aes(x = n_metaprograms, y = max_correlation_cells))
 Again, we'll look at the distribution of all points together. 
 
 ```{r}
-hist <- ggplot(score_correlation_df, aes(x = max_correlation_cells)) +
-  geom_histogram(fill = "grey90", color = "black") 
-
-density <- ggplot(score_correlation_df, aes(x = max_correlation_cells)) +
-  geom_density(fill = "darkblue", alpha = 0.5)
-
-hist / density
+plot_distribution(score_correlation_df, max_correlation_cells)
 ```
 
 Notably, this correlation range is much wider and we see correlations all the way up to close to 1.
@@ -249,7 +249,10 @@ ggplot(score_correlation_df, aes(x = n_metaprograms, y = max_correlation_cells))
   labs(
     x = "Number of metaprograms (k)",
     y = "Max correlation of cell scores"
-  ) 
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
 ```
 
 Hmm it doesn't look like there are any outliers. 
@@ -288,6 +291,12 @@ ggplot(mp_metrics_df, aes(x = n_metaprograms, y = median_difference)) +
   labs(
     x = "Number of metaprograms (k)",
     y = "Metaprogram coherence"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
   )
 ```
 
@@ -346,7 +355,74 @@ ggplot(coherence_elbow_df, aes(x = n_metaprograms, median_coherence)) +
 
 It looks like once you get to k=11, the value hits a plateau.
 
-## Combining metrics 
+Let's try to use a quantitative approach to find the elbow. 
+
+I'm going to try out a version of the "kneedle" algorithm, see https://raghavan.usc.edu/papers/kneedle-simplex11.pdf. 
+This involves rotating the curve so that the knee or elbow correspond to the local maxima. 
+After rotating, the elbow is the point with the maximum difference from the line that connects the two end points of the rotated curve. 
+The only step I'm not including is the thresholding step which finds a set of local maxima. 
+Instead, I'll just find a single maximum value to indicate the elbow.
+
+
+```{r}
+# function to calculate the "kneedle"
+kneedle <- function(k_values, metric_values, concave = TRUE) {
+  
+  # Step 1: Smooth data to preserve original shape 
+  fit <- smooth.spline(k_values, metric_values)
+  metric_values <- predict(fit, k_values)$y
+  
+  # Step 2: Normalize to [0, 1]
+  x <- (k_values - min(k_values)) / (max(k_values) - min(k_values))
+  y <- (metric_values - min(metric_values)) / (max(metric_values) - min(metric_values))
+  
+  # Step 3: Subtract the diagonal (line from first to last point)
+  # This "rotates" the curve so the elbow becomes a maximum
+  y_diff <- y - x  # for concave (increasing); use x - y for convex (decreasing)
+  if (!concave) y_diff <- x - y
+  
+  # Step 4: The knee is the point with the maximum difference
+  knee_index <- which.max(y_diff)
+  
+  k_values[knee_index]
+}
+```
+
+
+```{r}
+k_values <- stringr::str_remove(coherence_elbow_df$n_metaprograms, "k_") |> 
+  as.numeric()
+
+kneedle(k_values, coherence_elbow_df$median_coherence, concave = TRUE)
+```
+
+
+This lines up with what I would expect.
+How does this change if you first remove the outlier and then find the elbow? 
+
+```{r}
+filtered_coherence_elbow_df <- mp_metrics_df |> 
+  dplyr::filter(!coherence_is_outlier) |>
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarize(
+    median_coherence = median(median_difference)
+  ) |> 
+  dplyr::arrange(desc(median_coherence))
+
+ggplot(filtered_coherence_elbow_df, aes(x = n_metaprograms, median_coherence)) +
+  geom_point() +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+```{r}
+kneedle(k_values, filtered_coherence_elbow_df$median_coherence, concave = TRUE)
+```
+
+Again, we see that this is 11.
+
+## Concluding thoughts
 
 Some thoughts about putting everything together based on the above observations: 
 
@@ -358,56 +434,8 @@ It's a pretty big range of values and having a high biological correlation betwe
 * For the coherence metric, one option is to just remove the noisey metaprogram all together and not use that metric when combining metrics outside of that. 
 * The other option is to calculate the median and rank the values of k based on that. 
 My concern with that is high values of k have higher median values, but only marginally, so I wouldn't want that to heavily influence the final results.
+* We might also consider using the elbow to define a point where we see no added benefit to adding more metaprograms, but I'm not sure how exactly that would fit into defining our overall metric.
 
-
-First let's see what this looks like if we calculate the proportion of metaprograms passing the gene weight and coherence cutoffs. 
-We can get the mean value of those two metrics and rank the values of k. 
-
-```{r}
-mp_metrics_df |> 
-  # first add columns to indicate if the MP passed each threshold
-  dplyr::mutate(
-    passing_gene_correlation = max_correlation < 0.5,
-    passing_coherence = coherence_zscore > -2
-  ) |> 
-  # now calculate the proportion for each one individually and then get the mean
-  dplyr::group_by(n_metaprograms) |> 
-  dplyr::summarize(
-    num_mps = length(unique(metaprogram)),
-    proportion_passing_gene_correlation = sum(passing_gene_correlation)/num_mps,
-    proportion_passing_coherence = sum(passing_coherence)/num_mps,
-    mean_all_passing = mean(c(proportion_passing_gene_correlation,
-                              proportion_passing_coherence))
-  ) |> 
-  dplyr::select(-num_mps) |> 
-  dplyr::arrange(desc(mean_all_passing))
-```
-
-Interestingly, if you use the cutoff for coherence and calculate the proportion passing and combine with the gene weight correlation you see that values like k=16, k=15 are at the top. 
-
-Now instead of counting how many metaprograms pass the threshold for coherence, let's get the median coherence instead. 
-
-```{r}
-mp_metrics_df |> 
-  # first add columns to indicate if the MP passed each threshold
-  dplyr::mutate(
-    passing_gene_correlation = max_correlation < 0.5,
-  ) |> 
-  # now calculate the proportion for each one individually and then get the mean
-  dplyr::group_by(n_metaprograms) |> 
-  dplyr::summarize(
-    num_mps = length(unique(metaprogram)),
-    proportion_passing_gene_correlation = sum(passing_gene_correlation)/num_mps,
-    median_coherence = median(median_difference)/num_mps,
-    mean_all_passing = mean(c(proportion_passing_gene_correlation,
-                              median_coherence))
-  ) |> 
-  dplyr::select(-num_mps) |> 
-  dplyr::arrange(desc(mean_all_passing))
-```
-
-Here we see that k=6, k=7, and k=5 are at the top. 
-This is more consistent with what I would expect having looked at the metrics here and the sample distribution metrics. 
 
 ## Session info
 
