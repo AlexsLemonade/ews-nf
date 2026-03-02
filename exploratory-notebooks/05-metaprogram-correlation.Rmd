@@ -26,10 +26,10 @@ theme_set(
 # a little helper function to look at histogram and density plots for a single metric
 plot_distribution <- function(df, column){
   
-  hist <- ggplot(df, aes(x = !!sym(column))) +
+  hist <- ggplot(df, aes(x = {{ column }} )) +
     geom_histogram(fill = "grey90", color = "black") 
   
-  density <- ggplot(df, aes(x = !!sym(column))) +
+  density <- ggplot(df, aes(x = {{ column }} )) +
     geom_density(fill = "darkblue", alpha = 0.5)
   
   hist / density
@@ -126,13 +126,7 @@ ggplot(mp_metrics_df, aes(x = n_metaprograms, y = max_correlation)) +
 Let's look at the distribution of all points together regardless of the value of k to see if we can identify any obvious inflection points. 
 
 ```{r}
-hist <- ggplot(mp_metrics_df, aes(x = max_correlation)) +
-  geom_histogram(fill = "grey90", color = "black") 
-
-density <- ggplot(mp_metrics_df, aes(x = max_correlation)) +
-  geom_density(fill = "darkblue", alpha = 0.5)
-
-hist / density
+plot_distribution(mp_metrics_df, max_correlation)
 ```
 It looks like we have a bimodal distribution with an inflection point around 0.5. 
 When we looked at the smaller range of k (5-15), all the correlations were < 0.4 and it was hard to define a cutoff but as we increase the range of k, we start to see metaprograms with much higher correlations all the way up to 0.8. 
@@ -298,7 +292,7 @@ ggplot(mp_metrics_df, aes(x = n_metaprograms, y = median_difference)) +
 ```
 
 ```{r}
-plot_distribution(mp_metrics_df, "median_difference")
+plot_distribution(mp_metrics_df, median_difference)
 ```
 
 Here it looks like we have a mostly uniform distribution with small tails < 0.1 and > 0.6.
