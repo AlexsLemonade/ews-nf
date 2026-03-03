@@ -38,7 +38,7 @@ source("utils/ora-helper-functions.R")
 # plots background points with observed values in color on top as sina plot
 plot_permutation_results <- function(background_df, pvalue_df, x_axis, y_axis){
   
-  ggplot(background_df, aes(x = !!sym(x_axis), y = !!sym(y_axis))) +
+  ggplot(background_df, aes(x = {{ x_axis }}, y = {{ y_axis }})) +
   ggforce::geom_sina(
     color = "black",
     alpha = 0.3,
@@ -47,8 +47,8 @@ plot_permutation_results <- function(background_df, pvalue_df, x_axis, y_axis){
   geom_point(
     data = pvalue_df,
     aes(
-      x = !!sym(x_axis),
-      y = !!sym(y_axis),
+      x = {{ x_axis }},
+      y = {{ y_axis }},
       color = is_significant
     ),
     size  = 3,
@@ -86,6 +86,9 @@ metrics_files <- file.path(metaprogram_output_dirs, "metaprograms-metrics.rds") 
 # we'll use these for re-running ORA 
 metaprogram_files <- file.path(metaprogram_output_dirs, "metaprograms.rds") |> 
   purrr::set_names(sprintf("k_%02d", n_metaprograms))
+
+# significance value so we don't accidentally mis type it 
+sig_value <- 0.05
 ```
 
 ```{r, message=FALSE}
@@ -96,7 +99,7 @@ mp_metrics_list <- metrics_files |>
 # create dataframe with one row per metaprogram/n_metaprogram (k) combination 
 # each column is a metric for that metaprograms
 mp_metrics_df <- mp_metrics_list |> 
-  purrr::map(\(metrics_list) metrics_list$mp_metrics_df) |> 
+  purrr::map("mp_metrics_df") |> 
   dplyr::bind_rows(.id = "n_metaprograms")
 ```
 
@@ -110,11 +113,11 @@ We'll plot the number of gene sets observed with the background for each metapro
 # pull out observed and 
 ora_observed_df <- mp_metrics_df |> 
   dplyr::mutate(
-    is_significant = num_sig_genesets_adj_pvalue <= 0.5
+    is_significant = num_sig_genesets_adj_pvalue <= sig_value
   ) 
 
 ora_background_df <- mp_metrics_list |> 
-  purrr::map(\(metrics_list) metrics_list$ora_background_df) |> 
+  purrr::map("ora_background_df") |> 
   dplyr::bind_rows(.id = "n_metaprograms")
 
 ```
@@ -125,12 +128,13 @@ ora_background_df <- mp_metrics_list |>
 
 # plot each metaprogram on the x axis with the number of observed gene sets on the y axis
 # facet by k
-plot_permutation_results(ora_background_df, ora_observed_df, "metaprogram", "num_sig_genesets") +
+plot_permutation_results(ora_background_df, ora_observed_df, metaprogram, num_sig_genesets) +
   facet_wrap(
     vars(n_metaprograms),
     scales = "free_x",
     ncol = 4
   )
+
 ```
 
 Interestingly almost all metaprograms have a number of observed gene sets that are significant. 
@@ -159,18 +163,18 @@ unique_geneset_obs_df <- mp_metrics_df |>
   dplyr::select(n_metaprograms, num_unique_genesets, unique_genesets_pvalue) |>
   dplyr::distinct() |>
   dplyr::mutate(
-    is_significant = unique_genesets_pvalue <= 0.5
+    is_significant = unique_genesets_pvalue <= sig_value
   ) 
 
 # background distribution
 unique_geneset_background_df <- mp_metrics_list |> 
-  purrr::map(\(metrics_list) metrics_list$unique_geneset_background_df) |> 
+  purrr::map("unique_geneset_background_df") |> 
   dplyr::bind_rows(.id = "n_metaprograms")
 ```
 
 
 ```{r}
-plot_permutation_results(unique_geneset_background_df, unique_geneset_obs_df, "n_metaprograms", "num_unique_genesets")
+plot_permutation_results(unique_geneset_background_df, unique_geneset_obs_df, n_metaprograms, num_unique_genesets)
 ```
 
 Interestingly we see that every single value of k is significant for this metric.
@@ -250,7 +254,7 @@ updated_unique_geneset_results_df <- updated_ora_results_list |>
     # Combined data frame with obs and background together
     combined_df <- dplyr::bind_rows(obs_df, background_df) |>
       dplyr::mutate(unique_genesets_pvalue = pvalue,
-                    is_significant = pvalue <= 0.05)
+                    is_significant = pvalue <= sig_value)
 
     return(combined_df)
     
@@ -265,7 +269,7 @@ updated_unique_geneset_background_df <- updated_unique_geneset_results_df |>
 updated_unique_geneset_obs_df <- updated_unique_geneset_results_df |> 
   dplyr::filter(type == "observed")
 
-plot_permutation_results(updated_unique_geneset_background_df, updated_unique_geneset_obs_df, "n_metaprograms", "num_unique_genesets")
+plot_permutation_results(updated_unique_geneset_background_df, updated_unique_geneset_obs_df, n_metaprograms, num_unique_genesets)
 ```
 
 Again, everything is significant. 
@@ -284,7 +288,8 @@ We can calculate this number for each gene set and then take the mean of all gen
 I'll also look at the overall mean of all metaprograms for a single value of k to get a single metric. 
 
 The one caveat here is that if a metaprogram has no gene sets assigned, then this value cannot be computed. 
-I would favor converting this NA to 0 so that values of k with metaprograms that don't have any gene sets get penalized. 
+We will look at the results using two different approaches - leaving the values as NA and not counting them towards the mean or converting the NA to 0 prior to computing the mean.
+
 
 ```{r}
 # helper function for computing metaprogram specificity 
@@ -307,7 +312,9 @@ compute_metaprogram_specificity <- function(ora_results_df, n_metaprograms) {
     dplyr::left_join(geneset_specificity_df, by = "ID") |>
     dplyr::summarize(mean_geneset_specificity = mean(geneset_specificity), .by = "metaprogram") |>
     dplyr::mutate(
-      mean_geneset_specificity = dplyr::if_else(is.na(mean_geneset_specificity), 0, mean_geneset_specificity)
+      # add a new column to hep distinguish results considering 0s vs those with NA
+      # applies to metaprograms with 0 gene sets returned
+      mean_geneset_specificity_with_zeros = dplyr::if_else(is.na(mean_geneset_specificity), 0, mean_geneset_specificity)
     )
 }
 ```
@@ -327,9 +334,9 @@ specificity_df <- mp_metrics_list |>
 First let's just look to see if the distribution of this metric for each value of k.
 
 ```{r}
-ggplot(specificity_df, aes(x = n_metaprograms, y = mean_geneset_specificity)) +
+ggplot(specificity_df, aes(x = n_metaprograms, y = mean_geneset_specificity_with_zeros)) +
   geom_boxplot(outlier.shape = NA) +
-  ggbeeswarm::geom_beeswarm(color = "red") +
+  ggbeeswarm::geom_beeswarm(color = "red", alpha = 0.5) +
   labs(
     x = "Number of metaprograms (k)"
   ) +
@@ -347,20 +354,23 @@ If we just take the overall mean for each metaprogram, what are the top values o
 # rank by overall mean 
 obs_specificity_df <- specificity_df |> 
   dplyr::summarize(
-    overall_geneset_specificity = mean(mean_geneset_specificity),
+    overall_geneset_specificity = mean(mean_geneset_specificity, na.rm = TRUE),
+    overall_geneset_specificity_with_zeros = mean(mean_geneset_specificity_with_zeros),
     .by = n_metaprograms
   ) 
 
 obs_specificity_df |> 
-  dplyr::arrange(desc(overall_geneset_specificity))
+  dplyr::arrange(desc(overall_geneset_specificity)) |>
+  DT::datatable()
 ```
+If we sort by overall mean without zeros, then we see a mix of k values near the top.
 
-By taking the overall mean, we are going to be penalizing values of k with a metaprogram with no gene sets which definitely shows up here. 
+By taking the overall mean with zeros, we are going to be penalizing values of k with a metaprogram with no gene sets.
 The top values of k all have all metaprograms with gene sets and the rest are ranked by the specificity of the remaining gene sets. 
 
 Let's see if we can use permutation testing to define whether or not this gene set specificity is higher than what might be seen by random chance. 
 To do this, we'll shuffle the gene sets assigned to each metaprogram keeping the number of gene sets consistent with the observed values and then re-calculate specificity. 
-This is the same permutation testing that we did with number of unique gene sets.
+We will also weight the gene sets by the number of times they are observed.
 
 ```{r}
 permute_specificity <- function(
@@ -368,8 +378,12 @@ permute_specificity <- function(
     n_metaprograms,
     nreps
 ){
+  
+  # get gene set weights 
+  geneset_weights <- table(ora_results_df$ID)
   # pool of all significant gene sets across all metaprograms
-  all_genesets <- unique(ora_results_df$ID)
+  all_genesets <- names(geneset_weights)
+  
   
   # get the size (number of sig gene sets) for each metaprogram
   mp_geneset_counts <- ora_results_df |>
@@ -386,7 +400,7 @@ permute_specificity <- function(
         purrr::map(\(count){
           # sample without replacement from the full pool
           # ensuring no duplicate gene sets within a metaprogram
-          sample(all_genesets, count, replace = FALSE)
+          sample(all_genesets, count, replace = FALSE, prob = geneset_weights)
         }) |> 
         tibble::enframe(name = "metaprogram", value = "ID") |>
         tidyr::unnest_longer(ID)
@@ -411,9 +425,10 @@ permute_specificity <- function(
         ) |> 
         # make sure NA's are 0 since no gene sets occur 
         dplyr::mutate(
-          mean_geneset_specificity = dplyr::if_else(is.na(mean_geneset_specificity),0, mean_geneset_specificity), 
+          mean_geneset_specificity_with_zeros = dplyr::if_else(is.na(mean_geneset_specificity),0, mean_geneset_specificity), 
           # get the overall mean across all MPs
-          overall_geneset_specificity = mean(mean_geneset_specificity)
+          overall_geneset_specificity = mean(mean_geneset_specificity, na.rm = TRUE),
+          overall_geneset_specificity_with_zeros = mean(mean_geneset_specificity_with_zeros)
         ) 
       
     }, simplify = FALSE
@@ -426,25 +441,29 @@ permute_specificity <- function(
 # helper function to compute the pvalues for overall specificity 
 # returns a dataframe with one row per observed value 
 # new columns contain the specifity pvalue adj and is_significant
-compute_specificity_pvalue <- function(background_df, obs_df, nreps) {
+compute_specificity_pvalue <- function(background_df, obs_df, stat_column, nreps) {
   
   # join observed values with background values
   background_df |>
     dplyr::left_join(
-      dplyr::rename(obs_df, obs_value = overall_geneset_specificity),
+      dplyr::rename(obs_df, obs_value = {{ stat_column }}),
       by = c("n_metaprograms")
     ) |>
     # indicator column for if background >= observation
-    dplyr::mutate(greater_than_obs = overall_geneset_specificity >= obs_value) |>
+    dplyr::mutate(greater_than_obs = {{ stat_column }} >= obs_value,
+                  less_than_obs = {{ stat_column }} <= obs_value) |>
     dplyr::summarize(
       overall_geneset_specificity = unique(obs_value),
-      overall_geneset_specificity_pvalue = (sum(greater_than_obs) + 1) / (nreps + 1),
+      # we see values that are both higher and lower so use a two-tailed test
+      p_greater = (sum(greater_than_obs) + 1) / (nreps + 1),
+      p_lower = (sum(less_than_obs) + 1) / (nreps + 1),
+      overall_geneset_specificity_pvalue = min(p_greater, p_lower) * 2,
       .by = c("n_metaprograms")
     ) |>
     # add in adjusted pvalue
     dplyr::mutate(
       overall_geneset_specificity_adj_pvalue = p.adjust(overall_geneset_specificity_pvalue, method = "BH"),
-      is_significant = overall_geneset_specificity_pvalue <= 0.05
+      is_significant = overall_geneset_specificity_pvalue <= sig_value
     )
 }
 ```
@@ -459,19 +478,30 @@ specificity_background <- mp_metrics_list |>
     permute_specificity(k$ora_results_df, k$n_metaprograms, nreps)
   }) |>
   dplyr::bind_rows(.id = "n_metaprograms")
-
-specificity_pvalue_df <- compute_specificity_pvalue(specificity_background, obs_specificity_df , nreps = nreps)
 ```
 
 
 ```{r}
-plot_permutation_results(specificity_background, specificity_pvalue_df, "n_metaprograms", "overall_geneset_specificity")
+specificity_pvalue_df <- compute_specificity_pvalue(specificity_background, obs_specificity_df, overall_geneset_specificity, nreps = nreps)
+
+plot_permutation_results(specificity_background, specificity_pvalue_df, n_metaprograms, overall_geneset_specificity) +
+  labs(
+    title = "Metaprograms with no gene sets treated as NA"
+  )
 ```
 
-It looks like the specificity of gene sets falls off after k = 8. 
-Part of this could just be the nature of the gene sets? 
-If they aren't very specific they could be more likely to annotate multiple metaprograms as you increase k and separate larger programs. 
-The other possibility is that we are biasing our results towards values of k that produce metaprograms with all gene sets assigned, but maybe that's okay.
+```{r}
+specificity_pvalue_df <- compute_specificity_pvalue(specificity_background, obs_specificity_df, overall_geneset_specificity_with_zeros, nreps = nreps)
+
+plot_permutation_results(specificity_background, specificity_pvalue_df, n_metaprograms, overall_geneset_specificity) +
+  labs(
+    title = "Metaprograms with no gene sets treated as 0"
+  )
+```
+
+For both cases we see that the lower values of k are significant but more values of k are significant when we ignore metaprograms with 0 gene sets. 
+If we include those metaprograms in the overall score, only k=5 through k=8 are significant which are the only values of k where all metaprograms have at least 1 significant gene set.
+This suggests that how we handle metaprograms with 0 gene sets can affect the interpretation of this score. 
 
 As a last evaluation, we'll re-do this with different ORA results using the Reactome datasets we had looked at earlier.
 
@@ -492,9 +522,9 @@ updated_specificity_df <- updated_ora_results_list |>
 ```
 
 ```{r}
-ggplot(updated_specificity_df, aes(x = n_metaprograms, y = mean_geneset_specificity)) +
+ggplot(updated_specificity_df, aes(x = n_metaprograms, y = mean_geneset_specificity_with_zeros)) +
   geom_boxplot(outlier.shape = NA) +
-  ggbeeswarm::geom_beeswarm(color = "red") +
+  ggbeeswarm::geom_beeswarm(color = "red", alpha = 0.5) +
   labs(
     x = "Number of metaprograms (k)"
   ) +
@@ -504,13 +534,13 @@ ggplot(updated_specificity_df, aes(x = n_metaprograms, y = mean_geneset_specific
 ```
 
 It looks like for this case we have metaprograms without gene sets across the board. 
-We probably don't want to use only the reactome and hallmarks in practice as we seem to be annotating less metaprograms, but let's see how this impacts results.
 
 ```{r}
 # first get the observed df with overall mean for each metaprogram
 updated_obs_specificity_df <- specificity_df |> 
   dplyr::summarize(
-    overall_geneset_specificity = mean(mean_geneset_specificity),
+    overall_geneset_specificity = mean(mean_geneset_specificity, na.rm = TRUE),
+    overall_geneset_specificity_with_zeros = mean(mean_geneset_specificity_with_zeros),
     .by = n_metaprograms
   ) 
 
@@ -522,18 +552,32 @@ updated_specificity_background <- updated_ora_results_list |>
     permute_specificity(results, n_metaprograms, nreps)
   }) |>
   dplyr::bind_rows(.id = "n_metaprograms")
-
-# update pvalue
-updated_specificity_pvalue_df <- compute_specificity_pvalue(updated_specificity_background, updated_obs_specificity_df, nreps = nreps)
 ```
 
 ```{r}
-plot_permutation_results(updated_specificity_background, updated_specificity_pvalue_df, "n_metaprograms", "overall_geneset_specificity")
+# update pvalue
+updated_specificity_pvalue_df <- compute_specificity_pvalue(updated_specificity_background, updated_obs_specificity_df, overall_geneset_specificity, nreps = nreps)
+
+plot_permutation_results(updated_specificity_background, updated_specificity_pvalue_df, n_metaprograms, overall_geneset_specificity) +
+  labs(
+    title = "Metaprograms with no gene sets treated as NA"
+  )
 ```
 
-Again, it looks like we see significant values only for the smaller values of k. 
+```{r}
+# update pvalue
+updated_specificity_pvalue_df <- compute_specificity_pvalue(updated_specificity_background, updated_obs_specificity_df, overall_geneset_specificity_with_zeros, nreps = nreps)
 
-I think this might be something to consider moving forward as a metric, but I'm still worried that for all these metrics the results are going to be somewhat dependent on k and dependent on the gene sets used for ORA.
+plot_permutation_results(updated_specificity_background, updated_specificity_pvalue_df, n_metaprograms, overall_geneset_specificity) +
+  labs(
+    title = "Metaprograms with no gene sets treated as 0"
+  )
+```
+
+
+Again, it looks like  smaller values of k are the only time we see that the observation is greater than random chance and is significant. 
+
+I think this might be something to consider moving forward as a metric and is probably our best option, but I'm still worried that for all these metrics the results are going to be somewhat dependent on k and dependent on the gene sets used for ORA.
 
 ## Session info
 
