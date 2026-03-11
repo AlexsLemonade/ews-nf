@@ -237,13 +237,13 @@ workflow metaprograms {
     // define path to template report 
     report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
 
-    metaprogram_report(
-      grouped_score_ch,
-      file(report_template_file),
-      file(params.custom_genesets_file),
-      file(params.msigdb_genesets_file),
-      file(params.gene_set_category_file)
-    )
+    //metaprogram_report(
+    //  grouped_score_ch,
+    //  file(report_template_file),
+    //  file(params.custom_genesets_file),
+    //  file(params.msigdb_genesets_file),
+    //  file(params.gene_set_category_file)
+    //)
 
   emit:
     metaprograms = generate_metaprograms.out // [n_metaprograms, metaprograms_publish_dir, "metaprograms.rds"]
