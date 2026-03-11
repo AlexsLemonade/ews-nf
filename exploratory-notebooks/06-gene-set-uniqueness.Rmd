@@ -40,10 +40,8 @@ plot_permutation_results <- function(background_df, pvalue_df, x_axis, y_axis){
   
   ggplot(background_df, aes(x = {{ x_axis }}, y = {{ y_axis }})) +
   ggforce::geom_sina(
-    color = "black",
-    alpha = 0.3,
     color = "gray",
-    alpha = 0.1,
+    alpha = 0.1
   ) +
   geom_point(
     data = pvalue_df,
