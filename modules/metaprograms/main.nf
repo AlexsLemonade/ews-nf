@@ -105,6 +105,40 @@ process metaprogram_metrics {
     """
 }
 
+process score_background {
+  container params.ews_nf_container
+  tag "${n_metaprograms}_metaprograms"
+  label 'mem_24'
+  cpus 2
+  time '12h'
+  publishDir "${metaprograms_publish_dir}", mode: 'copy'
+  input:
+    tuple val(n_metaprograms),
+          path(score_files),
+          val(metaprograms_publish_dir),
+          path(metaprograms_file)
+    path sce_files
+  output:
+    tuple val(n_metaprograms),
+          path("${n_metaprograms}_scores-background-stats.tsv")
+  script:
+    def sce_files_string = sce_files.join(',')
+    def annotations_files_string = annotations_files.join(',')
+    """
+    04-score-permutations.R \
+      --sce_files ${sce_files_string} \
+      --annotations_files ${annotations_files_string} \
+      --metaprograms_file ${metaprograms_file} \
+      --output_file "${n_metaprograms}_scores-background-stats.tsv" \
+      --seed ${params.seed}
+    """
+
+  stub:
+    """
+    touch "${n_metaprograms}_scores-background-stats.tsv"
+    """
+}
+
 process metaprogram_report {
   container params.ews_nf_container
   tag "${n_metaprograms}_metaprograms"
@@ -113,9 +147,9 @@ process metaprogram_report {
   publishDir "${metaprograms_publish_dir}", mode: 'copy'
   input:
     tuple val(n_metaprograms),
+          path(score_files),
           val(metaprograms_publish_dir),
-          path(metaprograms_file),
-          path(score_files)
+          path(metaprograms_file)
     path template_file
     path custom_genesets_file
     path msigdb_genesets_file
@@ -179,23 +213,32 @@ workflow metaprograms {
       file(params.gene_set_category_file)
     )
 
-    // render report
-    // define path to template report 
-    report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
-
+    // group score files for each n_metaprograoms 
     grouped_score_ch = score_metaprograms.out
       .map{ n_metaprograms, unique_id, sample_id, score_file -> 
         [n_metaprograms, score_file]
       }
       // group by n_metaprograms to get list of score files for each n_metaprograms
       .groupTuple(by: 0)
+      // join with metaprogram files 
+      // [n_metaprograms, score_files, metaprograms_publish_dir, metaprograms_file]
+      .join(generate_metaprograms.out, by: 0)
 
-    report_ch = generate_metaprograms.out
-      // joining on n_metaprograms
-      .join(grouped_score_ch, by: 0)
+    // all annotation files 
+    annotations_ch = sce_ch.collect{ unique_id, sample_id, sce_file, annotations_file -> annotations_file }
+
+    // create background distribution for scores 
+    score_background(
+      grouped_score_ch, 
+      annotations_ch
+    )
+
+    // render report
+    // define path to template report 
+    report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
 
     metaprogram_report(
-      report_ch,
+      grouped_score_ch,
       file(report_template_file),
       file(params.custom_genesets_file),
       file(params.msigdb_genesets_file),
