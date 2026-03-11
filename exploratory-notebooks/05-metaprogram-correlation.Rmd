@@ -294,10 +294,7 @@ ggplot(mp_metrics_df, aes(x = n_metaprograms, y = median_difference)) +
   ) +
   theme(
     axis.text.x = element_text(angle = 90)
-  ) +
-  theme(
-    axis.text.x = element_text(angle = 90)
-  )
+  ) 
 ```
 
 ```{r}
@@ -361,7 +358,7 @@ I'm going to try out a version of the "kneedle" algorithm, see https://raghavan.
 This involves rotating the curve so that the knee or elbow correspond to the local maxima. 
 After rotating, the elbow is the point with the maximum difference from the line that connects the two end points of the rotated curve. 
 The only step I'm not including is the thresholding step which finds a set of local maxima. 
-Instead, I'll just find a single maximum value to indicate the elbow.
+Instead, I'll just find the global maximum value to indicate the elbow.
 
 
 ```{r}
