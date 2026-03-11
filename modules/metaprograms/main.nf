@@ -114,10 +114,10 @@ process score_background {
   publishDir "${metaprograms_publish_dir}", mode: 'copy'
   input:
     tuple val(n_metaprograms),
-          path(score_files),
           val(metaprograms_publish_dir),
           path(metaprograms_file)
     path sce_files
+    path annotations_files
   output:
     tuple val(n_metaprograms),
           path("${n_metaprograms}_scores-background-stats.tsv")
@@ -147,9 +147,9 @@ process metaprogram_report {
   publishDir "${metaprograms_publish_dir}", mode: 'copy'
   input:
     tuple val(n_metaprograms),
-          path(score_files),
           val(metaprograms_publish_dir),
-          path(metaprograms_file)
+          path(metaprograms_file),
+          path(score_files)
     path template_file
     path custom_genesets_file
     path msigdb_genesets_file
@@ -213,23 +213,14 @@ workflow metaprograms {
       file(params.gene_set_category_file)
     )
 
-    // group score files for each n_metaprograoms 
-    grouped_score_ch = score_metaprograms.out
-      .map{ n_metaprograms, unique_id, sample_id, score_file -> 
-        [n_metaprograms, score_file]
-      }
-      // group by n_metaprograms to get list of score files for each n_metaprograms
-      .groupTuple(by: 0)
-      // join with metaprogram files 
-      // [n_metaprograms, score_files, metaprograms_publish_dir, metaprograms_file]
-      .join(generate_metaprograms.out, by: 0)
-
-    // all annotation files 
+    // channels with all sce and all annotation files 
+    sce_files_ch = sce_ch.collect{ unique_id, sample_id, sce_file, annotations_file -> sce_file }
     annotations_ch = sce_ch.collect{ unique_id, sample_id, sce_file, annotations_file -> annotations_file }
 
     // create background distribution for scores 
     score_background(
-      grouped_score_ch, 
+      generate_metaprograms.out, 
+      sce_files_ch,
       annotations_ch
     )
 
@@ -237,8 +228,19 @@ workflow metaprograms {
     // define path to template report 
     report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
 
+    grouped_score_ch = score_metaprograms.out
+      .map{ n_metaprograms, unique_id, sample_id, score_file -> 
+        [n_metaprograms, score_file]
+      }
+      // group by n_metaprograms to get list of score files for each n_metaprograms
+      .groupTuple(by: 0)
+
+    report_ch = generate_metaprograms.out
+      // joining on n_metaprograms
+      .join(grouped_score_ch, by: 0)
+
     //metaprogram_report(
-    //  grouped_score_ch,
+    //  report_ch,
     //  file(report_template_file),
     //  file(params.custom_genesets_file),
     //  file(params.msigdb_genesets_file),
