@@ -219,7 +219,7 @@ ora_permutation_significance <- function(observed_df, background_df, nreps){
   pvalue_df <- combined_df |> 
     dplyr::mutate(
       # indicate which rows have background > obs
-      greater_than_obs_num_genesets = num_sig_genesets > obs_num_sig_genesets
+      greater_than_obs_num_genesets = num_sig_genesets >= obs_num_sig_genesets
     ) |> 
     dplyr::group_by(metaprogram) |> 
     dplyr::summarize(
@@ -524,7 +524,7 @@ observed_unique_genesets <- prop_unique_mapped_genesets(geneset_groups)
 unique_geneset_background_df <- permute_unique_genesets(ora_results_df, opt$nreps) |> 
   dplyr::mutate(
     # indicate which rows have background > obs
-    greater_than_obs = num_unique_genesets > observed_unique_genesets$num_unique_genesets
+    greater_than_obs = num_unique_genesets >= observed_unique_genesets$num_unique_genesets
   )
 
 # get a single pvalue 
@@ -544,7 +544,7 @@ mp_metrics_df <- max_cor_df |>
   dplyr::mutate(
     num_unique_genesets = observed_unique_genesets$num_unique_genesets,
     proportion_unique_genesets = observed_unique_genesets$proportion_unique_genesets,
-    unique_genesets_pavlue = unique_genesets_pvalue
+    unique_genesets_pvalue = unique_genesets_pvalue
   ) |>
   dplyr::left_join(max_jaccard_no_ews, by = "metaprogram") 
 
