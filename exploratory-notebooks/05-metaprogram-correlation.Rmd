@@ -1,0 +1,442 @@
+---
+title: "Metrics to measure correlation of metaprograms"
+author: "Ally Hawkins"
+date: "`r Sys.Date()`"
+output: html_notebook
+---
+
+This notebook looks at the distributions of three different correlation-based metrics and attempts to define some lenient cutoffs for what's considered a good or bad result. 
+
+Note that some of this setup code and box plot code comes from the original exploratory notebook in `03-metaprogram-comparison.Rmd`. 
+I am repeating it here to have everything related to correlation metrics in the same place. 
+
+
+```{r}
+library(ggplot2)
+library(patchwork)
+
+# Set default ggplot theme
+theme_set(
+  theme_bw()
+)
+```
+
+## Functions
+
+```{r}
+# a little helper function to look at histogram and density plots for a single metric
+plot_distribution <- function(df, column){
+  
+  hist <- ggplot(df, aes(x = {{ column }} )) +
+    geom_histogram(fill = "grey90", color = "black") 
+  
+  density <- ggplot(df, aes(x = {{ column }} )) +
+    geom_density(fill = "darkblue", alpha = 0.5)
+  
+  hist / density
+}
+```
+
+
+## Set Up 
+
+
+```{r}
+# metaprograms results directory
+results_dir <- here::here("ews-nf-out", "metaprograms")
+
+# params we are looking at in this particular notebook 
+# use these to construct the file paths 
+n_metaprograms <- seq(5, 30, 1)
+
+# directories with metaprogram results 
+# one directory per n_metaprogram
+metaprogram_output_dirs <- file.path(
+  results_dir, 
+  glue::glue("metaprograms-{n_metaprograms}_cnmf-5-10-15_filtered")
+) |> 
+  # set names here so we can use them to read in the score files
+  purrr::set_names(sprintf("k_%02d", n_metaprograms))
+
+
+# path to files with each of the metrics
+metrics_files <- file.path(metaprogram_output_dirs, "metaprograms-metrics.rds") |> 
+  # file.path doesn't keep the names so set them again 
+  purrr::set_names(sprintf("k_%02d", n_metaprograms))
+```
+
+```{r, message=FALSE}
+# get the metrics files 
+mp_metrics_list <- metrics_files |> 
+  purrr::map(readr::read_rds)
+
+# create dataframe with one row per metaprogram/n_metaprogram (k) combination 
+# each column is a metric for that metaprograms
+mp_metrics_df <- mp_metrics_list |> 
+  purrr::map(\(metrics_list) metrics_list$mp_metrics_df) |> 
+  dplyr::bind_rows(.id = "n_metaprograms")
+```
+
+```{r}
+# path to files with the scores for each of the outputs
+# each sample with each k/n_metaprograms has it's own file
+# so go through each of the directories and find the score files to join together
+# note that trying to read in all the files and then join at once caused R to crash 
+scores_df <- metaprogram_output_dirs |> 
+  purrr::map(\(dir){
+    
+    files <- list.files(
+      path = dir,
+      pattern = "_metaprogram_scores.tsv",
+      recursive = TRUE,
+      full.names = TRUE
+    )
+    
+    # read in dataframe with metaprogra(e.g., MP01), barcodes, mp_score, and unique_id
+    # one row per cell per mp
+    files |> 
+      purrr::map(\(f) {
+        readr::read_tsv(
+          f, 
+          col_types = 
+            list(metaprogram = "c", barcodes = "c", mp_score = "n", unique_id = "c")
+        )
+      })|> 
+      dplyr::bind_rows()
+    
+  }) |> 
+  dplyr::bind_rows(.id = "n_metaprograms")
+```
+
+
+## Max correlation - genes 
+
+First we'll look at the correlation of metaprograms at the gene level. 
+This is calculated by computing the pairwise correlation of all gene weights across all metaprograms. 
+
+```{r}
+ggplot(mp_metrics_df, aes(x = n_metaprograms, y = max_correlation)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(color = "red") +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Max correlation of metaprogram gene weights"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+Let's look at the distribution of all points together regardless of the value of k to see if we can identify any obvious inflection points. 
+
+```{r}
+plot_distribution(mp_metrics_df, max_correlation)
+```
+
+It looks like we have a bimodal distribution with an inflection point around 0.5. 
+When we looked at the smaller range of k (5-15), all the correlations were < 0.4 and it was hard to define a cutoff but as we increase the range of k, we start to see metaprograms with much higher correlations all the way up to 0.8. 
+
+I would feel comfortable saying that "good" metaprograms are those with a max correlation < 0.5.
+
+One way to do apply that threshold is to count the proportion of metaprograms with max correlation < 0.5 for each value of k. 
+Let's do that and then plot the proportion as we increase k to see at what value of k do we introduce metaprograms with high correlation. 
+Perhaps once we see metaprograms with correlation > 0.5, we've gone too high and should not consider that value of k.
+
+```{r}
+correlation_elbow_df <- mp_metrics_df |> 
+  dplyr::mutate(
+    passing_correlation = max_correlation < 0.5
+  ) |> 
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarize(
+    proportion_passing = sum(passing_correlation)/length(unique(metaprogram))
+  )
+
+ggplot(correlation_elbow_df, aes(x = n_metaprograms, proportion_passing)) +
+  geom_point() +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+It looks like once we get above k=15 we start to create metaprograms that have higher correlation. 
+
+Alternatively, if we just get the mean of the max correlation and look for the value of k that has the minimum value? 
+
+```{r}
+mp_metrics_df |> 
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarize(
+    mean_correlation = mean(max_correlation)
+  ) |> 
+  dplyr::arrange(mean_correlation)
+```
+
+Interestingly k=5 is at the top, followed by k=7, which was one of the "top" scoring metaprogram when looking at some of the sample diversity metrics. 
+I do think this is somewhat dependent on the value of k so I think measuring the proportion of programs that meet our criteria would be a better option. 
+For that scenario, everything for k=5 to k=15 would be equally as "good", which I think is the right conclusion for this specific metric. 
+
+## Max correlation - cells 
+
+Next we'll look at the correlation of scores for the top 200 genes across all cells. 
+To do this we first get a cell by metaprogram matrix where the values correspond to the scores for that metaprogram in that cell. 
+Then we calculate the pairwise correlation. 
+
+
+```{r}
+# split by value of k
+split_scores_list <- split(scores_df, scores_df$n_metaprograms)
+
+# separately calculate the correlation of metaprograms for each value of k 
+# then get the max for each metaprogram and combine back into a single df for plotting
+score_correlation_df <- split_scores_list |> 
+  purrr::map(\(df){
+    mtx <- df |>
+      tidyr::pivot_wider(
+        names_from = "metaprogram",
+        values_from = "mp_score"
+      ) |> 
+      dplyr::mutate(cell_id = glue::glue("{unique_id}_{barcodes}")) |> 
+      dplyr::select(-c(n_metaprograms, unique_id, barcodes)) |> 
+      tibble::column_to_rownames("cell_id") |> 
+      as.matrix()
+    
+    # correlation of scores for each cell 
+    cor_mtx <- cor(mtx, method = "pearson", use = "pairwise.complete.obs")
+    
+    # get the non-self max
+    diag(cor_mtx) <- 0
+    max_cor_df <- data.frame(
+      metaprogram = rownames(cor_mtx),
+      max_correlation_cells = MatrixGenerics::rowMaxs(cor_mtx)
+    )
+    
+  }) |> 
+  dplyr::bind_rows(.id = "n_metaprograms")
+```
+
+
+```{r}
+ggplot(score_correlation_df, aes(x = n_metaprograms, y = max_correlation_cells)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(color = "red") +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Max correlation of cell scores"
+  )
+```
+
+Again, we'll look at the distribution of all points together. 
+
+```{r}
+plot_distribution(score_correlation_df, max_correlation_cells)
+```
+
+Notably, this correlation range is much wider and we see correlations all the way up to close to 1.
+We might be able to say that anything above 0.8 is considered "high" correlation given the spike in correlations > 0.8 seen when you go to k > 17.
+
+Alternatively, we could try and define outliers as those with a zscore > 2. 
+
+```{r}
+score_correlation_df <- score_correlation_df |>
+  dplyr::mutate(correlation_zscore = scale(max_correlation_cells),
+                correlation_is_outlier = correlation_zscore > 2)
+
+ggplot(score_correlation_df, aes(x = n_metaprograms, y = max_correlation_cells)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(aes(color = correlation_is_outlier)) +
+  scale_color_manual(values = c("black", "red")) +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Max correlation of cell scores"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+Hmm it doesn't look like there are any outliers. 
+
+```{r}
+summary(score_correlation_df$correlation_zscore)
+```
+
+Indeed if you look at the range of the z-scores the highest zscore is 1.2. 
+So maybe we should just the use the > 0.8 cutoff or not use a cutoff at all for this one. 
+It's possible that the genes could be different but biologically related leading to correlated scores.
+
+Out of curiosity let's see what would happen if you rank based on the mean correlation and look for the value of k with the minimum correlation values. 
+
+```{r}
+score_correlation_df |> 
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarize(
+    mean_correlation_cells = mean(max_correlation_cells)
+  ) |> 
+  dplyr::arrange(mean_correlation_cells)
+```
+
+Looks like k=5 and k=7 are at the top again. 
+
+## Metaprogram Coherence - Difference in medians
+
+Finally, we'll look at the difference in medians between the distribution of correlation of spectra within a given metaprogram and between metaprograms, which we will refer to as metaprogram coherence. 
+Here we want to maximize the value. 
+
+
+```{r}
+ggplot(mp_metrics_df, aes(x = n_metaprograms, y = median_difference)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(color = "red") +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Metaprogram coherence"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  ) 
+```
+
+```{r}
+plot_distribution(mp_metrics_df, median_difference)
+```
+
+Here it looks like we have a mostly uniform distribution with small tails < 0.1 and > 0.6.
+
+Let's formally look for some outliers by using a zscore again. 
+We'll call anything with z < -2 an outlier. 
+
+```{r}
+mp_metrics_df <- mp_metrics_df |>
+  dplyr::mutate(coherence_zscore = scale(median_difference),
+                coherence_is_outlier = coherence_zscore < -2)
+
+ggplot(mp_metrics_df, aes(x = n_metaprograms, y = median_difference)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm(aes(color = coherence_is_outlier)) +
+  scale_color_manual(values = c("black", "red")) +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Metaprogram coherence",
+    color = "Outlier"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+As predicted, that bottom point in every value of k is considered an outlier. 
+
+It also looks like as you increase k eventually you get to a value where increasing k doesn't provide any more increase in the difference of medians. 
+To show this, we make an elbow plot showing the median difference for each value of k and find the value of k where the maximum occurs. 
+Since we know we have one obvious outlier for all values of k we'll use median as that number is not sensitive to outliers.
+
+```{r}
+coherence_elbow_df <- mp_metrics_df |> 
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarize(
+    median_coherence = median(median_difference)
+  ) |> 
+  dplyr::arrange(desc(median_coherence))
+```
+
+
+```{r}
+ggplot(coherence_elbow_df, aes(x = n_metaprograms, median_coherence)) +
+  geom_point() +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+
+It looks like once you get to k=11, the value hits a plateau.
+
+Let's try to use a quantitative approach to find the elbow. 
+
+I'm going to try out a version of the "kneedle" algorithm, see https://raghavan.usc.edu/papers/kneedle-simplex11.pdf. 
+This involves rotating the curve so that the knee or elbow correspond to the local maxima. 
+After rotating, the elbow is the point with the maximum difference from the line that connects the two end points of the rotated curve. 
+The only step I'm not including is the thresholding step which finds a set of local maxima. 
+Instead, I'll just find the global maximum value to indicate the elbow.
+
+
+```{r}
+# function to calculate the "kneedle"
+kneedle <- function(k_values, metric_values, concave = TRUE) {
+  
+  # Step 1: Smooth data to preserve original shape 
+  fit <- smooth.spline(k_values, metric_values)
+  metric_values <- predict(fit, k_values)$y
+  
+  # Step 2: Normalize to [0, 1]
+  x <- (k_values - min(k_values)) / (max(k_values) - min(k_values))
+  y <- (metric_values - min(metric_values)) / (max(metric_values) - min(metric_values))
+  
+  # Step 3: Subtract the diagonal (line from first to last point)
+  # This "rotates" the curve so the elbow becomes a maximum
+  y_diff <- y - x  # for concave (increasing); use x - y for convex (decreasing)
+  if (!concave) y_diff <- x - y
+  
+  # Step 4: The knee is the point with the maximum difference
+  knee_index <- which.max(y_diff)
+  
+  k_values[knee_index]
+}
+```
+
+
+```{r}
+k_values <- stringr::str_remove(coherence_elbow_df$n_metaprograms, "k_") |> 
+  as.numeric()
+
+kneedle(k_values, coherence_elbow_df$median_coherence, concave = TRUE)
+```
+
+
+This lines up with what I would expect.
+How does this change if you first remove the outlier and then find the elbow? 
+
+```{r}
+filtered_coherence_elbow_df <- mp_metrics_df |> 
+  dplyr::filter(!coherence_is_outlier) |>
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarize(
+    median_coherence = median(median_difference)
+  ) |> 
+  dplyr::arrange(desc(median_coherence))
+
+ggplot(filtered_coherence_elbow_df, aes(x = n_metaprograms, median_coherence)) +
+  geom_point() +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+```{r}
+kneedle(k_values, filtered_coherence_elbow_df$median_coherence, concave = TRUE)
+```
+
+Again, we see that this is 11.
+
+## Concluding thoughts
+
+Some thoughts about putting everything together based on the above observations: 
+
+* We could use the cutoff defined here for the gene weight correlation metric to identify "good" and "bad" metaprograms. 
+We can then calculate the proportion of good metaprograms to get a single number.
+This does mean that for the full cohort, when k < 15, all of the programs are considered good so the number will be equivalent, but I think that's actually a good thing. 
+* I don't know that we want to set cutoffs using cell score correlations just yet. 
+It's a pretty big range of values and having a high biological correlation between two gene sets is not out of the ordinary. 
+* For the coherence metric, one option is to just remove the noisey metaprogram all together and not use that metric when combining metrics outside of that. 
+* The other option is to calculate the median and rank the values of k based on that. 
+My concern with that is high values of k have higher median values, but only marginally, so I wouldn't want that to heavily influence the final results.
+* We might also consider using the elbow to define a point where we see no added benefit to adding more metaprograms, but I'm not sure how exactly that would fit into defining our overall metric.
+
+
+## Session info
+
+```{r}
+sessionInfo()
+```
+
