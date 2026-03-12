@@ -117,17 +117,17 @@ process score_background {
           val(metaprograms_publish_dir),
           path(metaprograms_file)
     path sce_files
-    path annotations_files
+    path annotation_files
   output:
     tuple val(n_metaprograms),
           path("${n_metaprograms}_scores-background-stats.tsv")
   script:
     def sce_files_string = sce_files.join(',')
-    def annotations_files_string = annotations_files.join(',')
+    def annotation_files_string = annotation_files.join(',')
     """
     04-score-permutations.R \
       --sce_files ${sce_files_string} \
-      --annotations_files ${annotations_files_string} \
+      --annotation_files ${annotation_files_string} \
       --metaprograms_file ${metaprograms_file} \
       --output_file "${n_metaprograms}_scores-background-stats.tsv" \
       --seed ${params.seed}
