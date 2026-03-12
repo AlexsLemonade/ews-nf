@@ -126,7 +126,7 @@ norm_expr <- quantile_norm_tumor_cells(sce, annotations_df, gene_universe)
 # if there are tumor cells, calculate the scores for each permutation 
 if(ncol(norm_expr) > 0){
   # for each of the shuffled list of mp genes calculate scores
-  background_df <- shuffled_mps |> 
+  background_df <- shuffled_mp_list |> 
     purrr::map(\(mp_top_list){
       # calculate scores
       scores_df <- mp_top_list |>
