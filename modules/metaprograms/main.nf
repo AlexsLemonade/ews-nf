@@ -204,13 +204,13 @@ workflow metaprograms {
       // joining on n_metaprograms
       .join(grouped_score_ch, by: 0)
 
-    //metaprogram_report(
-    //  report_ch,
-    //  file(report_template_file),
-    //  file(params.custom_genesets_file),
-    //  file(params.msigdb_genesets_file),
-    //  file(params.gene_set_category_file)
-    //)
+    metaprogram_report(
+      report_ch,
+      file(report_template_file),
+      file(params.custom_genesets_file),
+      file(params.msigdb_genesets_file),
+      file(params.gene_set_category_file)
+    )
 
   emit:
     metaprograms = generate_metaprograms.out // [n_metaprograms, metaprograms_publish_dir, "metaprograms.rds"]
