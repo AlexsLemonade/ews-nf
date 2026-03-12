@@ -55,7 +55,8 @@ process score_metaprograms {
     tuple val(n_metaprograms),
           val(unique_id),
           val(sample_id),
-          path("${unique_id}_metaprogram_scores.tsv")
+          path("${unique_id}_metaprogram_scores.tsv"),
+          path("${unique_id}_scores_background.tsv")
   script:
     """
     02-score-metaprograms.R \
@@ -64,36 +65,7 @@ process score_metaprograms {
       --metaprograms_file ${metaprograms_file} \
       --output_file "${unique_id}_metaprogram_scores.tsv" \
       --seed ${params.seed}
-    """
 
-  stub:
-    """
-    touch ${unique_id}_metaprogram_scores.tsv
-    """
-}
-
-process score_background {
-  container params.ews_nf_container
-  tag "${n_metaprograms}_metaprograms"
-  label 'mem_24'
-  cpus 2
-  time '12h'
-  publishDir "${metaprograms_publish_dir}/${sample_id}", mode: 'copy'
-  input:
-    tuple val(unique_id),
-          val(sample_id),
-          path(sce_file),
-          path(annotations_file),
-          val(n_metaprograms), 
-          val(metaprograms_publish_dir), 
-          path(metaprograms_file)
-  output:
-    tuple val(n_metaprograms),
-          val(unique_id),
-          val(sample_id),
-          path("${unique_id}_scores_background.tsv")
-  script:
-    """
     03-calculate-score-background.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
@@ -104,9 +76,11 @@ process score_background {
 
   stub:
     """
-    touch "${unique_id}_scores_background.tsv"
+    touch ${unique_id}_metaprogram_scores.tsv
+    touch ${unique_id}_scores_background.tsv
     """
 }
+
 
 process metaprogram_metrics {
   container params.ews_nf_container
@@ -207,9 +181,6 @@ workflow metaprograms {
     score_input_ch = sce_ch.combine(generate_metaprograms.out)
     score_metaprograms(score_input_ch)
 
-    // create background distribution for scores 
-    score_background(score_input_ch)
-
     // calculate metrics 
     metaprogram_metrics(
       generate_metaprograms.out, 
@@ -223,7 +194,7 @@ workflow metaprograms {
     report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
 
     grouped_score_ch = score_metaprograms.out
-      .map{ n_metaprograms, unique_id, sample_id, score_file -> 
+      .map{ n_metaprograms, unique_id, sample_id, score_file, background_score_file -> 
         [n_metaprograms, score_file]
       }
       // group by n_metaprograms to get list of score files for each n_metaprograms
