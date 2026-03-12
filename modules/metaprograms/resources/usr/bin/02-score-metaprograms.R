@@ -56,6 +56,12 @@ option_list <- list(
     help = "Path to RDS file containing metaprograms"
   ),
   make_option(
+    opt_str = c("--n_top_genes"),
+    type = "integer",
+    default = 200, 
+    help = "Number of genes to extract for each metaprogram to use for scoring"
+  ),
+  make_option(
     opt_str = c("--output_file"),
     type = "character",
     default = "mp_scores.tsv", 
@@ -118,7 +124,7 @@ mp_top_list <- mp_obj$metaprogram_list |>
   purrr::map(\(scores){
     scores |> 
       sort(decreasing = TRUE) |> 
-      head(n=200)
+      head(n=opt$n_top_genes)
   })
 
 scores_df <- mp_top_list |> 
