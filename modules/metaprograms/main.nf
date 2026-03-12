@@ -72,6 +72,42 @@ process score_metaprograms {
     """
 }
 
+process score_background {
+  container params.ews_nf_container
+  tag "${n_metaprograms}_metaprograms"
+  label 'mem_24'
+  cpus 2
+  time '12h'
+  publishDir "${metaprograms_publish_dir}/${sample_id}", mode: 'copy'
+  input:
+    tuple val(unique_id),
+          val(sample_id),
+          path(sce_file),
+          path(annotations_file),
+          val(n_metaprograms), 
+          val(metaprograms_publish_dir), 
+          path(metaprograms_file)
+  output:
+    tuple val(n_metaprograms),
+          val(unique_id),
+          val(sample_id),
+          path("${unique_id}_scores_background.tsv")
+  script:
+    """
+    03-calculate-score-background.R \
+      --sce_file ${sce_file} \
+      --annotations_file ${annotations_file} \
+      --metaprograms_file ${metaprograms_file} \
+      --output_file "${unique_id}_scores_background.tsv" \
+      --seed ${params.seed}
+    """
+
+  stub:
+    """
+    touch "${unique_id}_scores_background.tsv"
+    """
+}
+
 process metaprogram_metrics {
   container params.ews_nf_container
   tag "${n_metaprograms}_metaprograms"
@@ -91,7 +127,7 @@ process metaprogram_metrics {
           path("metaprograms-metrics.rds")
   script:
     """
-    03-metaprogram-metrics.R \
+    04-metaprogram-metrics.R \
       --metaprograms_file ${metaprograms_file} \
       --custom_geneset_file ${custom_genesets_file} \
       --msigdb_geneset_file ${msigdb_genesets_file} \
@@ -102,40 +138,6 @@ process metaprogram_metrics {
   stub:
     """
     touch "metaprograms-metrics.rds"
-    """
-}
-
-process score_background {
-  container params.ews_nf_container
-  tag "${n_metaprograms}_metaprograms"
-  label 'mem_48'
-  cpus 4
-  time '12h'
-  publishDir "${metaprograms_publish_dir}", mode: 'copy'
-  input:
-    tuple val(n_metaprograms),
-          val(metaprograms_publish_dir),
-          path(metaprograms_file)
-    path sce_files
-    path annotation_files
-  output:
-    tuple val(n_metaprograms),
-          path("${n_metaprograms}_scores-background-stats.tsv")
-  script:
-    def sce_files_string = sce_files.join(',')
-    def annotation_files_string = annotation_files.join(',')
-    """
-    04-score-permutations.R \
-      --sce_files ${sce_files_string} \
-      --annotation_files ${annotation_files_string} \
-      --metaprograms_file ${metaprograms_file} \
-      --output_file "${n_metaprograms}_scores-background-stats.tsv" \
-      --seed ${params.seed}
-    """
-
-  stub:
-    """
-    touch "${n_metaprograms}_scores-background-stats.tsv"
     """
 }
 
@@ -205,23 +207,15 @@ workflow metaprograms {
     score_input_ch = sce_ch.combine(generate_metaprograms.out)
     score_metaprograms(score_input_ch)
 
+    // create background distribution for scores 
+    score_background(score_input_ch)
+
     // calculate metrics 
     metaprogram_metrics(
       generate_metaprograms.out, 
       file(params.custom_genesets_file),
       file(params.msigdb_genesets_file),
       file(params.gene_set_category_file)
-    )
-
-    // channels with all sce and all annotation files 
-    sce_files_ch = sce_ch.collect{ unique_id, sample_id, sce_file, annotations_file -> sce_file }
-    annotations_ch = sce_ch.collect{ unique_id, sample_id, sce_file, annotations_file -> annotations_file }
-
-    // create background distribution for scores 
-    score_background(
-      generate_metaprograms.out, 
-      sce_files_ch,
-      annotations_ch
     )
 
     // render report
@@ -239,13 +233,13 @@ workflow metaprograms {
       // joining on n_metaprograms
       .join(grouped_score_ch, by: 0)
 
-    //metaprogram_report(
-    //  report_ch,
-    //  file(report_template_file),
-    //  file(params.custom_genesets_file),
-    //  file(params.msigdb_genesets_file),
-    //  file(params.gene_set_category_file)
-    //)
+    metaprogram_report(
+      report_ch,
+      file(report_template_file),
+      file(params.custom_genesets_file),
+      file(params.msigdb_genesets_file),
+      file(params.gene_set_category_file)
+    )
 
   emit:
     metaprograms = generate_metaprograms.out // [n_metaprograms, metaprograms_publish_dir, "metaprograms.rds"]
