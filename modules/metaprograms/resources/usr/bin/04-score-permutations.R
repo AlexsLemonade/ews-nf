@@ -99,7 +99,7 @@ option_list <- list(
     help = "Comma separated list of processed SCE files"
   ),
   make_option(
-    opt_str = c("--annotations_files"),
+    opt_str = c("--annotation_files"),
     type = "character",
     default = "",
     help = "Comma separated list of annotation files"
@@ -150,7 +150,7 @@ sce_unique_ids <- stringr::word(basename(sce_files), 1, sep = "_")
 names(sce_files) <- sce_unique_ids
 
 # get a list of all annotation files and pull out unique ids from each file name
-annotation_files <- stringr::str_split_1(opt$annotations_files, ",")
+annotation_files <- stringr::str_split_1(opt$annotation_files, ",")
 annotation_unique_ids <- stringr::word(basename(annotation_files), 1, sep = "_")
 names(annotation_files) <- annotation_unique_ids
 
@@ -163,7 +163,7 @@ annotation_files <- annotation_files[unique_ids]
 # check that files exist 
 stopifnot(
   "Some or all SCE files do not exist" = all(file.exists(sce_files)),
-  "Some or all annotations files do not exist" = all(file.exists(annotations_files))
+  "Some or all annotations files do not exist" = all(file.exists(annotation_files))
 )
 
 # read in the metaprogram object and extract gene universe and mp mtx
