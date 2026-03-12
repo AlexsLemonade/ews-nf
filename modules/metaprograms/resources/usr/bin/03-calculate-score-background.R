@@ -108,7 +108,7 @@ stopifnot(
 
 # read in files
 sce <- readr::read_rds(opt$sce_file)
-annotations_df <- readr::read_tsv(opt$annotation_file)
+annotations_df <- readr::read_tsv(opt$annotations_file)
 
 # read in the metaprogram object and extract gene universe and shuffled mps
 mp_object <- readr::read_rds(opt$metaprograms_file)
