@@ -108,8 +108,8 @@ process metaprogram_metrics {
 process score_background {
   container params.ews_nf_container
   tag "${n_metaprograms}_metaprograms"
-  label 'mem_24'
-  cpus 2
+  label 'mem_48'
+  cpus 4
   time '12h'
   publishDir "${metaprograms_publish_dir}", mode: 'copy'
   input:

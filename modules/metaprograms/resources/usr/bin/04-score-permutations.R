@@ -186,6 +186,11 @@ background_df <- purrr::map2(sce_files, annotation_files,
                                # quantile normalize expr matrix 
                                norm_expr <- quantile_norm_tumor_cells(sce, annotations_df, gene_universe)
                                
+                               # some clean up before permutation testing
+                               rm(sce)
+                               rm(annotations_df)
+                               gc()
+                               
                                # if there are tumor cells, permute the scores 
                                # shuffle the gene names in the mp matrix, grab top 200 genes and weights
                                # calculate scores 
