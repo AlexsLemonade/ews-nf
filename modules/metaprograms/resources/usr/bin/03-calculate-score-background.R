@@ -133,14 +133,26 @@ if(ncol(norm_expr) > 0){
         purrr::map(\(mps) {score_mp(mps, norm_expr)}) |>
         dplyr::bind_rows(.id = "metaprogram")
     }) |> 
-    dplyr::bind_rows(.id = "replicate") |> 
+    dplyr::bind_rows(.id = "replicate") |>
+    # calculate sample mean and sd
+    # chan's algorithm allows us to use the mean and sum of squared deviations
+    # for each sub-population (sample here) to calculate variance of the full population
+    dplyr::summarize(
+      num_cells = length(unique(barcodes)),
+      mean_mp_score = mean(mp_score),
+      M2 = sum((mp_score - mean_mp_score)^2),
+      .by = c("metaprogram", "replicate")
+    ) |> 
+    # add a column for unique id for easy joining with other samples
     dplyr::mutate(unique_id = unique_id)
 } else {
   # make an emtpy data frame to be exported 
   background_df <- data.frame(
-    barcodes = NA,
-    mp_score = NA,
     replicate = NA,
+    metaprogram = NA,
+    num_cells = NA,
+    mean_mp_score = NA,
+    M2 = NA,
     unique_id = NA
   )
 }
