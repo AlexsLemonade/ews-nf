@@ -42,7 +42,6 @@ process score_metaprograms {
   label 'mem_24'
   cpus 2
   time '12h'
-  publishDir "${metaprograms_publish_dir}/${sample_id}", mode: 'copy'
   input:
     tuple val(unique_id),
           val(sample_id),
@@ -53,6 +52,7 @@ process score_metaprograms {
           path(metaprograms_file)
   output:
     tuple val(n_metaprograms),
+          val(metaprograms_publish_dir),
           val(unique_id),
           val(sample_id),
           path("${unique_id}_metaprogram_scores.tsv"),
@@ -80,6 +80,41 @@ process score_metaprograms {
     touch ${unique_id}_scores_background.tsv
     """
 }
+
+process combine_score_files {
+  container params.ews_nf_container
+  tag "${n_metaprograms}_metaprograms"
+  publishDir "${metaprograms_publish_dir}", mode: 'copy'
+  label 'mem_24'
+  cpus 2
+  time '12h'
+  input:
+    tuple val(n_metaprograms), 
+          val(metaprograms_publish_dir),
+          path(score_files), // list of score files for each sample, 
+          path(background_score_files) // list of background score files for each sample
+  output:
+    tuple val(n_metaprograms),
+          path("${n_metaprograms}_metaprogram_scores.tsv"),
+          path("${n_metaprograms}_scores_background.tsv")
+  script:
+    """
+    03a-combine-score-files.R \
+      --input_tsv_files ${score_files.join(',')} \
+      --output_file "${n_metaprograms}_metaprogram_scores.tsv"
+
+    03a-combine-score-files.R \
+      --input_tsv_files ${background_score_files.join(',')} \
+      --output_file "${n_metaprograms}_scores_background.tsv"
+    """
+
+  stub:
+    """
+    touch ${n_metaprograms}_metaprogram_scores.tsv
+    touch ${n_metaprograms}_scores_background.tsv
+    """
+}
+
 
 
 process metaprogram_metrics {
@@ -181,6 +216,16 @@ workflow metaprograms {
     score_input_ch = sce_ch.combine(generate_metaprograms.out)
     score_metaprograms(score_input_ch)
 
+    grouped_score_ch = score_metaprograms.out
+      .map{ n_metaprograms, metaprograms_publish_dir, unique_id, sample_id, score_file, background_score_file -> 
+        [n_metaprograms, metaprograms_publish_dir, score_file, background_score_file]
+      }
+      // group by n_metaprograms to get list of score files and background score files for each n_metaprograms
+      .groupTuple(by: [0,1]) // group by n_metaprograms and publish dir
+
+    // create a single data frame for all observed and all background scores
+    combine_score_files(grouped_score_ch)
+
     // calculate metrics 
     metaprogram_metrics(
       generate_metaprograms.out, 
@@ -193,16 +238,10 @@ workflow metaprograms {
     // define path to template report 
     report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
 
-    grouped_score_ch = score_metaprograms.out
-      .map{ n_metaprograms, unique_id, sample_id, score_file, background_score_file -> 
-        [n_metaprograms, score_file]
-      }
-      // group by n_metaprograms to get list of score files for each n_metaprograms
-      .groupTuple(by: 0)
-
     report_ch = generate_metaprograms.out
-      // joining on n_metaprograms
-      .join(grouped_score_ch, by: 0)
+      // joining on n_metaprograms and publish dir
+      // drop the background files before joining
+      .join(grouped_score_ch.map { it.dropRight(1) }, by: [0,1])
 
     metaprogram_report(
       report_ch,
@@ -214,6 +253,6 @@ workflow metaprograms {
 
   emit:
     metaprograms = generate_metaprograms.out // [n_metaprograms, metaprograms_publish_dir, "metaprograms.rds"]
-    metaprogram_scores = score_metaprograms.out // [n_metaprograms, unique_id, sample_id, metaprogram scores tsv]
+    metaprogram_scores = score_metaprograms.out // [n_metaprograms, unique_id, sample_id, metaprogram scores tsv, background scores tsv]
     metaprogram_metrics = metaprogram_metrics.out // [n_metaprograms, metaprograms_publish_dir, "metaprogram-metrics.rds"]
 }
