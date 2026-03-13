@@ -2,7 +2,8 @@
 
 # script to calculate the scores for each shuffled metaprogram in a single library 
 # shuffled_mps are found in the mp_object
-# output is a data frame with unique_id, barcodes, metaprogram, replicate, and mp_score
+# we then calculate the mean and sum of squared deviations for each metaprogram
+# output is a data frame with unique_id, metaprogram, replicate, num_cells, mean_mp_score, M2
 
 # Functions --------------------------------------------------------------------
 # quantile normalize the logcounts for tumor cells using all genes in the gene universe
