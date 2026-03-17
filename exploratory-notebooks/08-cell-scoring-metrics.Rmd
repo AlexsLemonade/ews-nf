@@ -1,0 +1,434 @@
+---
+title: "Evaluating cell scoring metrics"
+author: "Ally Hawkins"
+date: "`r Sys.Date()`"
+output: html_notebook
+---
+
+In this notebook, we look at ways to measure variation in cell scores across metaprograms. 
+For each value of k, we want to summarize how many metaprograms show variation in the scores across the original samples used to construct the metaprograms. 
+
+Scores are calculated by taking the dot product between the top 200 gene weights and the quantile normalized counts for those genes. 
+Each cell will have a single score for each metaprogram. 
+
+To measure if a metaprogram shows variation, we will compare the observed coefficient of variation (CV) and variance to a background distribution. 
+This background distribution was calculated by shuffling the gene x metaprogram matrix, pulling the top 200 genes and re-calculating the scores. 
+Each metaprogram will have a unique background distribution. 
+
+```{r}
+library(ggplot2)
+
+# load libraries that we need for the linear mixed-effect model later
+library(lme4)
+library(lmerTest)
+
+# Set default ggplot theme
+theme_set(
+  theme_bw()
+)
+
+set.seed(2026)
+```
+
+```{r}
+# metaprograms results directory
+results_dir <- here::here("ews-nf-out", "metaprograms")
+
+# params we are looking at in this particular notebook 
+# use these to construct the file paths 
+n_metaprograms <- seq(5, 15, 1)
+
+# directories with metaprogram results 
+# one directory per n_metaprogram
+metaprogram_output_dirs <- file.path(
+  results_dir, 
+  glue::glue("metaprograms-{n_metaprograms}_cnmf-5-10-15_filtered")
+)
+
+# path to files with the observed scores
+scores_files <- file.path(metaprogram_output_dirs, "metaprogram_scores.tsv") |> 
+  purrr::set_names(sprintf("k_%02d", n_metaprograms))
+
+# path to files with the background scores 
+background_files <- file.path(metaprogram_output_dirs, "background_scores.tsv") |> 
+  purrr::set_names(sprintf("k_%02d", n_metaprograms))
+
+# significance value so we don't accidentally mis type it 
+sig_value <- 0.05
+```
+
+```{r}
+# observed scores
+# this includes one score for each cell for each metaprogram 
+scores_df <- scores_files |> 
+  purrr::map(readr::read_tsv) |> 
+  dplyr::bind_rows(.id = "n_metaprograms")
+
+# background scores
+# instead of one score for each cell we have the mean and sum of squared deviations
+# for each sample and metaprogram 
+# this is repeated across 1000 replicates 
+background_df <- background_files |> 
+  purrr::map(readr::read_tsv) |> 
+  dplyr::bind_rows(.id = "n_metaprograms")
+```
+
+## Functions
+
+We'll use these functions to compute the pvalue and plot the permutation results later on. 
+
+```{r}
+# function to compute the pvalue
+compute_var_pvalue <- function(background_df, obs_df, stat_column, nreps) {
+  
+  # join observed values with background values
+  background_df |>
+    dplyr::left_join(
+      dplyr::rename(obs_df, obs_value = {{ stat_column }}),
+      by = c("n_metaprograms", "metaprogram")
+    ) |>
+    # indicator column for if background >= observation
+    dplyr::mutate(greater_than_obs = {{ stat_column }} >= obs_value) |>
+    dplyr::summarize(
+      obs_value = unique(obs_value),
+      overall_pvalue = (sum(greater_than_obs) + 1) / (nreps + 1),
+      .by = c("n_metaprograms", "metaprogram")
+    ) |>
+    # add in adjusted pvalue
+    dplyr::mutate(
+      overall_adj_pvalue = p.adjust(overall_pvalue, method = "BH"),
+      is_significant = overall_adj_pvalue <= sig_value
+    )
+}
+
+# function to plot permutation results compared to background
+plot_permutation_results <- function(background_df, pvalue_df, x_axis, y_axis){
+  
+  ggplot(background_df, aes(x = {{ x_axis }}, y = {{ y_axis }})) +
+  ggforce::geom_sina(
+    color = "gray",
+    alpha = 0.1
+  ) +
+  geom_point(
+    data = pvalue_df,
+    aes(
+      x = {{ x_axis }},
+      y = {{ y_axis }},
+      color = is_significant
+    ),
+    size  = 3,
+    shape = 18  # diamond
+  ) +
+  scale_color_manual(values = c(`TRUE` = "red", `FALSE` = "blue")) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+  
+}
+```
+
+
+
+## Compute CV and Variance
+
+First we will approximate the CV and variance for the background distribution for each metaprogram. 
+To do this, we'll use Chan's algorithm to approximate the global values from the individual sub-populations (samples in this case).
+
+
+```{r}
+# calculate CV for each metaprogram for each sample using Chan's algorithm 
+# get both CV and var 
+global_background_df <- background_df |>
+  dplyr::summarize(
+    n_total = sum(num_cells),
+    global_mean = sum(num_cells * mean_mp_score) / sum(num_cells),
+    M2_total = sum(M2) + sum(num_cells * (mean_mp_score - sum(num_cells * mean_mp_score) / sum(num_cells))^2),
+    .by = c("n_metaprograms", "metaprogram", "replicate")
+  ) |>
+  dplyr::mutate(
+    score_var = M2_total / (n_total - 1),
+    global_sd  = sqrt(score_var),
+    score_cv  = (global_sd / global_mean)
+  )
+```
+
+We'll then get the CV and variance for the observed values. 
+We can do this by directly calculating the values from the individual cells or using Chan's approximation. 
+
+```{r}
+# calculate variance and CV for each sample without using Chan's 
+# we'll compare this to the value you would get if you used Chan's to confirm that the CV/variance is the same
+var_df <- scores_df |> 
+  dplyr::summarize(
+    score_var = var(mp_score, na.rm = TRUE),
+    score_cv = sqrt(score_var) / mean(mp_score),
+    .by = c("n_metaprograms", "metaprogram")
+  ) |>
+  dplyr::ungroup()
+
+# now use Chan's to first get the variance for all cells in a sample
+# then get variance and CV for all samples for a given metaprogram 
+chans_var_df <- scores_df |> 
+  # first calculate the variance for each sample and each metaprogram
+  dplyr::summarize(
+    num_cells = length(unique(barcodes)),
+    mean_mp_score = mean(mp_score),
+    M2 = sum((mp_score - mean_mp_score)^2),
+    .by = c("n_metaprograms", "metaprogram", "unique_id")
+  ) |> 
+  # now get the global values for each k/metaprogram
+  dplyr::summarize(
+    n_total = sum(num_cells),
+    global_mean = sum(num_cells * mean_mp_score) / sum(num_cells),
+    M2_total = sum(M2) + sum(num_cells * (mean_mp_score - sum(num_cells * mean_mp_score) / sum(num_cells))^2),
+    .by = c("n_metaprograms", "metaprogram")
+  ) |>
+  dplyr::mutate(
+    score_var = M2_total / (n_total - 1),
+    global_sd  = sqrt(score_var),
+    score_cv  = (global_sd / global_mean)
+  )
+```
+
+Let's check to see if both ways give us the same results.
+
+```{r}
+chans_cv <- chans_var_df$score_cv
+reg_cv <- var_df$score_cv
+
+all.equal(chans_cv, reg_cv)
+```
+
+
+As expected, the values calculated using Chan's formula are equivalent to directly calculating the CV of the entire population. 
+So it doesn't matter which calculation we use when comparing observed to the background.
+
+## Plot CV 
+
+Below we look at the observed CV compared to the background for each metaprogram. 
+Red dots indicate metaprograms that have a significant CV that is greater than what would be observed by random chance.
+
+
+```{r, fig.height=10}
+cv_pvalue_df <- compute_var_pvalue(global_background_df, var_df, score_cv, 1000) |> 
+  dplyr::rename(score_cv = obs_value)
+
+plot_permutation_results(global_background_df, cv_pvalue_df, metaprogram, score_cv) +
+  facet_wrap(
+    vars(n_metaprograms),
+    scales = "free_x",
+    ncol = 4
+  )
+```
+
+Interestingly, the background distributions are all at or below 1. 
+The CV tells you the variation in the dataset relative to the mean, with a CV of one meaning that the standard deviation is equal to the mean. 
+
+We could continue to use permutation testing, or we could probably just use a cutoff of 1 to say that a metaprogram shows variation. 
+
+A small side note is that MP03 is the "noise" metaprogram that we are consistently seeing with low coherence. 
+It looks like the variation of this metaprogram is low across the board. 
+
+## Plot Variance
+
+We can also directly look at variance.
+
+
+```{r, fig.height=10}
+var_pvalue_df <- compute_var_pvalue(global_background_df, var_df, score_var, 1000) |> 
+  dplyr::rename(score_var = obs_value)
+
+plot_permutation_results(global_background_df, var_pvalue_df, metaprogram, score_var) +
+  facet_wrap(
+    vars(n_metaprograms),
+    scales = "free_x",
+    ncol = 4
+  )
+```
+
+Here the background distributions vary from metaprogram to metaprogram. 
+We see some observed values that are below the background and if we used a two sided test might show up as significant. 
+However, we are only interested in those that have higher variance than background. 
+I wonder if the differences in the background score distributions across the metaprograms is going to make this hard to interpret? 
+
+## Proportion of metaprograms with significant CV
+
+If we look at the proportion of metaprograms with a CV that's significant, which values of k get prioritized? 
+
+```{r}
+cv_pvalue_df |> 
+  dplyr::mutate(
+    is_significant = overall_adj_pvalue <= sig_value
+  ) |> 
+  dplyr::summarize(
+    num_mps = length(metaprogram),
+    proportion_cv_sig = sum(is_significant)/num_mps,
+    .by = "n_metaprograms"
+  ) |> 
+  dplyr::arrange(desc(proportion_cv_sig))
+```
+
+It looks like k=5 and k=10 are tied with 80% of metaprograms.
+It's nice to see a metric that doesn't appear to be dictated by the value of k. 
+I think this is something we could use to influence our decision of k. 
+
+## Sample metadata 
+
+One thing we are curious about is if the scores that we observe are more prevalant in some samples than other. 
+For example, do we see a difference in scores for some metaprograms in samples from primary or metastatic tumors? 
+
+We shouldn't use this information to decide k, but it can be helpful summary information to see if samples from different tumor stages show higher or lower scores for a metaprogram. 
+
+```{r}
+# TODO: This path is relative to where my ScPCA-admin repo is stored
+# Before we can do anything with this outside of this notebook we'll have to save it to this repo in someway
+sample_metadata_file <- "../../ScPCA-admin/sample_info/bailey_cillo/sample-metadata.tsv"
+sample_df <- readr::read_tsv(sample_metadata_file)
+```
+
+To see if there are any different scores between samples based on type, we'll first pseudobulk the scores for each metaprogram across all cells by taking the mean score across all cells for each sample.
+This should account for any expected relationship in gene expression among cells from the same sample and minimize the potential for inflating our statistics. 
+
+
+```{r}
+pb_scores_df <- scores_df |> 
+  dplyr::summarize(
+    pb_mp_score = mean(mp_score),
+    .by = c("unique_id", "metaprogram", "n_metaprograms")
+  ) |> 
+  dplyr::mutate(
+    scpca_sample_id = stringr::word(unique_id, -1, sep = "-"),
+    # we'll log transform for plotting purposes 
+    log_pb_mp_score = -log(pb_mp_score)
+  ) |> 
+  # add in the sample metadata including disease timing and patient information 
+  dplyr::left_join(dplyr::select(sample_df, c("scpca_sample_id", "participant_id", "disease_timing")), by = c("scpca_sample_id"))
+```
+
+We will look at the `disease_timing` column which groups samples into primary, metastasis and recurrence.
+Let's start by just plotting the distributions. 
+
+```{r, fig.height=10, fig.width=10} 
+ggplot(pb_scores_df, aes(x = metaprogram, y = pb_mp_score, fill = disease_timing)) +
+  geom_boxplot(outlier.size = 0.2) +
+  facet_wrap(vars(n_metaprograms),
+             scales = "free",
+             ncol = 3) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  ) +
+  labs(
+    title = "Psuedobulked metaprogram score"
+  )
+```
+
+It looks like a lot of these scores are skewed to be closer to 0. 
+Let's look at the log of the scores to see if we can see any differences across sample types. 
+
+
+```{r, fig.height=10, fig.width=10} 
+ggplot(pb_scores_df, aes(x = metaprogram, y = log_pb_mp_score, fill = disease_timing)) +
+  geom_boxplot(outlier.size = 0.2) +
+  facet_wrap(vars(n_metaprograms),
+             scales = "free",
+             ncol = 3) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  ) +
+  labs(
+    title = "-Log (pseudobulked metaprogram score)"
+  )
+```
+
+Generally most of the metaprograms have similar distributions of scores across sample types. 
+There may be some differences in the recurrent samples where we see either higher scores (MP05 and MP02 for most lower values of k) or lower scores (MP04). 
+
+Let's see if any of these distributions are significantly different from the others.
+Since we have three groups, we will use the Kruskal-Wallis test to determine if samples from different disease timings are significantly different than other samples for each metaprogram. 
+
+```{r}
+# run Kw test on each metaprogram for each value of k
+# within each metaprogram test if there are differences in the distribution of scores 
+# between samples from different disease timing 
+kruskal_results <- pb_scores_df |>
+  dplyr::group_by(n_metaprograms, metaprogram) |>
+  rstatix::kruskal_test(pb_mp_score ~ disease_timing) |> 
+  dplyr::mutate(
+    adj_pvalue = p.adjust(p, method = "BH")
+  )
+
+kruskal_results |> 
+  dplyr::filter(adj_pvalue <= sig_value)
+```
+
+It looks like none are showing up as significant. 
+
+Another thing to consider here is that we have multiple samples from the same patient. 
+It's likely that samples from the same patient are going to share some underlying similarities that will confound our results. 
+To combat that we could try and use a linear mixed effects model that considers disease timing and participant ID. 
+
+```{r}
+# for each metaprogram for each value of k, use a linear mixed effect model 
+# then use ANOVA to calculate pvalues 
+lmm_results <- pb_scores_df |>
+  dplyr::group_by(metaprogram, n_metaprograms) |>
+  dplyr::group_modify(~ {
+    mod <- lme4::lmer(log_pb_mp_score ~ disease_timing + (1 | participant_id), data = .x)
+    mod_lt <- lmerTest::as_lmerModLmerTest(mod)
+
+    # Overall p-value for disease_timing (type III ANOVA)
+    anova_res <- anova(mod_lt) |>
+      as.data.frame() |>
+      tibble::rownames_to_column("term")
+    
+  }) |>
+  dplyr::rename(f_value = `F value`, p_value = `Pr(>F)`) |>
+  dplyr::mutate(p_adj = p.adjust(p_value, method = "BH"),
+                p_adj_signif = dplyr::if_else(p_adj <= sig_value, "*", "ns")) |> 
+  # join with scores for plotting 
+  dplyr::left_join(
+    pb_scores_df |>
+      dplyr::group_by(metaprogram, n_metaprograms) |>
+      dplyr::summarize(y.position = max(log_pb_mp_score, na.rm = TRUE) + 0.3),
+    by = c("metaprogram", "n_metaprograms")
+  )
+```
+
+```{r, fig.height=10, fig.width=10}
+ggplot(pb_scores_df, aes(x = metaprogram, y = log_pb_mp_score, fill = disease_timing)) +
+  geom_boxplot(outlier.size = 0.1) +
+  geom_text(
+    data = lmm_results,
+    aes(x = metaprogram, y = y.position, label = p_adj_signif),
+    inherit.aes = FALSE
+  ) +
+  facet_wrap(vars(n_metaprograms), 
+             scales = "free",
+             ncol = 3) +
+  labs(
+    title = "LMM with patient as random effect"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+Interestingly when we consider patient as random effect, accounting for similarities in gene expression across samples from the same patient, we see a number of metaprograms with significantly different scores when comparing primary vs. metastasis vs. recurrence. 
+
+I don't think this should go into our decision on what makes a "good" metaprogram, but it is useful information to know and I think could be important to show in the summary report. 
+
+This also does not tell us about the actual populations of cells within each sample that may have higher or lower scores than other cells within the same sample as it is summarized on a sample level. 
+Further analysis is needed to look at individual cell populations that is outside the scope of our work here. 
+I do think this is a nice starting point for SKC investigators to dig further into when looking at the results from the overall metaprogram analysis. 
+
+## Conclusions
+
+- I think we should include the proportion of metaprograms with a CV > 1 or CV > null distribution as a metric that helps choose the optimal value of k. 
+- We should include a summary plot that looks at the distribution of scores across disease timing in the report as extra information about the potential biological meaning of some of these metaprograms. 
+
+## Session info
+
+```{r}
+sessionInfo()
+```
+
