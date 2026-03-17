@@ -8,6 +8,8 @@ output: html_notebook
 This notebook evaluates the overlap in the top genes across metaprograms. 
 Here we look specifically at the top 200 genes since those are the ones we use for scoring and for running ORA.
 
+**Note:** The code in this notebook has not been optimized as we are not planning to move forward with this metric. 
+
 ```{r}
 library(ggplot2)
 
