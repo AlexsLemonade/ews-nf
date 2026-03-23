@@ -545,7 +545,7 @@ num_genesets_df <- get_total_genesets(names(mp_object$metaprogram_list), ora_res
 # calculate gene set specificity
 obs_specificity_df <- compute_metaprogram_specificity(ora_results_df, mp_object$n_metaprograms)
 
-# TODO: Calculate background and pvalue for gene set specificity 
+# Calculate background for gene set specificity 
 background_specificity_df <- permute_specificity(ora_results_df, mp_object$n_metaprograms, opt$nreps)
 
 # calculate pvalue for specificity 
