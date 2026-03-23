@@ -4,27 +4,36 @@
 # The output is a RDS file with 
 
 # mp_metrics_df: A dataframe of metrics calculated for each MP
-# geneset_prop_df: A dataframe with the proportion of total MPs that each 
-#  gene set is associated with as determined by ORA
 # ora_results_df: A dataframe of all results output from ORA
+# background_mp_stats_df: A dataframe with the background values for metaprogram stats
+# background_specificity_df: Dataframe with background for gene set specificity
 
 # mp_metrics_df contains the following metrics: 
 
 # max_correlation: Max correlation of the specified metaprogram to all other metaprograms
 # median_difference: Difference in medians between the correlation of spectra 
 #  within metaprograms and between metaprograms
+# num_spectra_per_mp: Number of spectra found in that metapgram
 # num_samples: Number of samples represented in the metaprogram
+# num_patients: Number of patients represented in the metaprogram
+# num_primary_samples: Number of samples with primary as disease_timing
+# num_mets_samples: Number of samples with Metastasis as disease_timing
+# num_recurrence_sample: Number of samples with Recurrence as disease_timing
 # proportion_of_samples: Proportion of the total samples represented in the metaprogram
+# proportion_of_patients: Proportion of the total patients represented in the metaprogram 
+# primary_sample_proportion: Proportion of all primary samples represented
+# mets_sample_proportion: Proportion of all metastatic samples represented
+# recurrence_sample_proportion: Proportion of all recurrence samples represented
+# shannon_entropy: shannon's entropy measuring relative abundance of samples in the metaprogram 
+# shannon_entropy_norm: Normalized shannon's entropy 
+# eff_number: Effective sample size 
+# eff_number_norm: Effective sample size normalized by the total samples in a metaprogram
+# greater_pvalue_eff_number_norm: Pvalue of the observed effective sample size > background 
+# grater_adj_pvalue_eff_number_norm: Adjused pvalue for effective sample size 
 # num_sig_genesets: Total number of gene sets identified as significant by ORA
-# num_sig_genesets_pvalue: P value associated with permutation testing for number of observed gene sets after ORA
-# num_sig_genesets_adj_pvalue: Adjusted pvalue associated with permutation testing for number of gene sets after ORA
-# num_unique_genesets: Total number of gene sets uniquely mapped to a single metaprogram 
-# proportion_unique_genesetss: Total proportion of gene sets uniquely mapped to a single metaprogram
-# unique_genesets_pvolue: P value associated with permutation testing for unique gene sets
-# max_jaccard: Max Jaccard index for each metaprogram calculated by comparing 
-#  the list of gene sets for each metaprogram after ORA
-#  this column includes all gene sets
-# max_jaccard_no_ews: Max Jaccard index after removing EF-activated and EF-repressed gene sets
+# mean_geneset_specificity: Mean specificity of all gene sets assigned to a metaprogram through ORA
+# overall_pvalue_geneset_specificity: pvalue of observed specificity being > or < background 
+# overall_adj_pvalue_geneset_specificity: adjusted pvalue for gene set specificity 
 
 # Additional entries in the object will include information about the parameters
 # used for metaprogram generation 
@@ -306,7 +315,7 @@ calculate_permutation_significance <- function(stat, observed_df, background_df,
     dplyr::mutate(
       # indicate which rows have background > or < obs
       greater_than_obs = {{ stat }} >= obs_value,
-      lower_than_obs = {{ stat }} <= ops_value
+      lower_than_obs = {{ stat }} <= obs_value
     ) |> 
     dplyr::group_by(metaprogram) |> 
     dplyr::summarize(
@@ -485,13 +494,13 @@ background_mp_stats_df <- replicate(opt$nreps, {
   # for each rep, shuffle the spectra
   # keep the distribution of num spectra/ mp the same
   dplyr::mutate(mp_clusters_df, metaprogram = sample(metaprogram)) |>
-    calculate_sample_stats()
+    calculate_sample_stats(total_samples, sample_df)
 }, simplify = FALSE) |>
   dplyr::bind_rows(.id = "replicate")
 
 # pvalue for neff to add in to the final data frame
 neff_pvalue_df <- calculate_permutation_significance(eff_number_norm,
-                                                     obs_neff_df,
+                                                     obs_stats_df,
                                                      background_mp_stats_df,
                                                      opt$nreps) |> 
   # select the columns that we want
@@ -533,14 +542,24 @@ num_genesets_df <- get_total_genesets(names(mp_object$metaprogram_list), ora_res
 
 # Gene set specificity ---------------------------------------------------------
 
-# get a nested list of groups to compare with names as the MPs and gene sets for each MP
-geneset_groups <- split(ora_results_df$ID, ora_results_df$metaprogram)
-
-# TODO: Update this to permute gene set specificity 
+# calculate gene set specificity
 obs_specificity_df <- compute_metaprogram_specificity(ora_results_df, mp_object$n_metaprograms)
 
+# TODO: Calculate background and pvalue for gene set specificity 
+background_specificity_df <- permute_specificity(ora_results_df, mp_object$n_metaprograms, opt$nreps)
 
-
+# calculate pvalue for specificity 
+specificity_pvalue_df <- calculate_permutation_significance(
+  mean_geneset_specificity,
+  obs_specificity_df,
+  background_specificity_df,
+  opt$nreps
+  ) |> 
+  dplyr::select(
+    "metaprogram",
+    "overall_pvalue_geneset_specificity" = "overall_pvalue",
+    "overall_adj_pvalue_geneset_specificity" = "overall_adj_pvalue"
+  )
 
 # Combine and export -----------------------------------------------------------
 
@@ -552,15 +571,17 @@ mp_metrics_df <- max_cor_df |>
   # add pvalue for neff
   dplyr::left_join(neff_pvalue_df, by = "metaprogram") |> 
   # add total number of gene sets for ORA 
-  dplyr::left_join(num_geneset_df, by = "metaprogram")
+  dplyr::left_join(num_genesets_df, by = "metaprogram") |> 
+  # gene set specificity and pvalue
+  dplyr::left_join(obs_specificity_df, by = "metaprogram") |> 
+  dplyr::left_join(specificity_pvalue_df, by = "metaprogram")
 
-# create an object for exporting with mp metrics, gene set entropy, and ora results
-# TODO: Remove the old objects and add in the correct background dfs 
+# create an object for exporting with mp metrics and ora results
 metrics_obj <- list(
   mp_metrics_df = mp_metrics_df,
   ora_results_df = ora_results_df,
   background_mp_stats_df = background_mp_stats_df,
-  # TODO: Add in gene set specificity stats
+  background_specificity_df = background_specificity_df,
   # add some key parameters which will help when we combine these TSV files across different parameters
   n_metaprograms = mp_object$n_metaprograms,
   cnmf_k_range = mp_object$cnmf_k_range,
