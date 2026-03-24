@@ -9,6 +9,7 @@
 
 # mp_metrics_df contains the following metrics: 
 
+# metaprogram specific metrics ------
 # max_correlation: Max correlation of the specified metaprogram to all other metaprograms
 # median_difference: Difference in medians between the correlation of spectra 
 #  within metaprograms and between metaprograms
@@ -29,6 +30,7 @@
 # eff_number_norm: Effective sample size normalized by the total samples in a metaprogram
 # greater_pvalue_eff_number_norm: Pvalue of the observed effective sample size > background 
 # grater_adj_pvalue_eff_number_norm: Adjused pvalue for effective sample size 
+# ORA based metrics ---
 # num_sig_genesets: Total number of gene sets identified as significant by ORA
 # mean_geneset_specificity: Mean specificity of all gene sets assigned to a metaprogram through ORA
 # overall_pvalue_geneset_specificity: pvalue of observed specificity being > or < background 
