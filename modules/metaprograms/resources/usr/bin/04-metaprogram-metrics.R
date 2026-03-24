@@ -1,8 +1,7 @@
 #!/usr/bin/env Rscript
 
 # This script is used to calculate a set of metrics on metaprograms
-# The output is a RDS file with 
-
+# The output is a RDS file with:
 # mp_metrics_df: A dataframe of metrics calculated for each MP
 # ora_results_df: A dataframe of all results output from ORA
 # background_mp_stats_df: A dataframe with the background values for metaprogram stats
@@ -16,9 +15,9 @@
 # num_spectra_per_mp: Number of spectra found in that metapgram
 # num_samples: Number of samples represented in the metaprogram
 # num_patients: Number of patients represented in the metaprogram
-# num_primary_samples: Number of samples with primary as disease_timing
-# num_mets_samples: Number of samples with Metastasis as disease_timing
-# num_recurrence_sample: Number of samples with Recurrence as disease_timing
+# num_primary_samples: Number of samples with primary as disease_timing in the metaprogram
+# num_mets_samples: Number of samples with Metastasis as disease_timing in the metaprogram
+# num_recurrence_sample: Number of samples with Recurrence as disease_timing in the metaprogram
 # proportion_of_samples: Proportion of the total samples represented in the metaprogram
 # proportion_of_patients: Proportion of the total patients represented in the metaprogram 
 # primary_sample_proportion: Proportion of all primary samples represented
