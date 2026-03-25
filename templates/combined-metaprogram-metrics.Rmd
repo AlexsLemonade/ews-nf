@@ -77,7 +77,7 @@ sig_value <- 0.05
 
 ```{r}
 # list of all metrics files
-metrics_rds_files <- stringr::str_split_1(params$metrics_file_list, sep = ",")
+metrics_rds_files <- stringr::str_split_1(params$metrics_file_list, pattern = ",")
 
 # make sure all files exist
 stopifnot(
