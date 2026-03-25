@@ -1,0 +1,298 @@
+---
+title: "Comparing metaprograms generated using a range of k"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    number_sections: false
+    code_folding: hide
+params:
+  metrics_file_list: NULL
+  seed: 2026
+---
+
+This report compares metaprograms generated from a single cohort across a range of k values.
+Here k refers to the number of clusters specified during hierarchical clustering of spectra to define metaprograms. 
+
+Metrics included in this notebook will be used to identify the optimal value of k for this group of samples.
+
+## Set Up
+
+```{r, define_functions}
+# helper function for plotting permutation results
+# plots background points with observed values in color on top as sina plot
+plot_permutation_results <- function(background_df, pvalue_df, x_axis, y_axis){
+  
+  ggplot(background_df, aes(x = {{ x_axis }}, y = {{ y_axis }})) +
+  ggforce::geom_sina(
+    color = "gray",
+    alpha = 0.1
+  ) +
+  geom_point(
+    data = pvalue_df,
+    aes(
+      x = {{ x_axis }},
+      y = {{ y_axis }},
+      color = is_significant
+    ),
+    size  = 3,
+    shape = 18  # diamond
+  ) +
+  scale_color_manual(values = c(`TRUE` = "red", `FALSE` = "blue")) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+  
+}
+```
+
+```{r setup, message = FALSE, echo = FALSE}
+library(ggplot2)
+
+# Set default ggplot theme
+theme_set(
+  theme_bw() +
+    theme(
+      strip.background = element_rect(fill = "transparent", linewidth = 0.5),
+      strip.text = element_text(face = "bold"),
+      axis.text.x = element_text(angle = 90)
+    )
+)
+
+options(DT.options = list(
+  scrollX = TRUE,
+  scrollY = "400px",
+  scrollCollapse = TRUE,
+  paging = FALSE
+))
+
+set.seed(params$seed)
+
+# set this here so we don't mess it up
+sig_value <- 0.05
+```
+
+TODO: Remove this and just use the params input 
+```{r}
+#metaprograms results directory
+results_dir <- here::here("ews-nf-out", "metaprograms")
+
+# params we are looking at in this particular notebook 
+# use these to construct the file paths 
+n_metaprograms <- seq(5, 15, 1)
+
+# directories with metaprogram results 
+# one directory per n_metaprogram
+metaprogram_output_dirs <- file.path(
+  results_dir, 
+  glue::glue("metaprograms-{n_metaprograms}_cnmf-5-10-15_filtered")
+)
+
+# path to files with each of the metrics
+metrics_rds_files <- file.path(metaprogram_output_dirs, "metaprograms-metrics.rds")
+```
+
+
+```{r}
+# list of all metrics files
+metrics_rds_files <- stringr::str_split(params$metrics_file_list)
+
+# make sure all files exist
+stopifnot(
+  "Some or all metrics files do not exist" = all(file.exists(metrics_rds_files))
+)
+```
+
+
+```{r}
+# get a list of all the metrics objects
+metrics_list <- metrics_rds_files |> 
+  purrr::map(readr::read_rds)
+
+# pull out n_metaprograms to use as names of the list
+n_metaprograms <- metrics_list |> 
+  purrr::map_dbl(\(list) list$n_metaprograms)
+
+names(metrics_list) <- sprintf("k_%02d", n_metaprograms)
+
+# create dataframe with one row per metaprogram/n_metaprogram (k) combination 
+# each column is a metric for that metaprograms
+mp_metrics_df <- metrics_list |> 
+  purrr::map(\(list) list$mp_metrics_df) |> 
+  dplyr::bind_rows(.id = "n_metaprograms")
+```
+
+## Sample and patient diversity 
+
+Metaprograms should be representative of a diverse set of samples and patients. 
+This section will summarize the proportion of samples and patients found in each metaprogram. 
+Any metaprograms that are only defined by a single patient will be flagged.
+
+```{r}
+# TODO: total number of samples 
+num_samples <- unique(mp_metrics_df$num_samples/mp_metrics_df$proportion_of_samples)
+
+num_patients <- unique(mp_metrics_df$num_patients/mp_metrics_df$proportion_of_patients)
+
+glue::glue("The metaprograms explored here are comprised of {num_samples} **samples** from {num_patients} **patients**.")
+```
+
+
+### Proportion of samples 
+
+Here each dot is a metaprogram and the value indicated is the proportion of total **samples** represented by spectra in that metaprogram. 
+The dotted line indicates 10%. 
+
+```{r}
+ggplot(mp_metrics_df, aes(x = n_metaprograms, y = proportion_of_samples)) +
+  geom_boxplot() +
+  ggbeeswarm::geom_beeswarm() +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Proportion of total samples \n contributing to each metaprogram"
+  )  +
+  geom_hline(yintercept = 0.1, linetype = "dashed")
+```
+
+### Proportion of patients 
+
+Here each dot is a metaprogram and the value indicated is the proportion of total **patients** represented by spectra in that metaprogram. 
+The dotted line indicates 10%. 
+
+```{r}
+ggplot(mp_metrics_df, aes(x = n_metaprograms, y = proportion_of_patients)) +
+  geom_boxplot() +
+  ggbeeswarm::geom_beeswarm() +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Proportion of total patients \n contributing to each metaprogram"
+  )  +
+  geom_hline(yintercept = 0.1, linetype = "dashed")
+```
+
+The below table reports how many metaprograms are driven by a single patient and the minimum number of patients represented in a metaprogram for a given value of k. 
+
+```{r}
+mp_metrics_df |> 
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarize(
+    single_patient_mps = sum(num_patients == 1),
+    min_num_patients_per_mp = min(num_patients)
+  ) |> 
+  DT::datatable(
+    colnames = c("k", "Metaprograms from 1 patient", "Minimum number of patients observed in a metaprogram")
+  )
+```
+
+### Representation across sample types 
+
+Here we will look at the contribution of different sample types to each of the metaprograms. 
+Particularly, we will see how many of the samples are from primary, metastatic, or recurrent samples within each metaprogram. 
+
+```{r}
+disease_timing_df <- mp_metrics_df |> 
+  tidyr::pivot_longer(
+    cols = c("num_primary_samples", "num_mets_samples", "num_recurrence_samples"),
+    names_to = "sample_type", 
+    values_to = "count"
+  ) |> 
+  dplyr::mutate(
+    proportion = count/ num_samples,
+    sample_type = stringr::word(sample_type, 2, sep = "_") |> 
+      factor(labels = c("Primary", "Metastasis", "Recurrence"))
+  ) |> 
+  dplyr::select(n_metaprograms, metaprogram, proportion, sample_type)
+```
+
+```{r}
+#| fig.height: 10
+#| fig.width: 10
+
+disease_timing_palette <- c(Primary = "#6A9FC0", Metastasis = "#C47A8A", Recurrence = "#5A9E82")
+
+ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
+  geom_col(width = 0.7) +
+  facet_wrap(vars(n_metaprograms), scales = "free_x") +
+  scale_fill_manual(values = disease_timing_palette) +
+  scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, 0.02))) +
+  labs(
+    x    = "Metaprogram",
+    y    = "Proportion of samples",
+    fill = "Sample type"
+  ) +
+  theme(
+    strip.text         = element_text(face = "bold"),
+    legend.position    = "top",
+    axis.text.x        = element_text(angle = 90, hjust = 1, size = 10)
+  )
+```
+
+
+### Normalized effective sample size 
+
+Here we will look at the normalized effective species size or Hill number of order 1. 
+This is calculated by taking the exponential of Shannon's entropy and represents the effective number of common or abundant species. 
+Here we are looking for a number close to the total possible samples in that metaprogram. 
+The values are normalized by the total number of samples in the metaprogram such that values close to 1 indicate all samples are equally abundant.
+
+To determine if the observed effective sample size is not due to random chance, we performed permutation testing. 
+The spectra assigned to each metaprogram were shuffled hile preserving the total number of spectra assigned to each metaprogram. 
+After shuffling, the normalized effective sample size is shuffled to create a null distribution. 
+
+The observed value is compared to the null distribution to get an empirical pvalue, producing a single pvalue for each metaprogram within a value of k.
+The below plot shows both the null distribution in gray and the observed value for each metaprogram. 
+The observed values are colored in red if they are significantly greater than the null distribution. 
+
+
+```{r}
+# pull out observations and add in significance column
+neff_obs_df <- mp_metrics_df |> 
+  dplyr::select(n_metaprograms, metaprogram, eff_number_norm, greater_adj_pvalue_eff_number_norm) |> 
+  dplyr::mutate(
+    is_significant = greater_adj_pvalue_eff_number_norm <= sig_value
+  )
+
+# get background for all values of k
+neff_background_df <- metrics_list |> 
+  purrr::map("background_mp_stats_df") |> 
+  dplyr::bind_rows(.id = "n_metaprograms")
+```
+
+
+```{r}
+#| fig.height: 10
+#| fig.width: 10
+
+plot_permutation_results(neff_background_df, neff_obs_df, metaprogram, eff_number_norm) +
+  facet_wrap(vars(n_metaprograms), scale = "free_x") +
+  labs(
+    y = "Normalized effective sample size",
+    x = "Metaprogram",
+    color = "significance"
+  )
+```
+
+We then can identify the percentage of metaprograms for each value of k that have a significant normalized effective sample size. 
+This will be used to identify the optimal value of k in the final section. 
+
+```{r}
+neff_obs_df |> 
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarize(
+    neff_sig_proportion = sum(is_significant)/dplyr::n()
+  ) |> 
+  DT::datatable(colnames = c("k", "% of metaprograms with significant effective sample size")) |> 
+  DT::formatPercentage("neff_sig_proportion", 2)
+```
+
+
+## Session info
+
+```{r}
+sessionInfo()
+```
+
+
+
