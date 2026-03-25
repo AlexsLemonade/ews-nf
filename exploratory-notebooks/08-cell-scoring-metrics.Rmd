@@ -61,7 +61,7 @@ sig_value <- 0.05
 # observed scores
 # this includes one score for each cell for each metaprogram 
 scores_df <- scores_files |> 
-  purrr::map(readr::read_tsv, col_types = list(.default = "c", mp_score = "d") |> 
+  purrr::map(readr::read_tsv, col_types = list(.default = "c", mp_score = "d")) |> 
   dplyr::bind_rows(.id = "n_metaprograms")
 
 # background scores
@@ -69,7 +69,7 @@ scores_df <- scores_files |>
 # for each sample and metaprogram 
 # this is repeated across 1000 replicates 
 background_df <- background_files |> 
-  purrr::map(readr::read_tsv) |> 
+  purrr::map(readr::read_tsv, col_types = list(.default = "d", metaprogram = "c", unique_id = "c")) |> 
   dplyr::bind_rows(.id = "n_metaprograms")
 ```
 
@@ -143,12 +143,10 @@ global_background_df <- background_df |>
     n_total = sum(num_cells),
     global_mean = sum(num_cells * mean_mp_score) / sum(num_cells),
     M2_total = sum(M2) + sum(num_cells * (mean_mp_score - global_mean)^2),
-    .by = c("n_metaprograms", "metaprogram", "replicate")
-  ) |>
-  dplyr::mutate(
     score_var = M2_total / (n_total - 1),
     global_sd  = sqrt(score_var),
-    score_cv  = (global_sd / global_mean)
+    score_cv  = (global_sd / global_mean),
+    .by = c("n_metaprograms", "metaprogram", "replicate")
   )
 ```
 
@@ -209,7 +207,10 @@ Below we look at the observed CV compared to the background for each metaprogram
 Red dots indicate metaprograms that have a CV that is significantly greater than what would be observed by random chance.
 
 
-```{r, fig.height=10}
+```{r}
+#| fig.height: 10
+#| fig.width: 10
+
 cv_pvalue_df <- compute_var_pvalue(global_background_df, var_df, score_cv, 1000) |> 
   dplyr::rename(score_cv = obs_value)
 
@@ -224,8 +225,6 @@ plot_permutation_results(global_background_df, cv_pvalue_df, metaprogram, score_
 Interestingly, the background distributions are all at or below 1. 
 The CV tells you the variation in the dataset relative to the mean, with a CV of one meaning that the standard deviation is equal to the mean. 
 
-We could continue to use permutation testing, or we could probably just use a cutoff of 1 to say that a metaprogram shows variation. 
-
 A small side note is that MP03 is the "noise" metaprogram that we are consistently seeing with low coherence. 
 It looks like the variation of this metaprogram is low across the board. 
 
@@ -234,7 +233,9 @@ It looks like the variation of this metaprogram is low across the board.
 We can also directly look at variance.
 
 
-```{r, fig.height=10}
+```{r}
+#| fig.height: 10
+#| fig.width: 10
 var_pvalue_df <- compute_var_pvalue(global_background_df, var_df, score_var, 1000) |> 
   dplyr::rename(score_var = obs_value)
 
@@ -274,7 +275,7 @@ I think this is something we could use to influence our decision of k.
 
 ## Sample metadata 
 
-One thing we are curious about is if the scores that we observe are more prevalant in some samples than other. 
+One thing we are curious about is if the scores that we observe are higher or lower in some samples than other. 
 For example, do we see a difference in scores for some metaprograms in samples from primary or metastatic tumors? 
 
 We shouldn't use this information to decide k, but it can be helpful summary information to see if samples from different tumor stages show higher or lower scores for a metaprogram. 
@@ -283,23 +284,24 @@ We shouldn't use this information to decide k, but it can be helpful summary inf
 # TODO: This path is relative to where my ScPCA-admin repo is stored
 # Before we can do anything with this outside of this notebook we'll have to save it to this repo in someway
 sample_metadata_file <- "../../ScPCA-admin/sample_info/bailey_cillo/sample-metadata.tsv"
-sample_df <- readr::read_tsv(sample_metadata_file)
+sample_df <- readr::read_tsv(sample_metadata_file, col_types = "c")
 ```
 
-To see if there are any different scores between samples based on type, we'll first pseudobulk the scores for each metaprogram across all cells by taking the mean score across all cells for each sample.
+To see if there are any different scores between samples based on type, we'll first get the mean score for each metaprogram across all cells for each sample.
 This should account for any expected relationship in gene expression among cells from the same sample and minimize the potential for inflating our statistics. 
 
 
 ```{r}
-pb_scores_df <- scores_df |> 
+mean_scores_df <- scores_df |> 
   dplyr::summarize(
-    pb_mp_score = mean(mp_score),
+    mean_mp_score = mean(mp_score),
     .by = c("unique_id", "metaprogram", "n_metaprograms")
   ) |> 
+  # z-score the mean scores within each k and metaprogram
   dplyr::mutate(
     scpca_sample_id = stringr::word(unique_id, -1, sep = "-"),
-    # we'll log transform for plotting purposes 
-    log_pb_mp_score = -log(pb_mp_score)
+    zscore_mean_mp_score = scale(mean_mp_score),
+    .by = c("metaprogram", "n_metaprograms")
   ) |> 
   # add in the sample metadata including disease timing and patient information 
   dplyr::left_join(dplyr::select(sample_df, c("scpca_sample_id", "participant_id", "disease_timing")), by = c("scpca_sample_id"))
@@ -309,7 +311,7 @@ We will look at the `disease_timing` column which groups samples into primary, m
 Let's start by just plotting the distributions. 
 
 ```{r, fig.height=10, fig.width=10} 
-ggplot(pb_scores_df, aes(x = metaprogram, y = pb_mp_score, fill = disease_timing)) +
+ggplot(mean_scores_df, aes(x = metaprogram, y = mean_mp_score, fill = disease_timing)) +
   geom_boxplot(outlier.size = 0.2) +
   facet_wrap(vars(n_metaprograms),
              scales = "free",
@@ -318,16 +320,15 @@ ggplot(pb_scores_df, aes(x = metaprogram, y = pb_mp_score, fill = disease_timing
     axis.text.x = element_text(angle = 90)
   ) +
   labs(
-    title = "Psuedobulked metaprogram score"
+    title = "Mean metaprogram score"
   )
 ```
 
 It looks like a lot of these scores are skewed to be closer to 0. 
-Let's look at the log of the scores to see if we can see any differences across sample types. 
-
+Let's look at the z-score of these scores, calculated for each metaprogram and value of k. 
 
 ```{r, fig.height=10, fig.width=10} 
-ggplot(pb_scores_df, aes(x = metaprogram, y = log_pb_mp_score, fill = disease_timing)) +
+ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = disease_timing)) +
   geom_boxplot(outlier.size = 0.2) +
   facet_wrap(vars(n_metaprograms),
              scales = "free",
@@ -336,7 +337,7 @@ ggplot(pb_scores_df, aes(x = metaprogram, y = log_pb_mp_score, fill = disease_ti
     axis.text.x = element_text(angle = 90)
   ) +
   labs(
-    title = "-Log (pseudobulked metaprogram score)"
+    title = "Mean metaprogram z-score)"
   )
 ```
 
@@ -350,9 +351,9 @@ Since we have three groups, we will use the Kruskal-Wallis test to determine if 
 # run Kw test on each metaprogram for each value of k
 # within each metaprogram test if there are differences in the distribution of scores 
 # between samples from different disease timing 
-kruskal_results <- pb_scores_df |>
+kruskal_results <- mean_scores_df |>
   dplyr::group_by(n_metaprograms, metaprogram) |>
-  rstatix::kruskal_test(pb_mp_score ~ disease_timing) |> 
+  rstatix::kruskal_test(mean_mp_score ~ disease_timing) |> 
   dplyr::mutate(
     adj_pvalue = p.adjust(p, method = "BH")
   )
@@ -367,38 +368,68 @@ Another thing to consider here is that we have multiple samples from the same pa
 It's likely that samples from the same patient are going to share some underlying similarities that will confound our results. 
 To combat that we could try and use a linear mixed effects model that considers disease timing and participant ID. 
 
-```{r}
-# for each metaprogram for each value of k, use a linear mixed effect model 
-# then use ANOVA to calculate pvalues 
-lmm_results <- pb_scores_df |>
-  dplyr::group_by(metaprogram, n_metaprograms) |>
-  dplyr::group_modify(~ {
-    mod <- lme4::lmer(log_pb_mp_score ~ disease_timing + (1 | participant_id), data = .x)
-    mod_lt <- lmerTest::as_lmerModLmerTest(mod)
+We'll use ANOVA to do this and run it with and without considering participant ID as a random effect.
 
-    # Overall p-value for disease_timing (type III ANOVA)
-    anova_res <- anova(mod_lt) |>
-      as.data.frame() |>
-      tibble::rownames_to_column("term")
-    
-  }) |>
-  dplyr::rename(f_value = `F value`, p_value = `Pr(>F)`) |>
-  dplyr::mutate(p_adj = p.adjust(p_value, method = "BH"),
-                p_adj_signif = dplyr::if_else(p_adj <= sig_value, "*", "ns")) |> 
-  # join with scores for plotting 
-  dplyr::left_join(
-    pb_scores_df |>
-      dplyr::group_by(metaprogram, n_metaprograms) |>
-      dplyr::summarize(y.position = max(log_pb_mp_score, na.rm = TRUE) + 0.3),
-    by = c("metaprogram", "n_metaprograms")
-  )
+```{r}
+run_anova <- function(data, sig_value, random_effect = NULL) {
+  # for each metaprogram for each value of k, use a linear mixed effect model 
+  # then use ANOVA to calculate pvalues 
+  results <- data |>
+    dplyr::group_by(metaprogram, n_metaprograms) |>
+    dplyr::group_modify(~ {
+      
+      if (!is.null(random_effect)) {
+        # create formula with random effect
+        formula <- as.formula(glue::glue("zscore_mean_mp_score ~ disease_timing + (1 | {random_effect})"))
+        mod <- lme4::lmer(formula, data = .x)
+        mod_lt <- lmerTest::as_lmerModLmerTest(mod)
+        # Overall p-value for disease_timing (type III ANOVA)
+        anova_res <- anova(mod_lt) |>
+          as.data.frame() |>
+          tibble::rownames_to_column("term")
+      } else {
+        # no random effect so use a regular ANOVA
+        mod <- lm(zscore_mean_mp_score ~ disease_timing, data = .x)
+        anova_res <- anova(mod) |>
+          as.data.frame() |>
+          tibble::rownames_to_column("term") |>
+          dplyr::filter(term != "Residuals")
+      }
+      
+    }) |>
+    # classify as significant or not
+    dplyr::rename(f_value = `F value`, p_value = `Pr(>F)`) |>
+    dplyr::mutate(
+      p_adj = p.adjust(p_value, method = "BH"),
+      p_adj_signif = dplyr::if_else(p_adj <= sig_value, "*", "ns")
+    ) |>
+    # join with data/scores for plotting 
+    dplyr::left_join(
+      data |>
+        dplyr::group_by(metaprogram, n_metaprograms) |>
+        dplyr::summarize(y.position = max(zscore_mean_mp_score, na.rm = TRUE) + 0.3),
+      by = c("metaprogram", "n_metaprograms")
+    )
+  
+  return(results)
+}
 ```
 
+
+```{r}
+# plain ANOVA
+plain_lmm_results <- run_anova(mean_scores_df, sig_value)
+
+# with random effect
+random_effect_lmm_results <- run_anova(mean_scores_df, sig_value, random_effect = "participant_id")
+```
+
+
 ```{r, fig.height=10, fig.width=10}
-ggplot(pb_scores_df, aes(x = metaprogram, y = log_pb_mp_score, fill = disease_timing)) +
+ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = disease_timing)) +
   geom_boxplot(outlier.size = 0.1) +
   geom_text(
-    data = lmm_results,
+    data = plain_lmm_results,
     aes(x = metaprogram, y = y.position, label = p_adj_signif),
     inherit.aes = FALSE
   ) +
@@ -406,7 +437,27 @@ ggplot(pb_scores_df, aes(x = metaprogram, y = log_pb_mp_score, fill = disease_ti
              scales = "free",
              ncol = 3) +
   labs(
-    title = "LMM with patient as random effect"
+    title = "ANOVA"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+
+```{r, fig.height=10, fig.width=10}
+ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = disease_timing)) +
+  geom_boxplot(outlier.size = 0.1) +
+  geom_text(
+    data = random_effect_lmm_results,
+    aes(x = metaprogram, y = y.position, label = p_adj_signif),
+    inherit.aes = FALSE
+  ) +
+  facet_wrap(vars(n_metaprograms), 
+             scales = "free",
+             ncol = 3) +
+  labs(
+    title = "ANOVA with patient as random effect"
   ) +
   theme(
     axis.text.x = element_text(angle = 90)
@@ -423,7 +474,7 @@ I do think this is a nice starting point for SKC investigators to dig further in
 
 ## Conclusions
 
-- I think we should include the proportion of metaprograms with a CV > 1 or CV > null distribution as a metric that helps choose the optimal value of k. 
+- I think we should include the proportion of metaprograms with a CV > null distribution as a metric that helps choose the optimal value of k. 
 - We should include a summary plot that looks at the distribution of scores across disease timing in the report as extra information about the potential biological meaning of some of these metaprograms. 
 
 ## Session info
