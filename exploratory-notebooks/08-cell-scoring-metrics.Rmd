@@ -61,7 +61,7 @@ sig_value <- 0.05
 # observed scores
 # this includes one score for each cell for each metaprogram 
 scores_df <- scores_files |> 
-  purrr::map(readr::read_tsv) |> 
+  purrr::map(readr::read_tsv, col_types = list(.default = "c", mp_score = "d") |> 
   dplyr::bind_rows(.id = "n_metaprograms")
 
 # background scores
@@ -142,7 +142,7 @@ global_background_df <- background_df |>
   dplyr::summarize(
     n_total = sum(num_cells),
     global_mean = sum(num_cells * mean_mp_score) / sum(num_cells),
-    M2_total = sum(M2) + sum(num_cells * (mean_mp_score - sum(num_cells * mean_mp_score) / sum(num_cells))^2),
+    M2_total = sum(M2) + sum(num_cells * (mean_mp_score - global_mean)^2),
     .by = c("n_metaprograms", "metaprogram", "replicate")
   ) |>
   dplyr::mutate(
@@ -206,7 +206,7 @@ So it doesn't matter which calculation we use when comparing observed to the bac
 ## Plot CV 
 
 Below we look at the observed CV compared to the background for each metaprogram. 
-Red dots indicate metaprograms that have a significant CV that is greater than what would be observed by random chance.
+Red dots indicate metaprograms that have a CV that is significantly greater than what would be observed by random chance.
 
 
 ```{r, fig.height=10}
