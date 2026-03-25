@@ -297,10 +297,16 @@ mean_scores_df <- scores_df |>
     mean_mp_score = mean(mp_score),
     .by = c("unique_id", "metaprogram", "n_metaprograms")
   ) |> 
-  # z-score the mean scores within each k and metaprogram
   dplyr::mutate(
     scpca_sample_id = stringr::word(unique_id, -1, sep = "-"),
-    zscore_mean_mp_score = scale(mean_mp_score),
+    # first log transform
+    log_mean_mp_score = log(mean_mp_score)
+  ) |>
+  # z-score the log scores within each k and metaprogram
+  # use these for plotting
+  dplyr::mutate(
+    scpca_sample_id = stringr::word(unique_id, -1, sep = "-"),
+    zscore_mean_mp_score = scale(log_mean_mp_score),
     .by = c("metaprogram", "n_metaprograms")
   ) |> 
   # add in the sample metadata including disease timing and patient information 
@@ -371,6 +377,7 @@ To combat that we could try and use a linear mixed effects model that considers 
 We'll use ANOVA to do this and run it with and without considering participant ID as a random effect.
 
 ```{r}
+# ANOVA test with/without random effect on log(mean mp score)
 run_anova <- function(data, sig_value, random_effect = NULL) {
   # for each metaprogram for each value of k, use a linear mixed effect model 
   # then use ANOVA to calculate pvalues 
@@ -380,7 +387,7 @@ run_anova <- function(data, sig_value, random_effect = NULL) {
       
       if (!is.null(random_effect)) {
         # create formula with random effect
-        formula <- as.formula(glue::glue("zscore_mean_mp_score ~ disease_timing + (1 | {random_effect})"))
+        formula <- as.formula(glue::glue("log_mean_mp_score ~ disease_timing + (1 | {random_effect})"))
         mod <- lme4::lmer(formula, data = .x)
         mod_lt <- lmerTest::as_lmerModLmerTest(mod)
         # Overall p-value for disease_timing (type III ANOVA)
@@ -389,7 +396,7 @@ run_anova <- function(data, sig_value, random_effect = NULL) {
           tibble::rownames_to_column("term")
       } else {
         # no random effect so use a regular ANOVA
-        mod <- lm(zscore_mean_mp_score ~ disease_timing, data = .x)
+        mod <- lm(log_mean_mp_score ~ disease_timing, data = .x)
         anova_res <- anova(mod) |>
           as.data.frame() |>
           tibble::rownames_to_column("term") |>
@@ -407,6 +414,7 @@ run_anova <- function(data, sig_value, random_effect = NULL) {
     dplyr::left_join(
       data |>
         dplyr::group_by(metaprogram, n_metaprograms) |>
+        # we'll plot with zscore so want to use that to determine the y position of the label
         dplyr::summarize(y.position = max(zscore_mean_mp_score, na.rm = TRUE) + 0.3),
       by = c("metaprogram", "n_metaprograms")
     )
