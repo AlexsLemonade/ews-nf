@@ -143,6 +143,19 @@ option_list <- list(
     help = "Minimum cross sample maximum required to keep spectra if --filter_spectra is used"
   ),
   make_option(
+    opt_str = c("--nreps"),
+    type = "integer",
+    default = 1000,
+    help = "Number of times to shuffle genes assigned to metaprograms to use for permutation testing"
+  ),
+  make_option(
+    opt_str = c("--n_top_genes"),
+    type = "integer",
+    default = 200, 
+    help = "Number of genes to extract for each metaprogram after shuffling, 
+      default is 200 to match the number of genes used for scoring"
+  ),
+  make_option(
     opt_str = c("--output_file"),
     type = "character",
     default = "metaprograms.rds", 
@@ -255,6 +268,28 @@ spectra_unique_ids <- names(clusters) |>
   stringr::word(1, sep = "_")
 removed_unique_ids <- setdiff(unique_ids, spectra_unique_ids)
 
+# Shuffle MPs ------------------------------------------------------------------
+# make gene x metaprogram matrix 
+mp_mtx <- do.call(cbind, mp_list)
+
+# return a list of shuffled mps for each replicate 
+shuffled_mps <- replicate(opt$nreps, {
+  # shuffle genes for metaprograms
+  rownames(mp_mtx) <- sample(rownames(mp_mtx))
+  
+  # extract top 200 genes for each mp
+  # first turn matrix into a list of vector weights where the names are gene ids
+  mp_list <- asplit(mp_mtx, MARGIN = 2)
+  # now return the named list of weights, names are genes
+  mp_top_list <- mp_list |>
+    purrr::map(\(scores){
+      scores |>
+        sort(decreasing = TRUE) |>
+        head(n=opt$n_top_genes)
+    })
+}, simplify = FALSE)
+
+
 # Export MPs -------------------------------------------------------------------
 
 # build a list with MPs, clustered spectra, cor mtx and parameters used to export
@@ -264,6 +299,7 @@ mp_info_list <- list(
   "cluster_list" = mp_cluster_list, # spectra grouped by cluster
   "cor_matrix" = cor_mtx,
   "spectra_cor_df" = spectra_cor_df,
+  "shuffled_metaprograms" = shuffled_mps,
   "gene_universe" = rownames(spectra_mtx),
   "n_metaprograms" = opt$n_metaprograms,
   "cnmf_k_range" = opt$cnmf_k_range,
