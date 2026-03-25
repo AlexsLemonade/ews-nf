@@ -18,6 +18,8 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
+![Overview of ews-nf](./manuscript/figures/pngs/ews-nf_annotation-overview.png)
+
 ## Description 
 
 This repository holds a Nextflow workflow used to analyze single-cell RNA-sequencing samples obtained from patients with Ewing sarcoma. 

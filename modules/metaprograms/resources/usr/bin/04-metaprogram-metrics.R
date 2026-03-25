@@ -1,35 +1,107 @@
 #!/usr/bin/env Rscript
 
 # This script is used to calculate a set of metrics on metaprograms
-# The output is a RDS file with 
-
+# The output is a RDS file with:
 # mp_metrics_df: A dataframe of metrics calculated for each MP
-# geneset_prop_df: A dataframe with the proportion of total MPs that each 
-#  gene set is associated with as determined by ORA
 # ora_results_df: A dataframe of all results output from ORA
+# background_mp_stats_df: A dataframe with the background values for metaprogram stats
+# background_specificity_df: Dataframe with background for gene set specificity
 
 # mp_metrics_df contains the following metrics: 
 
+# metaprogram specific metrics ------
 # max_correlation: Max correlation of the specified metaprogram to all other metaprograms
 # median_difference: Difference in medians between the correlation of spectra 
 #  within metaprograms and between metaprograms
+# num_spectra_per_mp: Number of spectra found in that metapgram
 # num_samples: Number of samples represented in the metaprogram
+# num_patients: Number of patients represented in the metaprogram
+# num_primary_samples: Number of samples with primary as disease_timing in the metaprogram
+# num_mets_samples: Number of samples with Metastasis as disease_timing in the metaprogram
+# num_recurrence_sample: Number of samples with Recurrence as disease_timing in the metaprogram
 # proportion_of_samples: Proportion of the total samples represented in the metaprogram
+# proportion_of_patients: Proportion of the total patients represented in the metaprogram 
+# primary_sample_proportion: Proportion of all primary samples represented
+# mets_sample_proportion: Proportion of all metastatic samples represented
+# recurrence_sample_proportion: Proportion of all recurrence samples represented
+# shannon_entropy: shannon's entropy measuring relative abundance of samples in the metaprogram 
+# shannon_entropy_norm: Normalized shannon's entropy 
+# eff_number: Effective sample size 
+# eff_number_norm: Effective sample size normalized by the total samples in a metaprogram
+# greater_pvalue_eff_number_norm: Pvalue of the observed effective sample size > background 
+# grater_adj_pvalue_eff_number_norm: Adjused pvalue for effective sample size 
+# ORA based metrics ---
 # num_sig_genesets: Total number of gene sets identified as significant by ORA
-# num_sig_genesets_pvalue: P value associated with permutation testing for number of observed gene sets after ORA
-# num_sig_genesets_adj_pvalue: Adjusted pvalue associated with permutation testing for number of gene sets after ORA
-# num_unique_genesets: Total number of gene sets uniquely mapped to a single metaprogram 
-# proportion_unique_genesetss: Total proportion of gene sets uniquely mapped to a single metaprogram
-# unique_genesets_pvolue: P value associated with permutation testing for unique gene sets
-# max_jaccard: Max Jaccard index for each metaprogram calculated by comparing 
-#  the list of gene sets for each metaprogram after ORA
-#  this column includes all gene sets
-# max_jaccard_no_ews: Max Jaccard index after removing EF-activated and EF-repressed gene sets
+# mean_geneset_specificity: Mean specificity of all gene sets assigned to a metaprogram through ORA
+# overall_pvalue_geneset_specificity: pvalue of observed specificity being > or < background 
+# overall_adj_pvalue_geneset_specificity: adjusted pvalue for gene set specificity 
 
 # Additional entries in the object will include information about the parameters
 # used for metaprogram generation 
 
 # Functions --------------------------------------------------------------------
+
+# helper function for calculating entropy
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/04-sample-diversity.Rmd
+entropy <- function(sample_n){
+  sample_freq <- sample_n / sum(sample_n)
+  -sum(sample_freq * log(sample_freq))
+}
+
+# calculate stats for all metaprograms 
+# returns a dataframe with one row for each metaprogram and one column for each stat
+# modified from the function in https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/04-sample-diversity.Rmd
+calculate_sample_stats <- function(mp_clusters_df, total_samples, sample_df){
+  
+  # how many total patients do we have
+  total_patients <- length(unique(sample_df$participant_id))
+  
+  # how many of each disease timing
+  disease_timing_totals_df <- table(sample_df$disease_timing) |> 
+    as.data.frame() |> 
+    tidyr::pivot_wider(
+      names_from = c("Var1"),
+      values_from = c("Freq")
+    )
+  
+  # df with one row per mp 
+  # calculates total spectra, entropy, norm entropy, eff species size
+  mp_entropy_df <-  mp_clusters_df <- mp_clusters_df |> 
+    dplyr::left_join(sample_df, by = c("sample_id" = "scpca_sample_id")) |> 
+    dplyr::group_by(metaprogram, sample_id) |>
+    # first get total spectra per sample
+    dplyr::summarize(
+      num_spectra_per_sample = dplyr::n(), 
+      # keep the participant and disease timing information for each sample
+      participant_id = dplyr::first(participant_id),
+      disease_timing = dplyr::first(disease_timing),
+      .groups = "drop_last") |>  
+    # now calculate stats for each metaprogram, drop sample grouping 
+    dplyr::bind_cols(disease_timing_totals_df) |> 
+    dplyr::summarize(
+      # totals for each group (spectra, sample, patient, disease timing)
+      num_spectra_per_mp = sum(num_spectra_per_sample),
+      num_samples = length(sample_id),
+      num_patients = length(unique(participant_id)),
+      num_primary_samples = sum(disease_timing == "Primary"),
+      num_mets_samples = sum(disease_timing == "Metastasis"),
+      num_recurrence_samples = sum(disease_timing == "Recurrence"),
+      # proportions of total for each category
+      proportion_of_samples = num_samples / total_samples,
+      proportion_of_patients = num_patients / total_patients,
+      primary_sample_proportion = num_primary_samples / unique(Primary),
+      mets_sample_proportion = num_mets_samples / unique(Metastasis), 
+      recurrence_sample_proportion = num_recurrence_samples / unique(Recurrence), 
+      # entropy and neff
+      shannon_entropy = entropy(num_spectra_per_sample), # entropy
+      shannon_entropy_norm = shannon_entropy / log(num_samples),# normalize by total possible samples in that mp
+      eff_number = exp(shannon_entropy), # effective species size or Hill number order of 1
+      eff_number_norm = eff_number/num_samples # eff number should be close to the total possible samples in that mp
+    )
+  
+  return(mp_entropy_df)
+  
+}
 
 # function for generating a term2gene df with specific MSigDB gene sets
 # input dataframe should include the geneset name, category and subcategory
@@ -118,34 +190,6 @@ run_ora <- function(mp_top_list, gene_universe, term2gene_df){
   
 }
 
-# helper function for getting jaccard between two vectors
-calc_jaccard <- function(vec1, vec2) {
-  length(intersect(vec1, vec2)) / length(union(vec1, vec2))
-}
-
-# get the max jaccard for overlap between two groups for a set of metaprograms
-# e.g., a list of genes or a list of gene sets assigned to each metaprogram 
-# groups_list is a list of vectors containing the groups assigned to each metaprogram
-# returns a df with the off diagonal max jaccard for each metaprogram
-max_jaccard <- function(groups_list){
-
-  # create the grid of comparisons
-  cross_df <- tidyr::expand_grid(id1 = names(groups_list), id2 = names(groups_list))
-  
-  jaccard_df <- cross_df |>
-    # remove comparisons to self
-    dplyr::filter(id1 != id2) |> 
-    dplyr::rowwise() |> 
-    # calculate a single Jaccard index for each combination using split lists & ids
-    dplyr::mutate(jaccard = calc_jaccard(groups_list[[id1]], groups_list[[id2]])) |>
-    dplyr::ungroup() |> # remove rowwise prior to getting max
-    # get the max jaccard
-    dplyr::slice_max(jaccard, by = id1, with_ties = FALSE) |>
-    dplyr::rename(metaprogram = id1, max_jaccard = jaccard) |> 
-    dplyr::select(metaprogram, max_jaccard)
-  
-  return(jaccard_df)
-}
 
 # helper function to get a table with the total number of genesets per metaprogram 
 get_total_genesets <- function(mps, ora_results_df){
@@ -167,101 +211,42 @@ get_total_genesets <- function(mps, ora_results_df){
   
 }
 
-
-# function to randomly shuffle genes assigned to metaprograms, recalculate the top scores, 
-# and then redo ORA and calculate stats
-# mp_mtx is a matrix with rownames as genes and columns as metaprograms
-# here we report both the num of significant gene sets and the max jaccard for each metaprogram
-permute_ora <- function(mp_mtx, nreps, gene_universe, term2gene_df) {
+# helper function for computing metaprogram specificity 
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/06-gene-set-uniqueness.Rmd
+compute_metaprogram_specificity <- function(ora_results_df, n_metaprograms) {
   
-  reps <- seq(1, nreps)
+  # since not all metaprograms have gene sets, make sure we track all of them
+  mp_names <- sprintf("MP%02d", seq(1, n_metaprograms))
   
-  background <- replicate(nreps, {
-      
-      # shuffle the genes (rownames) in the matrix 
-      rownames(mp_mtx) <- sample(rownames(mp_mtx))
-      
-      # extract top 200 genes for each mp 
-      # first turn matrix into a list of vector weights where the names are gene ids
-      mp_list <- asplit(mp_mtx, MARGIN = 2)
-      top_genes <- extract_top_genes(mp_list)
-      
-      # run ORA 
-      ora_results_df <- run_ora(
-        top_genes,
-        gene_universe,
-        term2gene_df
-      )
-      
-      # table of number of gene sets per metaprogram 
-      get_total_genesets(names(mp_list), ora_results_df) 
-    }, simplify = FALSE) |> # return as a list not mtx
-    dplyr::bind_rows(.id = "replicate")
+  # calculate specificity for each gene set
+  # one row per gene set
+  geneset_specificity_df <- ora_results_df |>
+    dplyr::group_by(ID) |>
+    dplyr::summarize(num_mps = dplyr::n_distinct(metaprogram)) |>
+    dplyr::mutate(geneset_specificity = 1 - (num_mps - 1) / (n_metaprograms - 1))
   
-  return(background)
+  # add gene set specificity to metaprograms
+  # get one row per metaprogram with mean gene set specificity 
+  data.frame(metaprogram = mp_names) |>
+    dplyr::left_join(ora_results_df, by = "metaprogram") |>
+    dplyr::left_join(geneset_specificity_df, by = "ID") |>
+    dplyr::summarize(mean_geneset_specificity = mean(geneset_specificity), .by = "metaprogram")
   
 }
 
-# calculate significance for permutation testing
-# reports a pvalue for number of gene sets returned from ORA
-ora_permutation_significance <- function(observed_df, background_df, nreps){
+# shuffle gene sets assigned to each metaprogram and then re-calculate specificity 
+# weight gene sets based on the number of times they appear in the table
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/06-gene-set-uniqueness.Rmd
+permute_specificity <- function(
+    ora_results_df,
+    n_metaprograms,
+    nreps
+){
   
-  # combine the observed values with the background
-  combined_df <- observed_df |> 
-    dplyr::select(
-      metaprogram,
-      obs_num_sig_genesets = num_sig_genesets
-    ) |> 
-    dplyr::left_join(background_df, by = c("metaprogram")) |> 
-    dplyr::select(-replicate)
-  
-  # calculate the pvalue for num genesets 
-  pvalue_df <- combined_df |> 
-    dplyr::mutate(
-      # indicate which rows have background > obs
-      greater_than_obs_num_genesets = num_sig_genesets >= obs_num_sig_genesets
-    ) |> 
-    dplyr::group_by(metaprogram) |> 
-    dplyr::summarize(
-      # calculate p values and retain a column with the observed value
-      num_sig_genesets = unique(obs_num_sig_genesets),
-      num_sig_genesets_pvalue = (sum(greater_than_obs_num_genesets) +1)/(nreps + 1)
-    ) |> 
-    # add adjusted pvalue 
-    dplyr::mutate(
-      num_sig_genesets_adj_pvalue = p.adjust(num_sig_genesets_pvalue, method = "BH")
-    )
-  
-  return(pvalue_df)
-  
-}
-
-# helper function to calculate the total proportion and number of uniquely mapped gene sets
-# geneset_list is a named list of gene sets mapped to each MP after ORA
-prop_unique_mapped_genesets <- function(geneset_list){
-  
-  # count gene sets that appear only once across all metaprograms
-  all_observed_genesets <- unlist(geneset_list) 
-  total_unique_genesets <- length(unique(all_observed_genesets))
-  
-  num_unique_genesets <- sum(table(all_observed_genesets) == 1)
-  proportion_unique_genesets <- num_unique_genesets/total_unique_genesets
-  
-  num_geneset_list <- list(
-    num_unique_genesets = num_unique_genesets,
-    proportion_unique_genesets= proportion_unique_genesets
-  )
-  
-}
-
-# shuffle gene sets assigned to each MP using ORA
-# we shuffle geneset assignments ensuring no duplicates per mp
-# and calculate total numer and proportion of unique gene sets
-# one value per value of k
-permute_unique_genesets <- function(ora_results_df, nreps) {
-  
+  # get gene set weights 
+  geneset_weights <- table(ora_results_df$ID)
   # pool of all significant gene sets across all metaprograms
-  all_genesets <- unique(ora_results_df$ID)
+  all_genesets <- names(geneset_weights)
   
   # get the size (number of sig gene sets) for each metaprogram
   mp_geneset_counts <- ora_results_df |>
@@ -273,17 +258,38 @@ permute_unique_genesets <- function(ora_results_df, nreps) {
     nreps, 
     {
       # keep the total number of genesets the same
-      shuffled_groups <- mp_geneset_counts$geneset_count |> 
+      shuffled_ora_results <- mp_geneset_counts$geneset_count |> 
         purrr::set_names(mp_geneset_counts$metaprogram) |>
         purrr::map(\(count){
           # sample without replacement from the full pool
           # ensuring no duplicate gene sets within a metaprogram
-          sample(all_genesets, count, replace = FALSE)
-        })
-    
-      # get unique gene sets as a data frame
-      unique_stats <- prop_unique_mapped_genesets(shuffled_groups) |> 
-        as.data.frame()
+          sample(all_genesets, count, replace = FALSE, prob = geneset_weights)
+        }) |> 
+        tibble::enframe(name = "metaprogram", value = "ID") |>
+        tidyr::unnest_longer(ID)
+      
+      # number of MPs each gene set is observed in 
+      geneset_prop_df <- shuffled_ora_results |>
+        dplyr::group_by(ID) |>
+        dplyr::summarize(
+          # get the num mps and proportion that each gene set is significant in
+          num_mps = dplyr::n_distinct(metaprogram)
+        ) |>
+        dplyr::mutate(
+          geneset_specificity = 1-(num_mps - 1)/(n_metaprograms - 1)
+        )
+      
+      mp_geneset_counts |> 
+        dplyr::left_join(shuffled_ora_results, by = c("metaprogram")) |> 
+        dplyr::left_join(geneset_prop_df, by = c("ID")) |> 
+        dplyr::summarize(
+          mean_geneset_specificity = mean(geneset_specificity),
+          .by = "metaprogram"
+        ) |> 
+        dplyr::mutate(
+          # get the overall mean across all MPs
+          overall_geneset_specificity = mean(mean_geneset_specificity, na.rm = TRUE)
+        ) 
       
     }, simplify = FALSE
   ) |>
@@ -292,6 +298,45 @@ permute_unique_genesets <- function(ora_results_df, nreps) {
   return(background)
 }
 
+# calculate significance for permutation testing
+# reports a pvalue for a specified statistic 
+calculate_permutation_significance <- function(stat, observed_df, background_df, nreps){
+  
+  # combine the observed values with the background
+  combined_df <- observed_df |> 
+    dplyr::select(
+      metaprogram,
+      obs_value = {{ stat }}
+    ) |> 
+    dplyr::left_join(background_df, by = c("metaprogram")) |> 
+    dplyr::select(-replicate)
+  
+  # calculate the pvalue for num genesets 
+  pvalue_df <- combined_df |> 
+    dplyr::mutate(
+      # indicate which rows have background > or < obs
+      greater_than_obs = {{ stat }} >= obs_value,
+      lower_than_obs = {{ stat }} <= obs_value
+    ) |> 
+    dplyr::group_by(metaprogram) |> 
+    dplyr::summarize(
+      # calculate p values and retain a column with the observed value
+      obs_value = unique(obs_value),
+      greater_pvalue = (sum(greater_than_obs) +1)/(nreps + 1),
+      lower_pvalue = (sum(lower_than_obs) + 1)/(nreps + 1),
+      overall_pvalue = min(greater_pvalue, lower_pvalue) * 2
+    ) |> 
+    # add adjusted pvalue 
+    # depending on the stat will depend on which pvalue we use, either 1 or 2 sided test
+    dplyr::mutate(
+      greater_adj_pvalue = p.adjust(greater_pvalue, method = "BH"), 
+      lower_adj_pvalue = p.adjust(lower_pvalue, method = "BH"),
+      overall_adj_pvalue = p.adjust(overall_pvalue, method = "BH")
+    )
+  
+  return(pvalue_df)
+  
+}
 
 # Read in arguments ------------------------------------------------------------
 
@@ -302,8 +347,14 @@ option_list <- list(
   make_option(
     opt_str = c("--metaprograms_file"),
     type = "character",
-    default = "metaprograms.rds",
+    default = here::here("ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/metaprograms.rds"),
     help = "Path to RDS file containing metaprograms"
+  ),
+  make_option(
+    opt_str = c("--sample_metadata_file"),
+    type = "character",
+    default = here::here("sample-info/sample-metadata.tsv"),
+    help = "Path to TSV file with sample metadata"
   ),
   make_option(
     opt_str = c("--custom_geneset_file"),
@@ -354,6 +405,7 @@ set.seed(opt$seed)
 # make sure inputs are correct
 stopifnot(
   "Metaprograms file does not exist" = file.exists(opt$metaprograms_file),
+  "Sample metadata file does not exist" = file.exists(opt$sample_metadata_file),
   "Custom gene sets file does not exist" = file.exists(opt$custom_geneset_file),
   "MSigDB gene sets file does not exist" = file.exists(opt$msigdb_geneset_file),
   "Gene set categories file does not exist" = file.exists(opt$category_file),
@@ -362,6 +414,11 @@ stopifnot(
 
 # object with metaprogram results
 mp_object <- readr::read_rds(opt$metaprograms_file)
+
+# read in sample metadata
+sample_df <- readr::read_tsv(opt$sample_metadata_file) |> 
+  # keep sample id and then other columns to look at distribution within metaprograms
+  dplyr::select(scpca_sample_id, participant_id, disease_timing, tumor_type)
 
 # read in custom gene lists and EF msigdb gene sets to use for ORA
 ef_msigdb_df <- readr::read_tsv(opt$msigdb_geneset_file)
@@ -383,7 +440,7 @@ max_cor_df <- data.frame(
   max_correlation = rowMax(mp_cor_matrix)
 )
 
-# Difference in medians --------------------------------------------------------
+# Difference in medians/ Coherence ---------------------------------------------
 
 # convert the mp cluster list into a dataframe with one row per spectra
 # use this to get the assigned mp for each cluster/metaprogram when calculating metrics
@@ -420,36 +477,47 @@ mp_medians_df <- mp_cor_df |>
 
 # Sample proportion ------------------------------------------------------------
 
-# get the total number of samples to use as the denominator for proportion
-# use all samples even if they are not all present in the spectra after filtering
+# get the total number of samples/patients to use as the denominator for proportion
+# use all samples/patients even if they are not all present in the spectra after filtering
 total_samples <- length(mp_object$unique_ids)
 
-# count the total number and proportion of samples per mp
-mp_prop_df <- mp_lookup |>
-  dplyr::mutate(sample_id = stringr::str_extract(spectra, "SCPCS[0-9]{6}")) |>
-  dplyr::select(metaprogram, sample_id) |> 
-  dplyr::distinct() |> 
-  dplyr::group_by(metaprogram) |>
-  dplyr::summarize(
-    num_samples = length(sample_id),
-    proportion_of_samples = num_samples / total_samples
+# add sample column 
+mp_clusters_df <- mp_lookup |>
+  dplyr::mutate(sample_id = stringr::str_extract(spectra, "SCPCS[0-9]{6}")) 
+
+# get observed stats
+# includes proportion samples, proption patients, proportion for each disease timing 
+# shannon entropy and effective sample size
+obs_stats_df <- calculate_sample_stats(mp_clusters_df, total_samples, sample_df)
+
+# get the background
+background_mp_stats_df <- replicate(opt$nreps, {
+  # for each rep, shuffle the spectra
+  # keep the distribution of num spectra/ mp the same
+  dplyr::mutate(mp_clusters_df, metaprogram = sample(metaprogram)) |>
+    calculate_sample_stats(total_samples, sample_df)
+}, simplify = FALSE) |>
+  dplyr::bind_rows(.id = "replicate")
+
+# pvalue for neff to add in to the final data frame
+neff_pvalue_df <- calculate_permutation_significance(eff_number_norm,
+                                                     obs_stats_df,
+                                                     background_mp_stats_df,
+                                                     opt$nreps) |> 
+  # select the columns that we want
+  # only care about greater than pvalue
+  dplyr::select(
+    metaprogram,
+    "greater_pvalue_eff_number_norm" = "greater_pvalue",
+    "greater_adj_pvalue_eff_number_norm" = "greater_adj_pvalue"
   )
-
-# Overlap in top genes ---------------------------------------------------------
-
-# get list of top genes for each mp 
-top_genes <- extract_top_genes(mp_list = mp_object$metaprogram_list)
-
-# get the max jaccard between top 200 genes for each MP 
-mp_genes_overlap_df <- max_jaccard(top_genes) |> 
-  dplyr::rename(top_genes_max_jaccard = max_jaccard)
-
 
 # ORA --------------------------------------------------------------------------
 
 # grab hallmarks to use in addition to the custom and Ews specific gene lists 
 hallmarks_msigdb_df <- msigdbr::msigdbr(species = "Homo sapiens", collection = "H") |> 
   dplyr::select(gs_name, ensembl_gene)
+# TODO: add in Gene ontology as a gene set? 
 
 # get genes in the EwS specific gene sets from MSigDB
 ef_msigdb_geneset_df <- prep_msigdb_genesets(ef_msigdb_df)
@@ -459,6 +527,9 @@ all_term_df <- ef_msigdb_geneset_df |>
   dplyr::bind_rows(custom_geneset_df) |> 
   dplyr::bind_rows(hallmarks_msigdb_df) |> 
   tidyr::drop_na()
+
+# extract top genes
+top_genes <- extract_top_genes(mp_object$metaprogram_list)
 
 # get ora results
 ora_results_df <- run_ora(
@@ -470,91 +541,48 @@ ora_results_df <- run_ora(
 # table of number of gene sets per metaprogram 
 num_genesets_df <- get_total_genesets(names(mp_object$metaprogram_list), ora_results_df)
 
-# Gene set proportion ---------------------------------------------------------_
+# Gene set specificity ---------------------------------------------------------
 
-# table of genesets and the proportion of MPs 
-geneset_prop_df <- ora_results_df |> 
-  dplyr::group_by(ID) |>
-  dplyr::summarise(
-    # get the num mps and proportion that each gene set is significant in
-    num_mps = dplyr::n_distinct(metaprogram), 
-    proportion_mps = num_mps/mp_object$n_metaprograms,
-    metaprograms = list(metaprogram)
+# calculate gene set specificity
+obs_specificity_df <- compute_metaprogram_specificity(ora_results_df, mp_object$n_metaprograms)
+
+# Calculate background for gene set specificity 
+background_specificity_df <- permute_specificity(ora_results_df, mp_object$n_metaprograms, opt$nreps)
+
+# calculate pvalue for specificity 
+specificity_pvalue_df <- calculate_permutation_significance(
+  mean_geneset_specificity,
+  obs_specificity_df,
+  background_specificity_df,
+  opt$nreps
   ) |> 
-  dplyr::arrange(desc(proportion_mps)) |> 
-  as.data.frame()
-
-# Jaccard index ----------------------------------------------------------------
-
-# max jaccard between all gene sets identified for each MP
-# get a nested list of groups to compare with names as the MPs and gene sets for each MP
-geneset_groups <- split(ora_results_df$ID, ora_results_df$metaprogram)
-max_jaccard_df <- max_jaccard(groups_list = geneset_groups)
-
-# get the EF activated and EF repressed gene sets to remove from the results
-ews_fli1_genesets <- ef_category_df |> 
-  dplyr::filter(geneset_category %in% c("EF-activated", "EF-repressed")) |> 
-  dplyr::pull(full_geneset_name)
-
-# filter out EF gene sets and recalculate jaccard
-filtered_ora_results_df <- ora_results_df |> 
-  dplyr::filter(!(ID %in% ews_fli1_genesets))
-filtered_geneset_groups <- split(filtered_ora_results_df$ID, filtered_ora_results_df$metaprogram)
-
-max_jaccard_no_ews <- max_jaccard(filtered_geneset_groups) |> 
-  dplyr::rename(max_jaccard_no_ews = max_jaccard)
-
-# Permute ORA ------------------------------------------------------------------
-
-# get the backround distribution for num genesets from ORA
-ora_background_df <- permute_ora(
-  mp_mtx, 
-  nreps = opt$nreps, 
-  gene_universe = mp_object$gene_universe, 
-  term2gene_df = all_term_df
-)
-
-# calculate pvalues 
-ora_pvalue_df <- ora_permutation_significance(num_genesets_df, ora_background_df, opt$nreps)
-
-# Proportion of uniquely mapped gene sets --------------------------------------
-observed_unique_genesets <- prop_unique_mapped_genesets(geneset_groups)
-
-# background distribution for total unique gene sets
-unique_geneset_background_df <- permute_unique_genesets(ora_results_df, opt$nreps) |> 
-  dplyr::mutate(
-    # indicate which rows have background > obs
-    greater_than_obs = num_unique_genesets >= observed_unique_genesets$num_unique_genesets
+  dplyr::select(
+    "metaprogram",
+    "overall_pvalue_geneset_specificity" = "overall_pvalue",
+    "overall_adj_pvalue_geneset_specificity" = "overall_adj_pvalue"
   )
-
-# get a single pvalue 
-unique_genesets_pvalue <- (sum(unique_geneset_background_df$greater_than_obs) +1)/(opt$nreps + 1)
 
 # Combine and export -----------------------------------------------------------
 
 # join all mp metrics 
 mp_metrics_df <- max_cor_df |> 
   dplyr::left_join(mp_medians_df, by = "metaprogram") |> 
-  dplyr::left_join(mp_prop_df, by = "metaprogram") |> 
-  dplyr::left_join(mp_genes_overlap_df, by = "metaprogram") |> 
-  # includes total num genesets and associated pvalues 
-  dplyr::left_join(ora_pvalue_df, by = "metaprogram") |> 
-  # now add in the total proportion of uniquely mapped gene sets and pvalue 
-  # only one value per set of metaprograms so all rows have the same value
-  dplyr::mutate(
-    num_unique_genesets = observed_unique_genesets$num_unique_genesets,
-    proportion_unique_genesets = observed_unique_genesets$proportion_unique_genesets,
-    unique_genesets_pvalue = unique_genesets_pvalue
-  ) |>
-  dplyr::left_join(max_jaccard_no_ews, by = "metaprogram") 
+  # add in all stats
+  dplyr::left_join(obs_stats_df, by = "metaprogram") |> 
+  # add pvalue for neff
+  dplyr::left_join(neff_pvalue_df, by = "metaprogram") |> 
+  # add total number of gene sets for ORA 
+  dplyr::left_join(num_genesets_df, by = "metaprogram") |> 
+  # gene set specificity and pvalue
+  dplyr::left_join(obs_specificity_df, by = "metaprogram") |> 
+  dplyr::left_join(specificity_pvalue_df, by = "metaprogram")
 
-# create an object for exporting with mp metrics, gene set entropy, and ora results
+# create an object for exporting with mp metrics and ora results
 metrics_obj <- list(
   mp_metrics_df = mp_metrics_df,
-  geneset_prop_df = geneset_prop_df,
   ora_results_df = ora_results_df,
-  ora_background_df = ora_background_df, # add in background stats for plotting
-  unique_geneset_background_df = unique_geneset_background_df,
+  background_mp_stats_df = background_mp_stats_df,
+  background_specificity_df = background_specificity_df,
   # add some key parameters which will help when we combine these TSV files across different parameters
   n_metaprograms = mp_object$n_metaprograms,
   cnmf_k_range = mp_object$cnmf_k_range,
