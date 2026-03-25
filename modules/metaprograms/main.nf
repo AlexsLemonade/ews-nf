@@ -91,12 +91,14 @@ process metaprogram_metrics {
           path("metaprograms-metrics.rds")
   script:
     """
-    03-metaprogram-metrics.R \
+    04-metaprogram-metrics.R \
       --metaprograms_file ${metaprograms_file} \
+      --sample_metadata_file ${params.sample_metadata_file} \
       --custom_geneset_file ${custom_genesets_file} \
       --msigdb_geneset_file ${msigdb_genesets_file} \
       --category_file ${gene_set_category_file} \
       --output_file "metaprograms-metrics.rds" \
+      --nreps ${params.nreps} \
       --seed ${params.seed}
     """
   stub:
