@@ -88,7 +88,7 @@ process metaprogram_metrics {
   output:
     tuple val(n_metaprograms), 
           val(metaprograms_publish_dir), 
-          path("metaprograms-metrics.rds")
+          path("*metaprograms-metrics.rds")
   script:
     """
     04-metaprogram-metrics.R \
@@ -97,13 +97,13 @@ process metaprogram_metrics {
       --custom_geneset_file ${custom_genesets_file} \
       --msigdb_geneset_file ${msigdb_genesets_file} \
       --category_file ${gene_set_category_file} \
-      --output_file "metaprograms-metrics.rds" \
+      --output_file "k_${n_metaprograms}_metaprograms-metrics.rds" \
       --nreps ${params.nreps} \
       --seed ${params.seed}
     """
   stub:
     """
-    touch "metaprograms-metrics.rds"
+    touch "k_${n_metaprograms}_metaprograms-metrics.rds"
     """
 }
 
