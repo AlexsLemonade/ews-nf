@@ -74,26 +74,6 @@ set.seed(params$seed)
 sig_value <- 0.05
 ```
 
-TODO: Remove this and just use the params input 
-```{r}
-#metaprograms results directory
-results_dir <- here::here("ews-nf-out", "metaprograms")
-
-# params we are looking at in this particular notebook 
-# use these to construct the file paths 
-n_metaprograms <- seq(5, 15, 1)
-
-# directories with metaprogram results 
-# one directory per n_metaprogram
-metaprogram_output_dirs <- file.path(
-  results_dir, 
-  glue::glue("metaprograms-{n_metaprograms}_cnmf-5-10-15_filtered")
-)
-
-# path to files with each of the metrics
-metrics_rds_files <- file.path(metaprogram_output_dirs, "metaprograms-metrics.rds")
-```
-
 
 ```{r}
 # list of all metrics files
