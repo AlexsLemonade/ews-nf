@@ -131,12 +131,14 @@ This section will summarize the proportion of samples and patients found in each
 Any metaprograms that are only defined by a single patient will be flagged.
 
 ```{r}
-# TODO: total number of samples 
+# display total samples and patients
+# compute this number from the proportion of samples/patients in each metaprogram
 num_samples <- unique(mp_metrics_df$num_samples/mp_metrics_df$proportion_of_samples)
-
 num_patients <- unique(mp_metrics_df$num_patients/mp_metrics_df$proportion_of_patients)
 
-glue::glue("The metaprograms explored here are comprised of {num_samples} **samples** from {num_patients} **patients**.")
+knitr::asis_output(
+  glue::glue("The metaprograms explored here are comprised of **{num_samples} samples** from **{num_patients} patients**.")
+)
 ```
 
 
