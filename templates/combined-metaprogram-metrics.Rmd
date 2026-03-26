@@ -261,6 +261,12 @@ plot_permutation_results(neff_background_df, neff_obs_df, metaprogram, eff_numbe
     y = "Normalized effective sample size",
     x = "Metaprogram",
     color = "significant"
+  ) +
+  theme(
+    axis.title = element_text(size = 14),
+    strip.text = element_text(size = 14),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 14)
   )
 ```
 
