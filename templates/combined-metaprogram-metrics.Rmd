@@ -131,7 +131,7 @@ knitr::asis_output(
 ### Proportion of samples 
 
 Here each dot is a metaprogram and the value indicated is the proportion of total **samples** represented by spectra in that metaprogram. 
-The dotted line indicates 10%. 
+The dotted line indicates 10% which may help identify any metaprograms with a low representation of samples and/or patients. 
 
 ```{r}
 ggplot(mp_metrics_df, aes(x = n_metaprograms, y = proportion_of_samples)) +
@@ -147,7 +147,7 @@ ggplot(mp_metrics_df, aes(x = n_metaprograms, y = proportion_of_samples)) +
 ### Proportion of patients 
 
 Here each dot is a metaprogram and the value indicated is the proportion of total **patients** represented by spectra in that metaprogram. 
-The dotted line indicates 10% which may help identify any metaprograms with a low representation of samples and/or patients. 
+Again, the dotted line indicates 10%. 
 
 ```{r}
 ggplot(mp_metrics_df, aes(x = n_metaprograms, y = proportion_of_patients)) +
