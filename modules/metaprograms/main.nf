@@ -205,11 +205,13 @@ process combined_metaprogram_report {
   script:
     def metrics_file_string = metrics_files.join(',')
     def scores_file_string = scores_files.join(',')
+    def background_scores_files_string = background_scores_files.join(',')
     """
     Rscript -e "rmarkdown::render('${template_file}', \
       output_file = 'combined-metaprograms-metrics.html',\
       params = list(metrics_file_list = '${metrics_file_string}', \
                     scores_file_list = '${scores_file_string}', \
+                    background_scores_file_list = '${background_scores_files_string}', \
                     seed = '${params.seed}'))"
     """
   stub:
