@@ -250,7 +250,41 @@ plot_permutation_results(global_background_df, var_pvalue_df, metaprogram, score
 Here the background distributions vary from metaprogram to metaprogram. 
 We see some observed values that are below the background and if we used a two sided test might show up as significant. 
 However, we are only interested in those that have higher variance than background. 
-I wonder if the differences in the background score distributions across the metaprograms is going to make this hard to interpret? 
+
+It's interesting that the CV background distributions are so uniform but the variance distributions are more variable. 
+Could the variance be directly impacted by mean gene expression? 
+Let's look at the mean expression to see how those distributions look.
+
+```{r}
+#| fig.height: 10
+#| fig.width: 10
+ggplot(global_background_df, aes(y = global_mean, x = metaprogram)) + 
+  ggforce::geom_sina(size = 0.1) +
+  facet_wrap(vars(n_metaprograms), scales = "free_x") +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+```
+
+These distributions very much mirror what we see for the variance, where metaprograms like MP09 have high mean and high variance. 
+In contrast, metaprograms with low mean expression have low variance. 
+Let's double check this by looking at the correlation of these two values. 
+
+```{r}
+ggplot(global_background_df, aes(x = global_mean, y= score_var)) +
+  geom_point()
+```
+
+Yup, as expected, there's a direct relationship between the mean expression and variance. 
+What about with the CV? 
+
+```{r}
+ggplot(global_background_df, aes(x = global_mean, y= score_cv)) +
+  geom_point()
+```
+
+There doesn't appear to be a clear relationship here. 
+I think this is a good argument to use the CV. 
 
 ## Proportion of metaprograms with significant CV
 
