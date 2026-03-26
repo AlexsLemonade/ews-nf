@@ -20,30 +20,30 @@ Metrics included in this notebook will be used to identify the optimal value of 
 
 ## Set Up
 
-```{r, define_functions}
+```{r}
 # helper function for plotting permutation results
 # plots background points with observed values in color on top as sina plot
 plot_permutation_results <- function(background_df, pvalue_df, x_axis, y_axis){
   
   ggplot(background_df, aes(x = {{ x_axis }}, y = {{ y_axis }})) +
-  ggforce::geom_sina(
-    color = "gray",
-    alpha = 0.1
-  ) +
-  geom_point(
-    data = pvalue_df,
-    aes(
-      x = {{ x_axis }},
-      y = {{ y_axis }},
-      color = is_significant
-    ),
-    size  = 3,
-    shape = 18  # diamond
-  ) +
-  scale_color_manual(values = c(`TRUE` = "red", `FALSE` = "blue")) +
-  theme(
-    axis.text.x = element_text(angle = 90)
-  )
+    ggforce::geom_sina(
+      color = "gray",
+      alpha = 0.1
+    ) +
+    geom_point(
+      data = pvalue_df,
+      aes(
+        x = {{ x_axis }},
+        y = {{ y_axis }},
+        color = is_significant
+      ),
+      size  = 3,
+      shape = 18  # diamond
+    ) +
+    scale_color_manual(values = c(`TRUE` = "red", `FALSE` = "blue")) +
+    theme(
+      axis.text.x = element_text(angle = 90)
+    )
   
 }
 
@@ -88,7 +88,8 @@ options(DT.options = list(
   scrollX = TRUE,
   scrollY = "400px",
   scrollCollapse = TRUE,
-  paging = FALSE
+  paging = FALSE,
+  searching = FALSE
 ))
 
 set.seed(params$seed)
@@ -115,14 +116,14 @@ metrics_list <- metrics_rds_files |>
 
 # pull out n_metaprograms to use as names of the list
 n_metaprograms <- metrics_list |> 
-  purrr::map_dbl(\(list) list$n_metaprograms)
+  purrr::map_dbl("n_metaprograms")
 
 names(metrics_list) <- sprintf("k_%02d", n_metaprograms)
 
 # create dataframe with one row per metaprogram/n_metaprogram (k) combination 
 # each column is a metric for that metaprograms
 mp_metrics_df <- metrics_list |> 
-  purrr::map(\(list) list$mp_metrics_df) |> 
+  purrr::map("mp_metrics_df") |> 
   dplyr::bind_rows(.id = "n_metaprograms")
 ```
 
@@ -135,11 +136,16 @@ Any metaprograms that are only defined by a single patient will be flagged.
 ```{r}
 # display total samples and patients
 # compute this number from the proportion of samples/patients in each metaprogram
-num_samples <- unique(mp_metrics_df$num_samples/mp_metrics_df$proportion_of_samples)
-num_patients <- unique(mp_metrics_df$num_patients/mp_metrics_df$proportion_of_patients)
+total_samples <- metrics_list |> 
+  purrr::map_dbl("total_samples") |> 
+  unique()
+
+num_patients <- metrics_list |> 
+  purrr::map_dbl("total_patients") |> 
+  unique()
 
 knitr::asis_output(
-  glue::glue("The metaprograms explored here are comprised of **{num_samples} samples** from **{num_patients} patients**.")
+  glue::glue("The metaprograms explored here are comprised of **{total_samples} samples** from **{total_patients} patients**.")
 )
 ```
 
@@ -147,7 +153,7 @@ knitr::asis_output(
 ### Proportion of samples 
 
 Here each dot is a metaprogram and the value indicated is the proportion of total **samples** represented by spectra in that metaprogram. 
-The dotted line indicates 10%. 
+The dotted line indicates 10% which may help identify any metaprograms with a low representation of samples and/or patients. 
 
 ```{r}
 ggplot(mp_metrics_df, aes(x = n_metaprograms, y = proportion_of_samples)) +
@@ -163,7 +169,7 @@ ggplot(mp_metrics_df, aes(x = n_metaprograms, y = proportion_of_samples)) +
 ### Proportion of patients 
 
 Here each dot is a metaprogram and the value indicated is the proportion of total **patients** represented by spectra in that metaprogram. 
-The dotted line indicates 10%. 
+Again, the dotted line indicates 10%. 
 
 ```{r}
 ggplot(mp_metrics_df, aes(x = n_metaprograms, y = proportion_of_patients)) +
@@ -183,11 +189,13 @@ mp_metrics_df |>
   dplyr::group_by(n_metaprograms) |> 
   dplyr::summarize(
     single_patient_mps = sum(num_patients == 1),
-    min_num_patients_per_mp = min(num_patients)
+    min_num_patients_per_mp = min(num_patients),
+    min_proportion_patients_per_mp = min(num_patients)/total_patients
   ) |> 
   DT::datatable(
-    colnames = c("k", "Metaprograms from 1 patient", "Minimum number of patients observed in a metaprogram")
-  )
+    colnames = c("k", "Metaprograms from 1 patient", "Minimum number of patients observed in a metaprogram", "Minimum percentage of patients observed in a metaprogram")
+  ) |> 
+  DT::formatPercentage("min_proportion_patients_per_mp")
 ```
 
 ### Representation across sample types 
@@ -237,15 +245,15 @@ ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_typ
 ### Normalized effective sample size 
 
 Here we will look at the normalized effective species size or Hill number of order 1. 
-This is calculated by taking the exponential of Shannon's entropy and represents the effective number of common or abundant species. 
+This is calculated by taking the exponential of Shannon's entropy and represents the effective number of common or abundant samples. 
 Here we are looking for a number close to the total possible samples in that metaprogram. 
 The values are normalized by the total number of samples in the metaprogram such that values close to 1 indicate all samples are equally abundant.
 
 To determine if the observed effective sample size is not due to random chance, we performed permutation testing. 
-The spectra assigned to each metaprogram were shuffled hile preserving the total number of spectra assigned to each metaprogram. 
-After shuffling, the normalized effective sample size is shuffled to create a null distribution. 
+The spectra assigned to each metaprogram were shuffled while preserving the total number of spectra assigned to each metaprogram. 
+After shuffling, the normalized effective sample size was calculated to create a null distribution. 
 
-The observed value is compared to the null distribution to get an empirical pvalue, producing a single pvalue for each metaprogram within a value of k.
+The observed value was compared to the null distribution to get an empirical p-value, producing a single p-value for each metaprogram within a value of k.
 The below plot shows both the null distribution in gray and the observed value for each metaprogram. 
 The observed values are colored in red if they are significantly greater than the null distribution. 
 
@@ -266,15 +274,21 @@ neff_background_df <- metrics_list |>
 
 
 ```{r}
-#| fig.height: 10
-#| fig.width: 10
+#| fig.height: 15
+#| fig.width: 15
 
 plot_permutation_results(neff_background_df, neff_obs_df, metaprogram, eff_number_norm) +
-  facet_wrap(vars(n_metaprograms), scale = "free_x") +
+  facet_wrap(vars(n_metaprograms), scale = "free_x", ncol = 3) +
   labs(
     y = "Normalized effective sample size",
     x = "Metaprogram",
-    color = "significance"
+    color = "significant"
+  ) +
+  theme(
+    axis.title = element_text(size = 14),
+    strip.text = element_text(size = 14),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 14)
   )
 ```
 
