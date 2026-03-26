@@ -386,7 +386,7 @@ k_values <- stringr::str_remove(coherence_elbow_df$n_metaprograms, "k_") |>
 elbow_value <- kneedle(k_values, coherence_elbow_df$median_coherence, concave = TRUE)
 
 knitr::asis_output(
-  glue::glue("Value of k corresponding to the elbow: {elbow_value}")
+  glue::glue("**Value of k corresponding to the elbow: {elbow_value}**")
 )
 ```
 
@@ -400,6 +400,7 @@ The `*` indicates the slope is significantly different from zero and the `ns` in
 patient_coherence_df <- mp_metrics_df |>
   dplyr::group_by(n_metaprograms) |>
   dplyr::summarize(
+    # run lm each time since we can't store the results directly in the data frame
     r_squared = summary(lm(median_difference ~ num_patients))$r.squared,
     slope = coef(lm(median_difference ~ num_patients))[["num_patients"]],
     p_value = summary(lm(median_difference ~ num_patients))$coefficients["num_patients", "Pr(>|t|)"], 
