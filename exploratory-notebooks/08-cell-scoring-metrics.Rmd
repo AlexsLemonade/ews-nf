@@ -411,58 +411,67 @@ To combat that we could try and use a linear mixed effects model that considers 
 We'll use ANOVA to do this and run it with and without considering participant ID as a random effect.
 
 ```{r}
+# helper function to calculate anova on a dataframe
+calculate_anova <- function(df, random_effect = NULL){
+  if (!is.null(random_effect)) {
+    # create formula with random effect
+    formula <- as.formula(glue::glue("log_mean_mp_score ~ disease_timing + (1 | {random_effect})"))
+    mod <- lmerTest::lmer(formula, data = df)
+    # Overall p-value for disease_timing (type III ANOVA)
+    anova_res <- anova(mod) |>
+      as.data.frame() |>
+      tibble::rownames_to_column("term")
+  } else {
+    # no random effect so use a regular ANOVA
+    mod <- lm(log_mean_mp_score ~ disease_timing, data = df)
+    anova_res <- anova(mod) |>
+      as.data.frame() |>
+      tibble::rownames_to_column("term") |>
+      dplyr::filter(term != "Residuals")
+  }
+  
+  return(anova_res)
+}
+
 # ANOVA test with/without random effect on log(mean mp score)
-run_anova <- function(data, sig_value, random_effect = NULL) {
+grouped_anova <- function(data, sig_value, random_effect = NULL) {
+  
   # for each metaprogram for each value of k, use a linear mixed effect model 
   # then use ANOVA to calculate pvalues 
-  results <- data |>
+  anova_results <- data |>
     dplyr::group_by(metaprogram, n_metaprograms) |>
-    dplyr::group_modify(\(df){
-      
-      if (!is.null(random_effect)) {
-        # create formula with random effect
-        formula <- as.formula(glue::glue("log_mean_mp_score ~ disease_timing + (1 | {random_effect})"))
-        mod <- lmerTest::lmer(formula, data = .x)
-        # Overall p-value for disease_timing (type III ANOVA)
-        anova_res <- anova(mod) |>
-          as.data.frame() |>
-          tibble::rownames_to_column("term")
-      } else {
-        # no random effect so use a regular ANOVA
-        mod <- lm(log_mean_mp_score ~ disease_timing, data = .x)
-        anova_res <- anova(mod) |>
-          as.data.frame() |>
-          tibble::rownames_to_column("term") |>
-          dplyr::filter(term != "Residuals")
-      }
-      
+    # using a lambda function requires two arguments
+    # can use ... to absorb the second one
+    dplyr::group_modify(\(df, ...) {
+      calculate_anova(df, random_effect)
     }) |>
     # classify as significant or not
     dplyr::rename(f_value = `F value`, p_value = `Pr(>F)`) |>
     dplyr::mutate(
       p_adj = p.adjust(p_value, method = "BH"),
       p_adj_signif = dplyr::if_else(p_adj <= sig_value, "*", "ns")
-    ) |>
+    ) 
+  
+  full_results <- anova_results |>
     # join with data/scores for plotting 
     dplyr::left_join(
       data |>
-        dplyr::group_by(metaprogram, n_metaprograms) |>
         # we'll plot with zscore so want to use that to determine the y position of the label
-        dplyr::summarize(y.position = max(zscore_mean_mp_score, na.rm = TRUE) + 0.3),
-      by = c("metaprogram", "n_metaprograms")
+        dplyr::summarize(max_mean_score = max(zscore_mean_mp_score, na.rm = TRUE),
+                         .by = c("n_metaprograms", "metaprogram"))
     )
   
-  return(results)
+  return(full_results)
 }
 ```
 
 
 ```{r}
 # plain ANOVA
-plain_lmm_results <- run_anova(mean_scores_df, sig_value)
+plain_lmm_results <- grouped_anova(mean_scores_df, sig_value)
 
 # with random effect
-random_effect_lmm_results <- run_anova(mean_scores_df, sig_value, random_effect = "participant_id")
+random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value, random_effect = "participant_id")
 ```
 
 
@@ -471,7 +480,7 @@ ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = dis
   geom_boxplot(outlier.size = 0.1) +
   geom_text(
     data = plain_lmm_results,
-    aes(x = metaprogram, y = y.position, label = p_adj_signif),
+    aes(x = metaprogram, y = max_mean_score + 0.3, label = p_adj_signif),
     inherit.aes = FALSE
   ) +
   facet_wrap(vars(n_metaprograms), 
