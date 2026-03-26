@@ -315,9 +315,9 @@ In that PR we modify the nextflow process to export cell scores which will affec
 
 ## Coherence 
 
-Metaprograms should show coherence, meaning the spectra that comprise the metaprogram are more similar to other spectra in the same metaprogram than to spectra in other metaprogram. 
+Metaprograms should show coherence, meaning the spectra that comprise the metaprogram are more similar to other spectra in the same metaprogram than to spectra in different metaprograms. 
 To measure this, we calculated the correlation of each spectra to all other spectra. 
-We then calculate the difference in medians between the distribution of correlation of spectra within a given metaprogram and between metaprograms, indicated as "Median coherence" throughout this report. 
+We then calculate the difference in medians between the distribution of correlation of spectra within a given metaprogram and between metaprograms, indicated as "coherence" throughout this report. 
 
 Metaprograms with coherence <= 0.1 are likely to represent noise and will not be used in further analysis.
 
@@ -345,9 +345,10 @@ The table below shows the overall percentage of metaprograms with coherence > 0.
 coherence_df |> 
   dplyr::group_by(n_metaprograms) |> 
   dplyr::summarize(
-    proportion_passing_coherence = sum(is_passing)/dplyr::n()
+    num_passing_coherence = sum(is_passing),
+    proportion_passing_coherence = num_passing_coherence/dplyr::n()
   ) |> 
-  DT::datatable(colnames = c("k", "% of metaprograms with median coherence > 0.1")) |> 
+  DT::datatable(colnames = c("k", "Number of metaprograms with coherence > 0.1", "% of metaprograms with coherence > 0.1")) |> 
   DT::formatPercentage("proportion_passing_coherence", 2)
 ```
 
@@ -369,7 +370,7 @@ ggplot(coherence_elbow_df, aes(x = n_metaprograms, median_coherence)) +
   geom_point() +
   labs(
     x = "Number of metaprograms (k)",
-    y = "Overall median coherence"
+    y = "Median coherence"
   )
 ```
 
@@ -383,11 +384,16 @@ k_values <- stringr::str_remove(coherence_elbow_df$n_metaprograms, "k_") |>
   as.numeric()
 
 elbow_value <- kneedle(k_values, coherence_elbow_df$median_coherence, concave = TRUE)
-elbow_value
+
+knitr::asis_output(
+  glue::glue("Value of k corresponding to the elbow: {elbow_value}")
+)
 ```
 
 This plot shows the relationship of coherence with number of patients represented in a metaprogram. 
 A negative correlation would suggest that metaprograms specific to a smaller subset of patients tend to have higher coherence, potentially reflecting patient-specific biological signals rather than broadly shared ones.
+The R-squared shown in the plot indicates the strength of the correlation. 
+The `*` indicates the slope is significantly different from zero and the `ns` indicates the slope is not significantly different from zero.
 
 ```{r}
 # calculate the r2 and pvalue 
