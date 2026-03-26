@@ -98,7 +98,7 @@ process metaprogram_metrics {
   output:
     tuple val(n_metaprograms), 
           val(metaprograms_publish_dir), 
-          path("*metaprograms-metrics.rds")
+          path("k_${n_metaprograms}_metaprograms-metrics.rds")
   script:
     """
     04-metaprogram-metrics.R \
@@ -117,6 +117,7 @@ process metaprogram_metrics {
     """
 }
 
+// used for individual k values
 process individual_metaprogram_report {
   container params.ews_nf_container
   tag "${n_metaprograms}_metaprograms"
@@ -153,6 +154,7 @@ process individual_metaprogram_report {
     """
 }
 
+// used for comparing across k values
 process combined_metaprogram_report {
   container params.ews_nf_container
   label 'mem_24'

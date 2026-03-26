@@ -20,7 +20,6 @@ Metrics included in this notebook will be used to identify the optimal value of 
 
 ## Set Up
 
-```{r, define_functions}
 # helper function for plotting permutation results
 # plots background points with observed values in color on top as sina plot
 plot_permutation_results <- function(background_df, pvalue_df, x_axis, y_axis){
@@ -220,10 +219,10 @@ Here we are looking for a number close to the total possible samples in that met
 The values are normalized by the total number of samples in the metaprogram such that values close to 1 indicate all samples are equally abundant.
 
 To determine if the observed effective sample size is not due to random chance, we performed permutation testing. 
-The spectra assigned to each metaprogram were shuffled hile preserving the total number of spectra assigned to each metaprogram. 
-After shuffling, the normalized effective sample size is shuffled to create a null distribution. 
+The spectra assigned to each metaprogram were shuffled while preserving the total number of spectra assigned to each metaprogram. 
+After shuffling, the normalized effective sample size was shuffled to create a null distribution. 
 
-The observed value is compared to the null distribution to get an empirical pvalue, producing a single pvalue for each metaprogram within a value of k.
+The observed value was compared to the null distribution to get an empirical p-value, producing a single p-value for each metaprogram within a value of k.
 The below plot shows both the null distribution in gray and the observed value for each metaprogram. 
 The observed values are colored in red if they are significantly greater than the null distribution. 
 
@@ -252,7 +251,7 @@ plot_permutation_results(neff_background_df, neff_obs_df, metaprogram, eff_numbe
   labs(
     y = "Normalized effective sample size",
     x = "Metaprogram",
-    color = "significance"
+    color = "significant"
   )
 ```
 
