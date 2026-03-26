@@ -140,7 +140,7 @@ total_samples <- metrics_list |>
   purrr::map_dbl("total_samples") |> 
   unique()
 
-num_patients <- metrics_list |> 
+total_patients <- metrics_list |> 
   purrr::map_dbl("total_patients") |> 
   unique()
 
