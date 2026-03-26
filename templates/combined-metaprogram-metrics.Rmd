@@ -252,11 +252,11 @@ neff_background_df <- metrics_list |>
 
 
 ```{r}
-#| fig.height: 10
+#| fig.height: 15
 #| fig.width: 15
 
 plot_permutation_results(neff_background_df, neff_obs_df, metaprogram, eff_number_norm) +
-  facet_wrap(vars(n_metaprograms), scale = "free_x") +
+  facet_wrap(vars(n_metaprograms), scale = "free_x", ncol = 3) +
   labs(
     y = "Normalized effective sample size",
     x = "Metaprogram",
