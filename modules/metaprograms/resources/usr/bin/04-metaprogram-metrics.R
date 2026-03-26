@@ -588,7 +588,9 @@ metrics_obj <- list(
   cnmf_k_range = mp_object$cnmf_k_range,
   filter_spectra = mp_object$filter_spectra,
   orphan_cutoff = mp_object$orphan_cutoff,
-  removed_unique_ids = mp_object$removed_unique_ids
+  removed_unique_ids = mp_object$removed_unique_ids,
+  total_samples = total_samples,
+  total_patients = length(unique(sample_df$participant_id))
 )
 
 readr::write_rds(metrics_obj, opt$output_file)

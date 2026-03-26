@@ -133,7 +133,7 @@ process metaprogram_metrics {
   output:
     tuple val(n_metaprograms), 
           val(metaprograms_publish_dir), 
-          path("metaprograms-metrics.rds")
+          path("k_${n_metaprograms}_metaprograms-metrics.rds")
   script:
     """
     04-metaprogram-metrics.R \
@@ -142,17 +142,18 @@ process metaprogram_metrics {
       --custom_geneset_file ${custom_genesets_file} \
       --msigdb_geneset_file ${msigdb_genesets_file} \
       --category_file ${gene_set_category_file} \
-      --output_file "metaprograms-metrics.rds" \
+      --output_file "k_${n_metaprograms}_metaprograms-metrics.rds" \
       --nreps ${params.nreps} \
       --seed ${params.seed}
     """
   stub:
     """
-    touch "metaprograms-metrics.rds"
+    touch "k_${n_metaprograms}_metaprograms-metrics.rds"
     """
 }
 
-process metaprogram_report {
+// used for individual k values
+process individual_metaprogram_report {
   container params.ews_nf_container
   tag "${n_metaprograms}_metaprograms"
   label 'mem_24'
@@ -185,6 +186,31 @@ process metaprogram_report {
   stub:
     """
     touch "metaprograms-summary-report.html"
+    """
+}
+
+// used for comparing across k values
+process combined_metaprogram_report {
+  container params.ews_nf_container
+  label 'mem_24'
+  time '2h'
+  publishDir "${params.outdir}/metaprograms", mode: 'copy'
+  input:
+    path metrics_files
+    path template_file
+  output:
+    path "combined-metaprograms-metrics.html"
+  script:
+    def metrics_file_string = metrics_files.join(',')
+    """
+    Rscript -e "rmarkdown::render('${template_file}', \
+      output_file = 'combined-metaprograms-metrics.html',\
+      params = list(metrics_file_list = '${metrics_file_string}', \
+                    seed = '${params.seed}'))"
+    """
+  stub:
+    """
+    touch "combined-metaprograms-metrics.html"
     """
 }
 
@@ -237,20 +263,31 @@ workflow metaprograms {
     )
 
     // render report
-    // define path to template report 
-    report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
+    // define path to template reports
+    individual_report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
+    combined_report_template_file = "${projectDir}/templates/combined-metaprogram-metrics.Rmd"
 
     report_ch = generate_metaprograms.out
       // joining on n_metaprograms and publish dir
       // drop the background files before joining
       .join(grouped_score_ch.map { it.dropRight(1) }, by: [0,1])
 
-    metaprogram_report(
+    individual_metaprogram_report(
       report_ch,
-      file(report_template_file),
+      file(individual_report_template_file),
       file(params.custom_genesets_file),
       file(params.msigdb_genesets_file),
       file(params.gene_set_category_file)
+    )
+
+    // collect all metrics files for the combined report
+    metrics_ch = metaprogram_metrics.out
+      .collect{ n_metaprograms, metaprograms_publish_dir, metrics_file -> metrics_file }
+
+    // render combined report
+    combined_metaprogram_report(
+      metrics_ch,
+      file(combined_report_template_file)
     )
 
   emit:
