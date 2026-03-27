@@ -339,8 +339,8 @@ ggplot(coherence_df, aes(x = n_metaprograms, y = median_difference)) +
 
 ```
 
-In looking at the distribution of median coherence values across k, we see that after certain values of k increasing k doesn't provide any more increase in the observed coherence. 
-To show this, we make an elbow plot showing the median difference for each value of k and find the elbow.
+This plot suggests that increasing k doesn't improve metaprogram coherence after certain values of k. 
+We therefore make an elbow plot showing the median coherence for each value of k and find the elbow.
 
 ```{r}
 # get the median coherence for each value of k to plot
@@ -363,14 +363,16 @@ ggplot(coherence_elbow_df, aes(x = n_metaprograms, median_coherence)) +
 
 We then use a modified version of the [kneedle algorithm](https://raghavan.usc.edu/papers/kneedle-simplex11.pdf) to identify the elbow. 
 Here we only find one global maximum rather than a set of local maxima. 
-Values of k greater than the elbow mean that we see no substantial gain of coherence over the lower values of k. 
+Values of k greater than the elbow indicate no substantial gain of coherence over the lower values of k. 
 
 ```{r}
 # pull out k as numeric
-k_values <- stringr::str_remove(coherence_elbow_df$n_metaprograms, "k_") |> 
-  as.numeric()
-
-elbow_value <- kneedle(k_values, coherence_elbow_df$median_coherence, concave = TRUE)
+elbow_value <- stringr::str_remove(coherence_elbow_df$n_metaprograms, "k_") |> 
+  as.numeric() |>
+  kneedle(
+    coherence_elbow_df$median_coherence, 
+    concave = TRUE
+  )
 
 knitr::asis_output(
   glue::glue("**Value of k corresponding to the elbow: {elbow_value}**")
@@ -380,9 +382,11 @@ knitr::asis_output(
 This plot shows the relationship of coherence with number of patients represented in a metaprogram. 
 A negative correlation would suggest that metaprograms specific to a smaller subset of patients tend to have higher coherence, potentially reflecting patient-specific biological signals rather than broadly shared ones.
 The R-squared shown in the plot indicates the strength of the correlation. 
-The `*` indicates the slope is significantly different from zero and the `ns` indicates the slope is not significantly different from zero.
+The `*` indicates the slope is significantly different from zero, and the `ns` indicates the slope is not significantly different from zero.
 
 ```{r}
+#| message: false
+
 # calculate the r2 and pvalue 
 patient_coherence_df <- mp_metrics_df |>
   dplyr::group_by(n_metaprograms) |>
@@ -396,7 +400,7 @@ patient_coherence_df <- mp_metrics_df |>
     plot_label = glue::glue("R^2=='{round(r_squared, 3)} {sig_label}'")
   )
 
-# plot the number of patients x coherence
+# plot the coherence x number of patients
 ggplot(mp_metrics_df, aes(x = num_patients, y = median_difference)) +
   geom_point() +
   facet_wrap(vars(n_metaprograms)) +
@@ -413,7 +417,8 @@ ggplot(mp_metrics_df, aes(x = num_patients, y = median_difference)) +
   labs(
     x = "Number of patients",
     y = "Coherence"
-  )
+  ) + 
+  theme(axis.text.x = element_text(angle = 0))
 ```
 
 
