@@ -9,8 +9,8 @@ output:
     number_sections: false
     code_folding: hide
 params:
-  metrics_file_list: "~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-5_cnmf-5-10-15_filtered/k_5_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-6_cnmf-5-10-15_filtered/k_6_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k_7_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-8_cnmf-5-10-15_filtered/k_8_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-9_cnmf-5-10-15_filtered/k_9_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/k_10_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k_11_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-12_cnmf-5-10-15_filtered/k_12_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-13_cnmf-5-10-15_filtered/k_13_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-14_cnmf-5-10-15_filtered/k_14_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-15_cnmf-5-10-15_filtered/k_15_metaprograms-metrics.rds"
-  scores_file_list: "~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-5_cnmf-5-10-15_filtered/k-5_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-6_cnmf-5-10-15_filtered/k-6_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k-7_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-8_cnmf-5-10-15_filtered/k-8_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-9_cnmf-5-10-15_filtered/k-9_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/k-10_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k-11_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-12_cnmf-5-10-15_filtered/k-12_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-13_cnmf-5-10-15_filtered/k-13_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-14_cnmf-5-10-15_filtered/k-14_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-15_cnmf-5-10-15_filtered/k-15_metaprogram_scores.tsv"
+  metrics_file_list: NULL
+  scores_file_list: NULL
   background_scores_file_list: NULL
   seed: 2026
 ---
@@ -621,7 +621,7 @@ pvalue_df <- gss_background_df |>
 ```{r}
 plot_permutation_results(gss_background_df, pvalue_df, n_metaprograms, overall_geneset_specificity) +
   labs(
-    y = "Gene set specificity",
+    y = "Mean gene set specificity",
     x = "Metaprogram",
     color = "significant"
   ) 
