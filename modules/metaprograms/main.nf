@@ -95,23 +95,23 @@ process combine_score_files {
           path(background_score_files) // list of background score files for each sample
   output:
     tuple val(n_metaprograms),
-          path("${n_metaprograms}_metaprogram_scores.tsv"),
-          path("${n_metaprograms}_scores_background.tsv")
+          path("k-${n_metaprograms}_metaprogram_scores.tsv"),
+          path("k-${n_metaprograms}_background_scores.tsv")
   script:
     """
     03a-combine-score-files.R \
       --input_tsv_files ${score_files.join(',')} \
-      --output_file "${n_metaprograms}_metaprogram_scores.tsv"
+      --output_file "k-${n_metaprograms}_metaprogram_scores.tsv"
 
     03a-combine-score-files.R \
       --input_tsv_files ${background_score_files.join(',')} \
-      --output_file "${n_metaprograms}_scores_background.tsv"
+      --output_file "k-${n_metaprograms}_background_scores.tsv"
     """
 
   stub:
     """
-    touch ${n_metaprograms}_metaprogram_scores.tsv
-    touch ${n_metaprograms}_scores_background.tsv
+    touch "k-${n_metaprograms}_metaprogram_scores.tsv"
+    touch "k-${n_metaprograms}_background_scores.tsv"
     """
 }
 
@@ -133,7 +133,7 @@ process metaprogram_metrics {
   output:
     tuple val(n_metaprograms), 
           val(metaprograms_publish_dir), 
-          path("k_${n_metaprograms}_metaprograms-metrics.rds")
+          path("k-${n_metaprograms}_metaprograms-metrics.rds")
   script:
     """
     04-metaprogram-metrics.R \
@@ -142,13 +142,13 @@ process metaprogram_metrics {
       --custom_geneset_file ${custom_genesets_file} \
       --msigdb_geneset_file ${msigdb_genesets_file} \
       --category_file ${gene_set_category_file} \
-      --output_file "k_${n_metaprograms}_metaprograms-metrics.rds" \
+      --output_file "k-${n_metaprograms}_metaprograms-metrics.rds" \
       --nreps ${params.nreps} \
       --seed ${params.seed}
     """
   stub:
     """
-    touch "k_${n_metaprograms}_metaprograms-metrics.rds"
+    touch "k-${n_metaprograms}_metaprograms-metrics.rds"
     """
 }
 
@@ -197,15 +197,21 @@ process combined_metaprogram_report {
   publishDir "${params.outdir}/metaprograms", mode: 'copy'
   input:
     path metrics_files
+    path scores_files
+    path background_scores_files
     path template_file
   output:
     path "combined-metaprograms-metrics.html"
   script:
     def metrics_file_string = metrics_files.join(',')
+    def scores_file_string = scores_files.join(',')
+    def background_scores_files_string = background_scores_files.join(',')
     """
     Rscript -e "rmarkdown::render('${template_file}', \
       output_file = 'combined-metaprograms-metrics.html',\
       params = list(metrics_file_list = '${metrics_file_string}', \
+                    scores_file_list = '${scores_file_string}', \
+                    background_scores_file_list = '${background_scores_files_string}', \
                     seed = '${params.seed}'))"
     """
   stub:
@@ -284,9 +290,18 @@ workflow metaprograms {
     metrics_ch = metaprogram_metrics.out
       .collect{ n_metaprograms, metaprograms_publish_dir, metrics_file -> metrics_file }
 
+    // collect all score and background score files for the report
+    scores_ch = combine_score_files.out
+      .collect{ n_metaprograms, score_file, background_score_file -> score_file }
+
+    background_scores_ch = combine_score_files.out
+      .collect{ n_metaprograms, score_file, background_score_file -> background_score_file }
+
     // render combined report
     combined_metaprogram_report(
       metrics_ch,
+      scores_ch, 
+      background_scores_ch,
       file(combined_report_template_file)
     )
 
