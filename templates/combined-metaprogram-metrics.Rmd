@@ -407,7 +407,7 @@ This is done by taking the dot product of the gene weights and quantile-normaliz
 
 Here we calculate the pairwise correlation of the scores for all metaprograms to all other metaprograms in the same value of k. 
 The plot below shows the max correlation observed for each metaprogram. 
-It is not unlikely to observe non-overlapping gene sets that have high correlation of gene expression.
+Non-overlapping gene sets may have highly correlated expression.
 Therefore, this statistic will not be used for defining the optimal value of k, but can be helpful in identifying any biologically related metaprograms. 
 
 ```{r}
