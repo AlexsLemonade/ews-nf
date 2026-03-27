@@ -466,7 +466,7 @@ coherence_df |>
   DT::formatPercentage("proportion_passing_coherence", 2)
 ```
 
-In looking at the distribution of medidan coherence values across k, we see that after certain values of k increasing k doesn't provide any more increase in the observed coherence. 
+In looking at the distribution of median coherence values across k, we see that after certain values of k increasing k doesn't provide any more increase in the observed coherence. 
 To show this, we make an elbow plot showing the median difference for each value of k and find the elbow.
 
 ```{r}
@@ -516,7 +516,6 @@ patient_coherence_df <- mp_metrics_df |>
   dplyr::summarize(
     # run lm each time since we can't store the results directly in the data frame
     r_squared = summary(lm(median_difference ~ num_patients))$r.squared,
-    slope = coef(lm(median_difference ~ num_patients))[["num_patients"]],
     p_value = summary(lm(median_difference ~ num_patients))$coefficients["num_patients", "Pr(>|t|)"], 
     # identify any where the slope is significantly different from 0
     sig_label = dplyr::if_else(p_value <= sig_value, "*", "ns"),
@@ -540,7 +539,7 @@ ggplot(mp_metrics_df, aes(x = num_patients, y = median_difference)) +
   ) +
   labs(
     x = "Number of patients",
-    y = "Median coherence"
+    y = "Coherence"
   )
 ```
 
