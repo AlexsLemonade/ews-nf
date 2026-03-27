@@ -453,19 +453,6 @@ ggplot(coherence_df, aes(x = n_metaprograms, y = median_difference)) +
 
 ```
 
-The table below shows the overall percentage of metaprograms with coherence > 0.1 for a given value of k. 
-
-```{r}
-coherence_df |> 
-  dplyr::group_by(n_metaprograms) |> 
-  dplyr::summarize(
-    num_passing_coherence = sum(is_passing),
-    proportion_passing_coherence = num_passing_coherence/dplyr::n()
-  ) |> 
-  DT::datatable(colnames = c("k", "Number of metaprograms with coherence > 0.1", "% of metaprograms with coherence > 0.1")) |> 
-  DT::formatPercentage("proportion_passing_coherence", 2)
-```
-
 In looking at the distribution of median coherence values across k, we see that after certain values of k increasing k doesn't provide any more increase in the observed coherence. 
 To show this, we make an elbow plot showing the median difference for each value of k and find the elbow.
 
