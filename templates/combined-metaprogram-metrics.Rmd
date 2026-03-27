@@ -84,8 +84,7 @@ max_cell_score_correlation <- function(df){
       names_from = "metaprogram",
       values_from = "mp_score"
     ) |> 
-    dplyr::mutate(cell_id = glue::glue("{unique_id}_{barcodes}")) |> 
-    dplyr::select(-c(unique_id, barcodes)) |> 
+    tidyr::unite("cell_id", unique_id, barcodes) |>
     tibble::column_to_rownames("cell_id") |> 
     as.matrix()
   
@@ -172,7 +171,7 @@ scores_df_list <- scores_files |>
 # since nextflow sometimes changes the order of files, grab the value of k from the filename directly here 
 score_files_n_metaprograms <- basename(scores_files) |> 
   stringr::word(1, sep = "_") |> 
-  stringr::str_remove("k-") |>
+  stringr::str_remove("^k-") |>
   as.numeric()
 
 # match name formatting so the ordering is correct in plots
@@ -384,7 +383,7 @@ ggplot(correlation_df, aes(x = n_metaprograms, y = max_correlation)) +
   labs(
     x = "Number of metaprograms (k)",
     y = "Max correlation of metaprogram gene weights",
-    color = "Max correlation < 0.5"
+    color = "Max correlation ≤ 0.5"
   )
 ```
 
@@ -395,7 +394,7 @@ correlation_df |>
     num_passing_correlation = sum(is_passing),
     proportion_passing_correlation = num_passing_correlation/dplyr::n()
   ) |> 
-  DT::datatable(colnames = c("k", "Number of metaprograms with max correlation <= 0.5", "% of metaprograms with max correlation <= 0.5")) |> 
+  DT::datatable(colnames = c("k", "Number of metaprograms with max correlation ≤ 0.5", "% of metaprograms with max correlation ≤ 0.5")) |> 
   DT::formatPercentage("proportion_passing_correlation", 2)
 ```
 
