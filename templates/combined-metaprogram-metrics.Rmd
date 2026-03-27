@@ -46,6 +46,29 @@ plot_permutation_results <- function(background_df, pvalue_df, x_axis, y_axis){
     )
   
 }
+
+# function to calculate the "kneedle"
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/05-metaprogram-correlation.Rmd
+kneedle <- function(k_values, metric_values, concave = TRUE) {
+  
+  # Step 1: Smooth data to preserve original shape 
+  fit <- smooth.spline(k_values, metric_values)
+  metric_values <- predict(fit, k_values)$y
+  
+  # Step 2: Normalize to [0, 1]
+  x <- (k_values - min(k_values)) / (max(k_values) - min(k_values))
+  y <- (metric_values - min(metric_values)) / (max(metric_values) - min(metric_values))
+  
+  # Step 3: Subtract the diagonal (line from first to last point)
+  # This "rotates" the curve so the elbow becomes a maximum
+  y_diff <- y - x  # for concave (increasing); use x - y for convex (decreasing)
+  if (!concave) y_diff <- x - y
+  
+  # Step 4: The knee is the point with the maximum difference
+  knee_index <- which.max(y_diff)
+  
+  k_values[knee_index]
+}
 ```
 
 ```{r setup, message = FALSE, echo = FALSE}
@@ -74,7 +97,6 @@ set.seed(params$seed)
 # set this here so we don't mess it up
 sig_value <- 0.05
 ```
-
 
 ```{r}
 # list of all metrics files
@@ -118,7 +140,7 @@ total_samples <- metrics_list |>
   purrr::map_dbl("total_samples") |> 
   unique()
 
-num_patients <- metrics_list |> 
+total_patients <- metrics_list |> 
   purrr::map_dbl("total_patients") |> 
   unique()
 
@@ -281,6 +303,122 @@ neff_obs_df |>
   ) |> 
   DT::datatable(colnames = c("k", "% of metaprograms with significant effective sample size")) |> 
   DT::formatPercentage("neff_sig_proportion", 2)
+```
+
+## Correlation 
+
+Metaprograms should be unique and non-redundant. 
+Therefore we expect them to have low correlation to other metaprograms from the same value of k.
+<!--TODO: Wait until we have merged the cell scoring PR to add this in since we also want to look at cell score correlation 
+In that PR we modify the nextflow process to export cell scores which will affect how we read in data and plot here.
+-->
+
+## Coherence 
+
+Metaprograms should show coherence, meaning the spectra that comprise the metaprogram are more similar to other spectra in the same metaprogram than to spectra in different metaprograms. 
+To measure this, we calculated the correlation of each spectra to all other spectra. 
+We then calculate the difference in medians between the distribution of correlation of spectra within a given metaprogram and between metaprograms, indicated as "coherence" throughout this report. 
+
+Metaprograms with coherence <= 0.1 are likely to represent noise and will not be used in further analysis.
+
+```{r}
+coherence_df <- mp_metrics_df |> 
+  dplyr::mutate(
+    is_passing = median_difference > 0.1
+  )
+
+ggplot(coherence_df, aes(x = n_metaprograms, y = median_difference)) +
+  geom_boxplot() +
+  ggbeeswarm::geom_beeswarm(aes(color = is_passing)) +
+  scale_color_manual(values = c("red", "black")) +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Metaprogram coherence",
+    color = "Coherence > 0.1"
+  ) 
+
+```
+
+This plot suggests that increasing k doesn't improve metaprogram coherence after certain values of k. 
+We therefore make an elbow plot showing the median coherence for each value of k and find the elbow.
+
+```{r}
+# get the median coherence for each value of k to plot
+coherence_elbow_df <- mp_metrics_df |> 
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarize(
+    median_coherence = median(median_difference)
+  ) |> 
+  dplyr::arrange(desc(median_coherence))
+```
+
+```{r}
+ggplot(coherence_elbow_df, aes(x = n_metaprograms, median_coherence)) +
+  geom_point() +
+  labs(
+    x = "Number of metaprograms (k)",
+    y = "Median coherence"
+  )
+```
+
+We then use a modified version of the [kneedle algorithm](https://raghavan.usc.edu/papers/kneedle-simplex11.pdf) to identify the elbow. 
+Here we only find one global maximum rather than a set of local maxima. 
+Values of k greater than the elbow indicate no substantial gain of coherence over the lower values of k. 
+
+```{r}
+# pull out k as numeric
+elbow_value <- stringr::str_remove(coherence_elbow_df$n_metaprograms, "k_") |> 
+  as.numeric() |>
+  kneedle(
+    coherence_elbow_df$median_coherence, 
+    concave = TRUE
+  )
+
+knitr::asis_output(
+  glue::glue("**Value of k corresponding to the elbow: {elbow_value}**")
+)
+```
+
+This plot shows the relationship of coherence with number of patients represented in a metaprogram. 
+A negative correlation would suggest that metaprograms specific to a smaller subset of patients tend to have higher coherence, potentially reflecting patient-specific biological signals rather than broadly shared ones.
+The R-squared shown in the plot indicates the strength of the correlation. 
+The `*` indicates the slope is significantly different from zero, and the `ns` indicates the slope is not significantly different from zero.
+
+```{r}
+#| message: false
+
+# calculate the r2 and pvalue 
+patient_coherence_df <- mp_metrics_df |>
+  dplyr::group_by(n_metaprograms) |>
+  dplyr::summarize(
+    # run lm each time since we can't store the results directly in the data frame
+    r_squared = summary(lm(median_difference ~ num_patients))$r.squared,
+    p_value = summary(lm(median_difference ~ num_patients))$coefficients["num_patients", "Pr(>|t|)"], 
+    # identify any where the slope is significantly different from 0
+    sig_label = dplyr::if_else(p_value <= sig_value, "*", "ns"),
+    # make a label for the facets
+    plot_label = glue::glue("R^2=='{round(r_squared, 3)} {sig_label}'")
+  )
+
+# plot the coherence x number of patients
+ggplot(mp_metrics_df, aes(x = num_patients, y = median_difference)) +
+  geom_point() +
+  facet_wrap(vars(n_metaprograms)) +
+  geom_smooth(method = "lm", se = TRUE) +
+  geom_text(
+    data = patient_coherence_df,
+    aes(label = plot_label),
+    x = -Inf, y = Inf,
+    hjust = -0.1, vjust = 1.5,
+    inherit.aes = FALSE,
+    parse = TRUE, # to let us show R2 properly
+    size = 3
+  ) +
+  labs(
+    x = "Number of patients",
+    y = "Coherence"
+  ) + 
+  theme(axis.text.x = element_text(angle = 0))
 ```
 
 
