@@ -534,6 +534,101 @@ ggplot(mp_metrics_df, aes(x = num_patients, y = median_difference)) +
   theme(axis.text.x = element_text(angle = 0))
 ```
 
+## Gene set specificity 
+
+After generating metaprograms for each value of k, the top 200 genes based on gene weights were extracted from each metaprogram. 
+Over-representation analysis was then run using `clusterProfiler::enricher()` function on these 200 genes.
+Input gene sets include a set of custom `EWS::FLI1` activated and repressed gene sets and Hallmarks from `MSigDb`.
+
+Any gene sets with an adjusted p value ≤ 0.05 are considered significant. 
+Good metaprograms should have at least one significant gene set.
+
+The table below shows the total number of metaprograms with at least one significant gene set for each value of k.
+
+```{r}
+mp_metrics_df |>
+  dplyr::summarize(
+    num_metaprograms_with_genesets = sum(num_sig_genesets > 0),
+    .by = c("n_metaprograms")
+  ) |> 
+  DT::datatable(colnames = c("k", "Number of metaprograms with ≥ 1 significant gene set"))
+```
+
+
+Metaprograms should be biologically distinct and annotated by a unique set of gene sets.
+This means gene sets should be significant in as few metaprograms as possible, ideally only one metaprogram. 
+For each gene set, we calculated gene set specificity using the following formula: 
+
+$$1 - \frac{\text{# of metaprograms the gene set is significant in}- 1}{\text{total # of metaprograms} - 1}$$
+
+A score of 1 indicates the gene set is unique to a single metaprogram, while a score of 0 indicates it is shared across all metaprograms. 
+
+We then take the mean specificity across all gene sets and all metaprograms for a single value of k.
+Metaprograms with no identified gene sets are not considered in this calculation.
+
+To determine if this value is greater than what would be observed by random chance, we generated a null distribution by shuffling the gene sets assigned to each metaprogram, keeping the number of gene sets consistent with the observed distribution and recalculating the mean specificity. 
+When shuffling the gene sets, each gene set was weighted based on the number of metaprograms in which the gene set was considered significant.
+
+The below plot shows the observed mean gene set specificity and the associated background distribution for each value of k. 
+Any values of k with a significant mean gene set specificity are indicated in red.
+
+```{r}
+# pull out observations and summarize to get the mean for each value of k
+gss_obs_df <- mp_metrics_df |> 
+  dplyr::summarize(
+    overall_geneset_specificity = mean(mean_geneset_specificity, na.rm = TRUE),
+    .by = c("n_metaprograms")
+  )
+
+# get background mean gene expression for each k and each replicate
+gss_background_df <- metrics_list |> 
+  purrr::map("background_specificity_df") |> 
+  dplyr::bind_rows(.id = "n_metaprograms") |> 
+  # overall_geneset_specificity is per k
+  dplyr::select(n_metaprograms, replicate, overall_geneset_specificity) |> 
+  unique()
+
+# pull out the number of replicates 
+# note this isn't stored as a number in the objects 
+nreps <- max(gss_background_df$replicate |> as.numeric())
+
+# join observed values with background values
+# here we are calculating the overall mean pvalue so that we get one pvalue for each k
+# this mirrors what we did in: https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/06-gene-set-uniqueness.Rmd
+# the metrics calculation script calculates per mp so we need to do this separately here
+pvalue_df <- gss_background_df |>
+  dplyr::left_join(
+    dplyr::rename(gss_obs_df, obs_value = overall_geneset_specificity),
+    by = c("n_metaprograms")
+  ) |>
+  # indicator column for if background >= observation
+  dplyr::mutate(greater_than_obs = overall_geneset_specificity >= obs_value,
+                less_than_obs = overall_geneset_specificity <= obs_value) |>
+  dplyr::summarize(
+      overall_geneset_specificity = unique(obs_value),
+      # we see values that are both higher and lower so use a two-tailed test
+      p_greater = (sum(greater_than_obs) + 1) / (nreps + 1),
+      p_lower = (sum(less_than_obs) + 1) / (nreps + 1),
+      overall_geneset_specificity_pvalue = min(p_greater, p_lower) * 2,
+      .by = c("n_metaprograms")
+    ) |>
+    # add in adjusted pvalue
+    dplyr::mutate(
+      overall_geneset_specificity_adj_pvalue = p.adjust(overall_geneset_specificity_pvalue, method = "BH"),
+      is_significant = overall_geneset_specificity_pvalue <= sig_value
+    )
+```
+
+
+```{r}
+plot_permutation_results(gss_background_df, pvalue_df, n_metaprograms, overall_geneset_specificity) +
+  labs(
+    y = "Mean gene set specificity",
+    x = "Metaprogram",
+    color = "significant"
+  ) 
+```
+
 
 ## Session info
 
