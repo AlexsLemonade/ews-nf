@@ -562,10 +562,11 @@ For each gene set, we calculated gene set specificity using the following formul
 $$1 - \frac{\text{# of metaprograms the gene set is significant in}- 1}{\text{total # of metaprograms} - 1}$$
 
 A score of 1 indicates the gene set is unique to a single metaprogram, while a score of 0 indicates it is shared across all metaprograms. 
-We then take the mean specificity across all gene sets and all metaprograms for a single value of k.
-Any metaprograms with no identified gene sets are not considered in this calculation.
 
-To determine if this value is greater than what would be observed by random chance, we generated a null distribution by shuffling the gene sets assigned to each metaprogram keeping the number of gene sets consistent with the observed distribution and then re-calculated mean specificity. 
+We then take the mean specificity across all gene sets and all metaprograms for a single value of k.
+Metaprograms with no identified gene sets are not considered in this calculation.
+
+To determine if this value is greater than what would be observed by random chance, we generated a null distribution by shuffling the gene sets assigned to each metaprogram, keeping the number of gene sets consistent with the observed distribution and recalculating the mean specificity. 
 The gene sets were also weighted by the number of times they were observed.
 
 The below plot shows the observed mean gene set specificity and the associated background distribution for each value of k. 
@@ -583,6 +584,7 @@ gss_obs_df <- mp_metrics_df |>
 gss_background_df <- metrics_list |> 
   purrr::map("background_specificity_df") |> 
   dplyr::bind_rows(.id = "n_metaprograms") |> 
+  # overall_geneset_specificity is per k
   dplyr::select(n_metaprograms, replicate, overall_geneset_specificity) |> 
   unique()
 
