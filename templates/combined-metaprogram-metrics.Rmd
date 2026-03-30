@@ -12,6 +12,7 @@ params:
   metrics_file_list: NULL
   scores_file_list: NULL
   background_scores_file_list: NULL
+  sample_metadata_file: "../sample-info/sample-metadata.tsv"
   seed: 2026
 ---
 
@@ -23,6 +24,21 @@ Metrics included in this notebook will be used to identify the optimal value of 
 ## Set Up
 
 ```{r}
+# helper function to assign names to a list of file names
+assign_k_names <- function(file_list) {
+  
+  # since nextflow sometimes changes the order of files, grab the value of k from the filename directly here 
+  files_n_metaprograms <- basename(file_list) |> 
+    stringr::word(1, sep = "_") |> 
+    stringr::str_remove("^k-") |>
+    as.numeric()
+  
+  # match name formatting so the ordering is correct in plots
+  names(file_list) <- sprintf("k_%02d", files_n_metaprograms) 
+  
+  return(file_list)
+}
+
 # helper function for plotting permutation results
 # plots background points with observed values in color on top as sina plot
 plot_permutation_results <- function(background_df, pvalue_df, x_axis, y_axis){
@@ -101,10 +117,110 @@ max_cell_score_correlation <- function(df){
   return(max_cor_df)
 }
 
+# helper function to calculate anova on a dataframe
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/08-cell-scoring-metrics.Rmd
+calculate_anova <- function(df, random_effect = NULL){
+  if (!is.null(random_effect)) {
+    # create formula with random effect
+    formula <- as.formula(glue::glue("log_mean_mp_score ~ disease_timing + (1 | {random_effect})"))
+    mod <- lmerTest::lmer(formula, data = df)
+    # Overall p-value for disease_timing (type III ANOVA)
+    anova_res <- anova(mod) |>
+      as.data.frame() |>
+      tibble::rownames_to_column("term")
+  } else {
+    # no random effect so use a regular ANOVA
+    mod <- lm(log_mean_mp_score ~ disease_timing, data = df)
+    anova_res <- anova(mod) |>
+      as.data.frame() |>
+      tibble::rownames_to_column("term") |>
+      dplyr::filter(term != "Residuals")
+  }
+  
+  return(anova_res)
+}
+
+# ANOVA test with/without random effect on log(mean mp score)
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/08-cell-scoring-metrics.Rmd
+grouped_anova <- function(data, sig_value, random_effect = NULL) {
+  
+  # for each metaprogram for each value of k, use a linear mixed effect model 
+  # then use ANOVA to calculate pvalues 
+  anova_results <- data |>
+    dplyr::group_by(metaprogram, n_metaprograms) |>
+    # using a lambda function requires two arguments
+    # can use ... to absorb the second one
+    dplyr::group_modify(\(df, ...) {
+      calculate_anova(df, random_effect)
+    }) |>
+    # classify as significant or not
+    dplyr::rename(f_value = `F value`, p_value = `Pr(>F)`) |>
+    dplyr::mutate(
+      p_adj = p.adjust(p_value, method = "BH"),
+      p_adj_signif = dplyr::if_else(p_adj <= sig_value, "*", "ns")
+    ) 
+  
+  full_results <- anova_results |>
+    # join with data/scores for plotting 
+    dplyr::left_join(
+      data |>
+        # we'll plot with zscore so want to use that to determine the y position of the label
+        dplyr::summarize(max_mean_score = max(zscore_mean_mp_score, na.rm = TRUE),
+                         .by = c("n_metaprograms", "metaprogram"))
+    )
+  
+  return(full_results)
+}
+
+# calculate significance for permutation testing
+# reports a pvalue for a specified statistic 
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/modules/metaprograms/resources/usr/bin/04-metaprogram-metrics.R
+# used here for overall gene set specificity and cell score CV 
+calculate_permutation_significance <- function(stat, observed_df, background_df, nreps, group_columns = c("n_metaprograms", "metaprogram")){
+  
+  # combine the observed values with the background
+  combined_df <- observed_df |> 
+    dplyr::select(
+      group_columns,
+      obs_value = {{ stat }}
+    ) |> 
+    dplyr::left_join(background_df, by = group_columns) |> 
+    dplyr::select(-replicate)
+  
+  # calculate the pvalue for num genesets 
+  pvalue_df <- combined_df |> 
+    dplyr::mutate(
+      # indicate which rows have background > or < obs
+      greater_than_obs = {{ stat }} >= obs_value,
+      lower_than_obs = {{ stat }} <= obs_value
+    ) |> 
+    dplyr::summarize(
+      # calculate p values and retain a column with the observed value
+      obs_value = unique(obs_value),
+      greater_pvalue = (sum(greater_than_obs) +1)/(nreps + 1),
+      lower_pvalue = (sum(lower_than_obs) + 1)/(nreps + 1),
+      overall_pvalue = min(greater_pvalue, lower_pvalue) * 2,
+      .by = dplyr::all_of(group_columns)
+    ) |> 
+    # add adjusted pvalue 
+    # depending on the stat will depend on which pvalue we use, either 1 or 2 sided test
+    dplyr::mutate(
+      greater_adj_pvalue = p.adjust(greater_pvalue, method = "BH"), 
+      lower_adj_pvalue = p.adjust(lower_pvalue, method = "BH"),
+      overall_adj_pvalue = p.adjust(overall_pvalue, method = "BH")
+    )
+  
+  return(pvalue_df)
+  
+}
 ```
 
 ```{r setup, message = FALSE, echo = FALSE}
 library(ggplot2)
+
+# load libraries that we need for the ANOVA model 
+library(lme4)
+library(lmerTest)
 
 # Set default ggplot theme
 theme_set(
@@ -137,10 +253,15 @@ metrics_rds_files <- stringr::str_split_1(params$metrics_file_list, pattern = ",
 # list of all scores files 
 scores_files <- stringr::str_split_1(params$scores_file_list, pattern = ",")
 
+# all background score files
+background_files <- stringr::str_split_1(params$background_scores_file_list, pattern = ",")
+
 # make sure all files exist
 stopifnot(
   "Some or all metrics files do not exist" = all(file.exists(metrics_rds_files)),
-  "Some or all cell score files do not exist" = all(file.exists(scores_files))
+  "Some or all cell score files do not exist" = all(file.exists(scores_files)),
+  "Some or all background cell score files do not exist" = all(file.exists(background_files)),
+  "Sample metadata file is missing" = file.exists(params$sample_metadata_file)
 )
 ```
 
@@ -164,18 +285,35 @@ mp_metrics_df <- metrics_list |>
 ```
 
 ```{r}
+# assign names to files using the appropriate k value
+# nextflow doesn't keep things in order so we need to do this to make sure we match the correct k with the correct file 
+scores_files <- assign_k_names(scores_files)
+background_files <- assign_k_names(background_files)
+
 # read in cell scores as a list of dataframes 
 scores_df_list <- scores_files |> 
   purrr::map(\(file) readr::read_tsv(file, col_types = list(.default = "c", mp_score = "d")))
 
-# since nextflow sometimes changes the order of files, grab the value of k from the filename directly here 
-score_files_n_metaprograms <- basename(scores_files) |> 
-  stringr::word(1, sep = "_") |> 
-  stringr::str_remove("^k-") |>
-  as.numeric()
+# read in background scores 
+background_df_list <- background_files |> 
+  purrr::map(\(file) readr::read_tsv(file, col_types = list(.default = "d", metaprogram = "c", unique_id = "c")))
+```
 
-# match name formatting so the ordering is correct in plots
-names(scores_df_list) <- sprintf("k_%02d", score_files_n_metaprograms)
+```{r}
+# combine scores and background lists into data frame
+scores_df <- scores_df_list |> 
+  dplyr::bind_rows(.id = "n_metaprograms")
+
+background_df <- background_df_list |>
+  dplyr::bind_rows(.id = "n_metaprograms")
+```
+
+```{r}
+# read in sample metadata
+sample_df <- readr::read_tsv(params$sample_metadata_file, col_types = "c")
+
+# define palette for disease timings shown here
+disease_timing_palette <- c(Primary = "#6A9FC0", Metastasis = "#C47A8A", Recurrence = "#5A9E82")
 ```
 
 
@@ -273,8 +411,6 @@ disease_timing_df <- mp_metrics_df |>
 ```{r}
 #| fig.height: 10
 #| fig.width: 10
-
-disease_timing_palette <- c(Primary = "#6A9FC0", Metastasis = "#C47A8A", Recurrence = "#5A9E82")
 
 ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
   geom_col(width = 0.7) +
@@ -596,37 +732,187 @@ nreps <- max(gss_background_df$replicate |> as.numeric())
 # here we are calculating the overall mean pvalue so that we get one pvalue for each k
 # this mirrors what we did in: https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/06-gene-set-uniqueness.Rmd
 # the metrics calculation script calculates per mp so we need to do this separately here
-pvalue_df <- gss_background_df |>
-  dplyr::left_join(
-    dplyr::rename(gss_obs_df, obs_value = overall_geneset_specificity),
-    by = c("n_metaprograms")
-  ) |>
-  # indicator column for if background >= observation
-  dplyr::mutate(greater_than_obs = overall_geneset_specificity >= obs_value,
-                less_than_obs = overall_geneset_specificity <= obs_value) |>
-  dplyr::summarize(
-      overall_geneset_specificity = unique(obs_value),
-      # we see values that are both higher and lower so use a two-tailed test
-      p_greater = (sum(greater_than_obs) + 1) / (nreps + 1),
-      p_lower = (sum(less_than_obs) + 1) / (nreps + 1),
-      overall_geneset_specificity_pvalue = min(p_greater, p_lower) * 2,
-      .by = c("n_metaprograms")
-    ) |>
-    # add in adjusted pvalue
-    dplyr::mutate(
-      overall_geneset_specificity_adj_pvalue = p.adjust(overall_geneset_specificity_pvalue, method = "BH"),
-      is_significant = overall_geneset_specificity_pvalue <= sig_value
-    )
+gss_pvalue_df <- calculate_permutation_significance(
+  overall_geneset_specificity, 
+  gss_obs_df, 
+  gss_background_df, 
+  nreps, 
+  group_columns = "n_metaprograms"
+) |> 
+  dplyr::rename(
+    overall_geneset_specificity = obs_value
+  ) |> 
+  dplyr::mutate(
+    is_significant = overall_adj_pvalue <= sig_value
+  )
 ```
 
 
 ```{r}
-plot_permutation_results(gss_background_df, pvalue_df, n_metaprograms, overall_geneset_specificity) +
+plot_permutation_results(gss_background_df, gss_pvalue_df, n_metaprograms, overall_geneset_specificity) +
   labs(
     y = "Mean gene set specificity",
     x = "Metaprogram",
     color = "significant"
   ) 
+```
+
+
+## Variation in cell scores 
+
+As noted in the correlation section, the gene weights for the top 200 genes are used to calculate a cell score for each cell in the dataset. This is done by taking the dot product of the gene weights and quantile-normalized counts in each cell. 
+
+Good metaprograms should show variation in the scores assigned to cells in the original dataset.
+To measure variation, we will use the coefficient of variation (CV), which reports relative variation compared to the mean score. 
+
+Here we compare the observed CV to a null distribution to determine if a metaprogram shows significant variation compared to random chance. 
+The background distribution was constructed by shuffling the gene identifiers for each metaprogram in the gene by metaprogram matrix. 
+This ensured the weights for each metaprogram and the relationship of genes across metaprograms was retained. 
+After shuffling, the top 200 genes were extracted and the scores were re-calculated. 
+This produces a unique background distribution for each metaprogram.
+
+```{r}
+# calculate CV for each metaprogram for each sample using Chan's algorithm 
+# get both CV and var 
+global_background_df <- background_df |> 
+  dplyr::summarize(
+    n_total = sum(num_cells),
+    global_mean = sum(num_cells * mean_mp_score) / sum(num_cells),
+    M2_total = sum(M2) + sum(num_cells * (mean_mp_score - global_mean)^2),
+    score_var = M2_total / (n_total - 1),
+    global_sd  = sqrt(score_var),
+    score_cv  = (global_sd / global_mean),
+    .by = c("n_metaprograms", "metaprogram", "replicate")
+  )
+
+# calculate variance and CV for each sample without using Chan's 
+# we confirmed previously that this calculation is equal to the result you get from Chan's
+# so we can use this as the observed value and then compare to the null distribution
+var_df <- scores_df |> 
+  dplyr::summarize(
+    score_var = var(mp_score, na.rm = TRUE),
+    score_cv = sqrt(score_var) / mean(mp_score),
+    .by = c("n_metaprograms", "metaprogram")
+  ) |>
+  dplyr::ungroup()
+```
+
+```{r}
+#| fig.height: 10
+#| fig.width: 15
+
+# calculate pvalues for each cv 
+cv_pvalue_df <- calculate_permutation_significance(score_cv, var_df, global_background_df, nreps) |> 
+  dplyr::rename(score_cv = obs_value) |> 
+  dplyr::mutate(
+    is_significant = greater_adj_pvalue <= sig_value
+  )
+
+plot_permutation_results(global_background_df, cv_pvalue_df, metaprogram, score_cv) +
+  facet_wrap(
+    vars(n_metaprograms),
+    scales = "free_x",
+    ncol = 4
+  ) +
+  labs(
+    x = "Metaprogram",
+    y = "Coefficient of variation (CV)",
+    color = "Significant"
+  ) +
+  theme(
+    axis.title = element_text(size = 14),
+    strip.text = element_text(size = 14),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 14)
+  )
+```
+
+The below table shows the total percentage of metaprograms with significant CV for each value of k. 
+
+```{r}
+cv_pvalue_df |> 
+  dplyr::group_by(n_metaprograms) |> 
+  dplyr::summarize(
+    num_significant_cv = sum(is_significant),
+    proportion_significant_cv = num_significant_cv/dplyr::n()
+  ) |> 
+  DT::datatable(colnames = c("k", "Number of metaprograms with significant CV", "% of metaprograms with significant CV")) |> 
+  DT::formatPercentage("proportion_significant_cv", 2)
+```
+
+
+### Comparison of scores across sample types 
+
+Here we look at the distribution of cell scores across varying sample types (primary, metastatic, and recurrent tumors). 
+First, we calculate the mean score for each metaprogram for each sample. 
+As the scores are skewed towards zero, we log-transform the scores before calculating any statistics. 
+We then compare scores to determine if any metaprograms show significantly different distributions across sample types. 
+For the statistical test, we use a linear mixed model with patient as the random effect to account for within-patient correlation that is likely observed in samples of different sample types from the same patient. 
+
+For visualization purposes, we calculate a z-score for all `log(mean(scores))` within each metaprogram and display that in the box plot below.
+The significance of the comparison among the three sample types is shown above the distributions for that metaprogram with `*` indicating that the distributions are significantly different from each other and `ns` indicating the distributions are not significantly different from each other. 
+
+**Caution:** This information will not be used to decide on the value of k, but can be helpul to determine if any of the identified metaprograms may be biologically relevant. 
+Because we summarize scores for all cells in a sample, this does not tell us anything about the heterogeneity of scores within a sample. 
+Further analysis is needed to look at individual cell populations that is outside the scope of the analysis done here.
+
+```{r}
+mean_scores_df <- scores_df |> 
+  dplyr::summarize(
+    mean_mp_score = mean(mp_score),
+    .by = c("unique_id", "metaprogram", "n_metaprograms")
+  ) |> 
+  dplyr::mutate(
+    scpca_sample_id = stringr::word(unique_id, -1, sep = "-"),
+    # first log transform
+    log_mean_mp_score = log(mean_mp_score)
+  ) |>
+  # z-score the log scores within each k and metaprogram
+  # use these for plotting
+  dplyr::mutate(
+    scpca_sample_id = stringr::word(unique_id, -1, sep = "-"),
+    zscore_mean_mp_score = scale(log_mean_mp_score), 
+    .by = c("metaprogram", "n_metaprograms")
+  ) |> 
+  # add in the sample metadata including disease timing and patient information 
+  dplyr::left_join(dplyr::select(sample_df, c("scpca_sample_id", "participant_id", "disease_timing")), by = c("scpca_sample_id"))
+```
+
+```{r}
+#| message: FALSE 
+# calculate anova with random effect
+random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value, random_effect = "participant_id")
+```
+
+```{r}
+#| fig.height: 15
+#| fig.width: 15
+
+# plot the scores fore ach sample type and indicate the significance
+ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = disease_timing)) +
+  geom_boxplot(outlier.size = 0.1) +
+  geom_text(
+    data = random_effect_lmm_results,
+    color = "red",
+    aes(x = metaprogram, y = max_mean_score + 0.3, label = p_adj_signif),
+    inherit.aes = FALSE
+  ) +
+  scale_fill_manual(values = disease_timing_palette) +
+  facet_wrap(vars(n_metaprograms), 
+             scales = "free",
+             ncol = 3) +
+  labs(
+    title = "ANOVA with patient as random effect",
+    fill = "Sample type",
+    x = "Metaprogram",
+    y = "Z-score computed from mean metaprogram score per sample"
+  ) +
+  theme(
+    axis.title = element_text(size = 14),
+    strip.text = element_text(size = 14),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 14)
+  )
 ```
 
 
