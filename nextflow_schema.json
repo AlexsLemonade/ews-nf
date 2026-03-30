@@ -200,6 +200,19 @@
           "type": "number",
           "default": 0.3,
           "description": "Minimum cross sample maximum required to keep spectra if filter_spectra is true"
+        },
+        "nreps" : {
+          "type": "number",
+          "default": 1000,
+          "description": "Number of permutations to use for metrics that use permutation testing"
+        },
+        "sample_metadata_file": {
+          "type": "string",
+          "default": "${projectDir}/metadata/sample-metadata.tsv",
+          "pattern": "\\.tsv$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Path to TSV file containing sample metadata containing disease timing information"
         }
       }
     }
