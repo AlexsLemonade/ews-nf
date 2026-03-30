@@ -567,7 +567,7 @@ We then take the mean specificity across all gene sets and all metaprograms for 
 Metaprograms with no identified gene sets are not considered in this calculation.
 
 To determine if this value is greater than what would be observed by random chance, we generated a null distribution by shuffling the gene sets assigned to each metaprogram, keeping the number of gene sets consistent with the observed distribution and recalculating the mean specificity. 
-When shuffling the gene sets, each gene set was weighted based on the number of times it was observed as being significant.
+When shuffling the gene sets, each gene set was weighted based on the number of metaprograms in which the gene set was considered significant.
 
 The below plot shows the observed mean gene set specificity and the associated background distribution for each value of k. 
 Any values of k with a significant mean gene set specificity are indicated in red.
