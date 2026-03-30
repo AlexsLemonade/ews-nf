@@ -543,15 +543,15 @@ Input gene sets include a set of custom `EWS::FLI1` activated and repressed gene
 Any gene sets with an adjusted p value ≤ 0.05 are considered significant. 
 Good metaprograms should have at least one significant gene set.
 
-The table below shows the total number of metaprograms with zero significant gene sets for each value of k.
+The table below shows the total number of metaprograms with at least one significant gene set for each value of k.
 
 ```{r}
 mp_metrics_df |>
   dplyr::summarize(
-    num_metaprograms_without_genesets = sum(num_sig_genesets == 0),
+    num_metaprograms_with_genesets = sum(num_sig_genesets > 0),
     .by = c("n_metaprograms")
   ) |> 
-  DT::datatable(colnames = c("k", "Number of metaprograms with 0 significant gene sets"))
+  DT::datatable(colnames = c("k", "Number of metaprograms with ≥ 1 significant gene set"))
 ```
 
 
@@ -567,7 +567,7 @@ We then take the mean specificity across all gene sets and all metaprograms for 
 Metaprograms with no identified gene sets are not considered in this calculation.
 
 To determine if this value is greater than what would be observed by random chance, we generated a null distribution by shuffling the gene sets assigned to each metaprogram, keeping the number of gene sets consistent with the observed distribution and recalculating the mean specificity. 
-The gene sets were also weighted by the number of times they were observed.
+When shuffling the gene sets, each gene set was weighted based on the number of times it was observed as being significant.
 
 The below plot shows the observed mean gene set specificity and the associated background distribution for each value of k. 
 Any values of k with a significant mean gene set specificity are indicated in red.
