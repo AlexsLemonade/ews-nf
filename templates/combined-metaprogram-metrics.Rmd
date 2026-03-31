@@ -165,8 +165,10 @@ grouped_anova <- function(data, sig_value, random_effect = NULL) {
     dplyr::left_join(
       data |>
         # we'll plot with zscore so want to use that to determine the y position of the label
-        dplyr::summarize(max_mean_score = max(zscore_mean_mp_score, na.rm = TRUE),
-                         .by = c("n_metaprograms", "metaprogram"))
+        dplyr::summarize(
+          max_mean_score = max(zscore_mean_mp_score, na.rm = TRUE),
+          .by = c("n_metaprograms", "metaprogram")
+        )
     )
   
   return(full_results)
@@ -176,7 +178,13 @@ grouped_anova <- function(data, sig_value, random_effect = NULL) {
 # reports a pvalue for a specified statistic 
 # copied from https://github.com/AlexsLemonade/ews-nf/blob/main/modules/metaprograms/resources/usr/bin/04-metaprogram-metrics.R
 # used here for overall gene set specificity and cell score CV 
-calculate_permutation_significance <- function(stat, observed_df, background_df, nreps, group_columns = c("n_metaprograms", "metaprogram")){
+calculate_permutation_significance <- function(
+  stat, 
+  observed_df, 
+  background_df, 
+  nreps, 
+  group_columns = c("n_metaprograms", "metaprogram")
+){
   
   # combine the observed values with the background
   combined_df <- observed_df |> 
@@ -760,15 +768,16 @@ plot_permutation_results(gss_background_df, gss_pvalue_df, n_metaprograms, overa
 
 ## Variation in cell scores 
 
-As noted in the correlation section, the gene weights for the top 200 genes are used to calculate a cell score for each cell in the dataset. This is done by taking the dot product of the gene weights and quantile-normalized counts in each cell. 
+As noted in the correlation section, the gene weights for the top 200 genes are used to calculate a cell score for each cell in the dataset. 
+This is done by taking the dot product of the gene weights and quantile-normalized counts in each cell. 
 
 Good metaprograms should show variation in the scores assigned to cells in the original dataset.
-To measure variation, we will use the coefficient of variation (CV), which reports relative variation compared to the mean score. 
+To measure variation, we will use the coefficient of variation (CV), which reports a score's variance relative to the mean score across all cells. 
 
-Here we compare the observed CV to a null distribution to determine if a metaprogram shows significant variation compared to random chance. 
+Here we compare the observed CV to a null distribution to determine if a metaprogram shows significantly more variation compared to random chance. 
 The background distribution was constructed by shuffling the gene identifiers for each metaprogram in the gene by metaprogram matrix. 
-This ensured the weights for each metaprogram and the relationship of genes across metaprograms was retained. 
-After shuffling, the top 200 genes were extracted and the scores were re-calculated. 
+This ensured that both the weights for each metaprogram and the relationship of genes across metaprograms were retained. 
+After shuffling, the top 200 genes were extracted, and the scores were re-calculated. 
 This produces a unique background distribution for each metaprogram.
 
 ```{r}
@@ -898,9 +907,11 @@ ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = dis
     inherit.aes = FALSE
   ) +
   scale_fill_manual(values = disease_timing_palette) +
-  facet_wrap(vars(n_metaprograms), 
-             scales = "free",
-             ncol = 3) +
+  facet_wrap(
+    vars(n_metaprograms), 
+    scales = "free",
+     ncol = 3
+   ) +
   labs(
     title = "ANOVA with patient as random effect",
     fill = "Sample type",
