@@ -300,11 +300,21 @@ background_files <- assign_k_names(background_files)
 
 # read in cell scores as a list of dataframes 
 scores_df_list <- scores_files |> 
-  purrr::map(\(file) readr::read_tsv(file, col_types = list(.default = "c", mp_score = "d")))
+  purrr::map(\(file) {
+    readr::read_tsv(
+      file, 
+      col_types = list(.default = "c", mp_score = "d")
+    )
+  })
 
 # read in background scores 
 background_df_list <- background_files |> 
-  purrr::map(\(file) readr::read_tsv(file, col_types = list(.default = "d", metaprogram = "c", unique_id = "c")))
+  purrr::map(\(file) {
+    readr::read_tsv(
+      file, 
+      col_types = list(.default = "d", metaprogram = "c", unique_id = "c")
+    )
+  })
 ```
 
 ```{r}
@@ -495,9 +505,10 @@ This will be used to identify the optimal value of k in the final section.
 neff_obs_df |> 
   dplyr::group_by(n_metaprograms) |> 
   dplyr::summarize(
-    neff_sig_proportion = sum(is_significant)/dplyr::n()
+    neff_sig_number = sum(is_significant), 
+    neff_sig_proportion = neff_sig_number/dplyr::n()
   ) |> 
-  DT::datatable(colnames = c("k", "% of metaprograms with significant effective sample size")) |> 
+  DT::datatable(colnames = c("k", "Number of metaprograms with significant effective sample size", "% of metaprograms with significant effective sample size")) |> 
   DT::formatPercentage("neff_sig_proportion", 2)
 ```
 
@@ -693,9 +704,11 @@ The table below shows the total number of metaprograms with at least one signifi
 mp_metrics_df |>
   dplyr::summarize(
     num_metaprograms_with_genesets = sum(num_sig_genesets > 0),
+    proportion_metaprograms_with_genesets = num_metaprograms_with_genesets/dplyr::n(),
     .by = c("n_metaprograms")
   ) |> 
-  DT::datatable(colnames = c("k", "Number of metaprograms with ≥ 1 significant gene set"))
+  DT::datatable(colnames = c("k", "Number of metaprograms with ≥ 1 significant gene set", "% of metaprograms with ≥ 1 significant gene set")) |>
+  DT::formatPercentage("proportion_metaprograms_with_genesets", 2)
 ```
 
 
@@ -782,6 +795,7 @@ This produces a unique background distribution for each metaprogram.
 
 ```{r}
 # calculate CV for each metaprogram for each sample using Chan's algorithm 
+# originally explored in https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/08-cell-scoring-metrics.Rmd
 # get both CV and var 
 global_background_df <- background_df |> 
   dplyr::summarize(
@@ -879,12 +893,17 @@ mean_scores_df <- scores_df |>
   # z-score the log scores within each k and metaprogram
   # use these for plotting
   dplyr::mutate(
-    scpca_sample_id = stringr::word(unique_id, -1, sep = "-"),
     zscore_mean_mp_score = scale(log_mean_mp_score), 
     .by = c("metaprogram", "n_metaprograms")
   ) |> 
   # add in the sample metadata including disease timing and patient information 
-  dplyr::left_join(dplyr::select(sample_df, c("scpca_sample_id", "participant_id", "disease_timing")), by = c("scpca_sample_id"))
+  dplyr::left_join(
+    dplyr::select(
+      sample_df, 
+      c("scpca_sample_id", "participant_id", "disease_timing")
+    ), 
+    by = c("scpca_sample_id")
+  )
 ```
 
 ```{r}
