@@ -401,7 +401,7 @@ mp_metrics_df |>
     min_proportion_patients_per_mp = min(num_patients)/total_patients
   ) |> 
   DT::datatable(
-    colnames = c("k", "Metaprograms from 1 patient", "Minimum number of patients observed in a metaprogram", "Minimum percentage of patients observed in a metaprogram")
+    colnames = c("k", "Metaprograms from 1 patient", "Minimum number of patients observed in a metaprogram", "Minimum % of patients observed in a metaprogram")
   ) |> 
   DT::formatPercentage("min_proportion_patients_per_mp")
 ```
