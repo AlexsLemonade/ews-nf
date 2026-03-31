@@ -9,9 +9,9 @@ output:
     number_sections: false
     code_folding: hide
 params:
-  metrics_file_list: NULL
-  scores_file_list: NULL
-  background_scores_file_list: NULL
+  metrics_file_list: "~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-5_cnmf-5-10-15_filtered/k_5_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-6_cnmf-5-10-15_filtered/k_6_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k_7_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-8_cnmf-5-10-15_filtered/k_8_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-9_cnmf-5-10-15_filtered/k_9_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/k_10_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k_11_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-12_cnmf-5-10-15_filtered/k_12_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-13_cnmf-5-10-15_filtered/k_13_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-14_cnmf-5-10-15_filtered/k_14_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-15_cnmf-5-10-15_filtered/k_15_metaprograms-metrics.rds"
+  scores_file_list: "~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-5_cnmf-5-10-15_filtered/k-5_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-6_cnmf-5-10-15_filtered/k-6_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k-7_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-8_cnmf-5-10-15_filtered/k-8_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-9_cnmf-5-10-15_filtered/k-9_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/k-10_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k-11_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-12_cnmf-5-10-15_filtered/k-12_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-13_cnmf-5-10-15_filtered/k-13_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-14_cnmf-5-10-15_filtered/k-14_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-15_cnmf-5-10-15_filtered/k-15_metaprogram_scores.tsv"
+  background_scores_file_list: "~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-5_cnmf-5-10-15_filtered/k-5_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-6_cnmf-5-10-15_filtered/k-6_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k-7_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-8_cnmf-5-10-15_filtered/k-8_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-9_cnmf-5-10-15_filtered/k-9_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/k-10_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k-11_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-12_cnmf-5-10-15_filtered/k-12_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-13_cnmf-5-10-15_filtered/k-13_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-14_cnmf-5-10-15_filtered/k-14_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-15_cnmf-5-10-15_filtered/k-15_background_scores.tsv"
   sample_metadata_file: "../sample-info/sample-metadata.tsv"
   seed: 2026
 ---
@@ -502,12 +502,15 @@ We then can identify the percentage of metaprograms for each value of k that hav
 This will be used to identify the optimal value of k in the final section. 
 
 ```{r}
-neff_obs_df |> 
+# save to a separate data frame to combine with all metrics at the end
+neff_sig_df <- neff_obs_df |> 
   dplyr::group_by(n_metaprograms) |> 
   dplyr::summarize(
     neff_sig_number = sum(is_significant), 
     neff_sig_proportion = neff_sig_number/dplyr::n()
-  ) |> 
+  ) 
+
+neff_sig_df |> 
   DT::datatable(colnames = c("k", "Number of metaprograms with significant effective sample size", "% of metaprograms with significant effective sample size")) |> 
   DT::formatPercentage("neff_sig_proportion", 2)
 ```
@@ -543,12 +546,15 @@ ggplot(correlation_df, aes(x = n_metaprograms, y = max_correlation)) +
 ```
 
 ```{r}
-correlation_df |> 
+# save to use with final metrics at the end
+grouped_correlation_df <- correlation_df |> 
   dplyr::group_by(n_metaprograms) |> 
   dplyr::summarize(
     num_passing_correlation = sum(is_passing),
     proportion_passing_correlation = num_passing_correlation/dplyr::n()
-  ) |> 
+  ) 
+
+grouped_correlation_df |> 
   DT::datatable(colnames = c("k", "Number of metaprograms with max correlation ≤ 0.5", "% of metaprograms with max correlation ≤ 0.5")) |> 
   DT::formatPercentage("proportion_passing_correlation", 2)
 ```
@@ -853,12 +859,15 @@ plot_permutation_results(global_background_df, cv_pvalue_df, metaprogram, score_
 The below table shows the total percentage of metaprograms with significant CV for each value of k. 
 
 ```{r}
-cv_pvalue_df |> 
+# save to use with final metrics at the end
+cv_sig_df <- cv_pvalue_df |> 
   dplyr::group_by(n_metaprograms) |> 
   dplyr::summarize(
     num_significant_cv = sum(is_significant),
     proportion_significant_cv = num_significant_cv/dplyr::n()
-  ) |> 
+  ) 
+
+cv_sig_df |> 
   DT::datatable(colnames = c("k", "Number of metaprograms with significant CV", "% of metaprograms with significant CV")) |> 
   DT::formatPercentage("proportion_significant_cv", 2)
 ```
@@ -945,6 +954,331 @@ ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = dis
   )
 ```
 
+
+## Combining metrics to identify an optimal value of k
+
+In this section, we will combine some of the above metrics to define the optimal value of k. 
+Each metric will have a single number reported for each value of k on a 0-1 scale where 1 indicates a good metaprogram. 
+The values we will include are: 
+
+* Proportion of metaprograms with a normalized effective sample size significantly greater than the null distribution (p ≥ 0.05)
+* Proportion of metaprograms with a max correlation to all other metaprograms < 0.5
+* Binary value indicating if the specific k is above or below the elbow point for coherence. 
+Values of k at or below the elbow will be 1 and values above the elbow will be 0.
+* Binary value indicating if the overall gene set specificity is significantly greater than the null distribution (p ≥ 0.05).
+Values of k that are significant will be 1 and those that are not significant will be 0.
+* Proportion of metaprograms with a CV significantly greater than the null distribution (p ≥ 0.05)
+
+<!--TODO: Update this text based on using mean value or mean rank-->
+Finally, we will calculate the mean across all reported metrics and the value of k with the maximum mean will be reported as the optimal value of k. 
+
+```{r}
+# define the metrics that we are going to use and the order we want to display them 
+# make the names human readable for display in the heatmap
+metrics_columns <- c(
+  "Effective sample size" = "neff_sig_proportion", 
+  "Correlation" = "proportion_passing_correlation",
+  "Coherence" = "coherence_elbow_passing",
+  "Gene set specificity" = "gss_significant",
+  "Coefficient of variation" = "proportion_significant_cv"
+)
+
+
+# custom row names 
+human_readable_rownames <- c(
+  "Effective sample size", 
+  "Correlation", 
+  "Coherence", 
+  "Gene set specificity",
+  "Coefficient of variation", 
+  "Total"
+)
+
+# pull out metaprograms that are significant for gene set specificity
+gss_sig_values <- gss_pvalue_df |>
+  dplyr::filter(is_significant) |> 
+  dplyr::pull(n_metaprograms)
+
+# combine all relevant metrics into a single dataframe
+# neff, correlation, and cv sig are already formatted with n_metaprograms and proportion
+combined_metrics_df <- neff_sig_df |> 
+  dplyr::left_join(grouped_correlation_df, by = c("n_metaprograms")) |> 
+  dplyr::left_join(cv_sig_df, by = c("n_metaprograms")) |> 
+  dplyr::mutate(
+    # coherence and gss have to be classified by seeing if the value of k 
+    # is significant or below/above the elbow 
+    k = stringr::str_remove(n_metaprograms, "k_") |> as.numeric(),
+    coherence_elbow_passing = dplyr::if_else(k <= elbow_value, 1, 0) ,
+    gss_significant = dplyr::if_else(n_metaprograms %in% gss_sig_values, 1, 0)
+  )
+
+# add a column for total mean and format mtx for the heatmap
+mean_mtx <- combined_metrics_df |> 
+  dplyr::mutate(
+    total_mean = rowMeans(dplyr::across(dplyr::all_of(metrics_columns)))
+  ) |> 
+  dplyr::select(
+    n_metaprograms, 
+    metrics_columns,
+    total_mean
+  ) |> 
+  tibble::column_to_rownames("n_metaprograms") |> 
+  as.matrix() |>
+  t()
+```
+
+
+```{r}
+#| fig.width: 10 
+#| fig.height: 5
+
+# define a color scale
+col_fun <- circlize::colorRamp2(
+  breaks = c(0, 0.5, 1),
+  colors = c("#2166AC", "white", "#B2182B")
+)
+
+# make the heatmap
+ht <- ComplexHeatmap::Heatmap(
+  mean_mtx,
+  name = "Value", 
+  row_labels = c(names(metrics_columns), "Mean score"),
+  col = col_fun,
+  # don't cluster and preserve our ordering
+  cluster_rows    = FALSE,
+  cluster_columns = FALSE,
+  # Split last row into its own section
+  row_split = c(rep("Metrics", nrow(mean_mtx) - 1), "Mean score"),
+  row_gap   = unit(0.3, "cm"),  # gap size between the two sections
+  # Labels
+  row_names_side    = "left",
+  column_names_side = "bottom",
+  row_names_gp      = grid::gpar(fontsize = 10),
+  column_names_gp   = grid::gpar(fontsize = 10),
+  column_names_rot  = 90,
+  # Cell appearance
+  rect_gp = grid::gpar(col = "white", lwd = 2), # white cell border
+  border  = FALSE, # no border around the whole thing
+  # Legend
+  heatmap_legend_param = list(
+    title          = "Value",
+    title_position = "leftcenter-rot", # rotate title on left
+    legend_height  = unit(4, "cm"),
+    at             = c(0, 0.25, 0.5, 0.75, 1),
+    labels         = c("0", "0.25", "0.5", "0.75", "1")
+  ),
+  # Axis labels
+  row_title      = "Metric",
+  row_title_side = "left",
+  row_title_gp   = grid::gpar(fontsize = 11),
+  # Square cells: set a fixed size per cell
+  cell_fun = NULL,
+  width  = unit(ncol(mean_mtx) * 0.8, "cm"),  # 0.8 cm per column
+  height = unit(nrow(mean_mtx) * 0.8, "cm")   # 0.8 cm per row (same as width = square)
+)
+
+ComplexHeatmap::draw(ht, heatmap_legend_side = "right")
+```
+
+```{r}
+# turn the mean back into a dataframe to get the optimal k
+# this is the one with max mean score
+optimal_k <- mean_mtx |> 
+  t() |> 
+  as.data.frame() |> 
+  tibble::rownames_to_column("n_metaprograms") |> 
+  dplyr::filter(total_mean == max(total_mean)) |> 
+  dplyr::pull(n_metaprograms)
+
+# find any metaprograms that are patient specific 
+single_patient_mps <- mp_metrics_df |> 
+  dplyr::filter(num_patients == 1 & n_metaprograms == optimal_k) |> 
+  dplyr::pull(metaprogram)
+
+# find any metaprograms that have low coherence 
+low_coherence_mps <- coherence_df |> 
+  dplyr::filter(!is_passing & n_metaprograms == optimal_k) |> 
+  dplyr::pull(metaprogram)
+```
+
+
+```{r}
+# compile text based on if there are any metaprograms with low coherence or patient specific
+main_text <- glue::glue(
+  "**The optimal value of k for this cohort is: {optimal_k}**"
+)
+
+patient_text <- glue::glue(
+  "This value of k has {length(single_patient_mps)} patient-specific metaprograms in which spectra come from a single patient."
+)
+
+if(length(single_patient_mps) > 0){
+  patient_text <- glue::glue(
+    "{patient_text}
+    This includes: {single_patient_mps}"
+  )
+}
+
+coherence_text <- glue::glue(
+  "For this value of k, {length(low_coherence_mps)} metaprogram(s) do not pass the minimum coherence of 0.1. "
+)
+
+if(length(low_coherence_mps) > 0){
+  coherence_text <- glue::glue(
+    "{coherence_text}
+    This includes: {low_coherence_mps}"
+  )
+}
+knitr::asis_output(
+  glue::glue(
+    "
+    {main_text}
+    
+    {patient_text}
+    
+    {coherence_text}
+    "
+  )
+)
+```
+
+
+<!--TODO: Pick either rank based or mean metric--> 
+For each metric, we will rank each value of k, assigning the same rank to any values of k with the exact same value for a specific metric. 
+We normalize this value by the max rank for each metric so that the scale is still 0-1. 
+The optimal value of k is the k with the highest average rank.
+
+```{r}
+# remove the names for doing the ranks
+# having a named list of columns does wierd things with mutate across
+rank_metrics_columns <- unname(metrics_columns)
+# get the ranks for all metrics columns
+# normalize by the max ranks
+rank_mtx <- combined_metrics_df |> 
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::all_of(rank_metrics_columns),
+      ~ rank(., ties.method = "min")/dplyr::n() # exact ties get the same (lowest) rank
+    )
+  ) |>
+  dplyr::mutate(
+    total_mean_rank = rowMeans(dplyr::across(dplyr::all_of(rank_metrics_columns)))
+  ) |>
+  dplyr::select(
+    n_metaprograms, 
+    dplyr::all_of(rank_metrics_columns), 
+    total_mean_rank
+    ) |> 
+  tibble::column_to_rownames("n_metaprograms") |> 
+  as.matrix() |> 
+  t()
+```
+
+
+
+```{r}
+# make the heatmap
+ht <- ComplexHeatmap::Heatmap(
+  rank_mtx,
+  name = "Value", 
+  row_labels = c(names(metrics_columns), "Mean rank"),
+  col = col_fun,
+  # don't cluster and preserve our ordering
+  cluster_rows    = FALSE,
+  cluster_columns = FALSE,
+  # Split last row into its own section
+  row_split = c(rep("Metrics", nrow(rank_mtx) - 1), "Mean rank"),
+  row_gap   = unit(0.3, "cm"),  # gap size between the two sections
+  # Labels
+  row_names_side    = "left",
+  column_names_side = "bottom",
+  row_names_gp      = grid::gpar(fontsize = 10),
+  column_names_gp   = grid::gpar(fontsize = 10),
+  column_names_rot  = 90,
+  # Cell appearance
+  rect_gp = grid::gpar(col = "white", lwd = 2), # white cell border
+  border  = FALSE, # no border around the whole thing
+  # Legend
+  heatmap_legend_param = list(
+    title          = "Value",
+    title_position = "leftcenter-rot", # rotate title on left
+    legend_height  = unit(4, "cm"),
+    at             = c(0, 0.25, 0.5, 0.75, 1),
+    labels         = c("0", "0.25", "0.5", "0.75", "1")
+  ),
+  # Axis labels
+  row_title      = "Metric",
+  row_title_side = "left",
+  row_title_gp   = grid::gpar(fontsize = 11),
+  # Square cells: set a fixed size per cell
+  cell_fun = NULL,
+  width  = unit(ncol(rank_mtx) * 0.8, "cm"),  # 0.8 cm per column
+  height = unit(nrow(rank_mtx) * 0.8, "cm")   # 0.8 cm per row (same as width = square)
+)
+
+ComplexHeatmap::draw(ht, heatmap_legend_side = "right")
+```
+<!--TODO: This is repeated from the above section, depending on what we decide we need to remove this or remove the other section-->
+```{r}
+# turn the mean back into a dataframe to get the optimal k
+# this is the one with max mean score
+optimal_k <- rank_mtx |> 
+  t() |> 
+  as.data.frame() |> 
+  tibble::rownames_to_column("n_metaprograms") |> 
+  dplyr::filter(total_mean_rank == max(total_mean_rank)) |> 
+  dplyr::pull(n_metaprograms)
+
+# find any metaprograms that are patient specific 
+single_patient_mps <- mp_metrics_df |> 
+  dplyr::filter(num_patients == 1 & n_metaprograms == optimal_k) |> 
+  dplyr::pull(metaprogram)
+
+# find any metaprograms that have low coherence 
+low_coherence_mps <- coherence_df |> 
+  dplyr::filter(!is_passing & n_metaprograms == optimal_k) |> 
+  dplyr::pull(metaprogram)
+```
+
+```{r}
+# compile text based on if there are any metaprograms with low coherence or patient specific
+main_text <- glue::glue(
+  "**The optimal value of k for this cohort is: {optimal_k}**"
+)
+
+patient_text <- glue::glue(
+  "This value of k has {length(single_patient_mps)} patient-specific metaprograms in which spectra come from a single patient."
+)
+
+if(length(single_patient_mps) > 0){
+  patient_text <- glue::glue(
+    "{patient_text}
+    This includes: {single_patient_mps}"
+  )
+}
+
+coherence_text <- glue::glue(
+  "For this value of k, {length(low_coherence_mps)} metaprogram(s) do not pass the minimum coherence of 0.1. "
+)
+
+if(length(low_coherence_mps) > 0){
+  coherence_text <- glue::glue(
+    "{coherence_text}
+    This includes: {low_coherence_mps}"
+  )
+}
+knitr::asis_output(
+  glue::glue(
+    "
+    {main_text}
+    
+    {patient_text}
+    
+    {coherence_text}
+    "
+  )
+)
+```
 
 ## Session info
 
