@@ -1034,7 +1034,7 @@ mean_mtx <- combined_metrics_df |>
 
 # define a color scale
 col_fun <- circlize::colorRamp2(
-  breaks = c(0, 0.5, 1),
+  breaks = c(0, 0.75, 1),
   colors = c("#2166AC", "white", "#B2182B")
 )
 
@@ -1155,20 +1155,21 @@ rank_metrics_columns <- unname(metrics_columns)
 # get the ranks for all metrics columns
 # normalize by the max ranks
 rank_mtx <- combined_metrics_df |> 
+  dplyr::select(
+    n_metaprograms,
+    dplyr::all_of(rank_metrics_columns)
+  ) |> 
   dplyr::mutate(
     dplyr::across(
       dplyr::all_of(rank_metrics_columns),
-      ~ rank(., ties.method = "min")/dplyr::n() # exact ties get the same (lowest) rank
+      # normalize so that higher values get higher ranks 
+      # ultimately high ranks get a value of 1 and low ranks get a value of 0
+      \(column) {rank(column, ties = "max")/dplyr::n()}# exact ties get the same highest rank
     )
   ) |>
   dplyr::mutate(
     total_mean_rank = rowMeans(dplyr::across(dplyr::all_of(rank_metrics_columns)))
-  ) |>
-  dplyr::select(
-    n_metaprograms, 
-    dplyr::all_of(rank_metrics_columns), 
-    total_mean_rank
-    ) |> 
+  ) |> 
   tibble::column_to_rownames("n_metaprograms") |> 
   as.matrix() |> 
   t()
