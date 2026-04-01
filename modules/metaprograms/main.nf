@@ -230,7 +230,7 @@ process score_and_annotate_sce {
   tag "${unique_id}"
   label 'mem_24'
   time '2h'
-  publishDir "${params.outdir}/metaprograms/${sample_id}", mode: 'copy'
+  publishDir "${params.outdir}/metaprograms/scored-sces/${sample_id}", mode: 'copy'
   input:
     tuple val(unique_id),
           val(sample_id),
@@ -238,18 +238,18 @@ process score_and_annotate_sce {
           path(annotations_file),
           path(score_file)
   output:
-    path("${unique_id}_annotated.sce")
+    path("${unique_id}_annotated.rds")
   script:
     """
     05-score-and-annotate-sce.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
       --score_file ${score_file} \
-      --output_file "${unique_id}_annotated.sce"
+      --output_file "${unique_id}_annotated.rds"
     """
   stub:
     """
-    touch "${unique_id}_annotated.sce"
+    touch "${unique_id}_annotated.rds"
     """
 }
 
