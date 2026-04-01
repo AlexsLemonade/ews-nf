@@ -9,10 +9,9 @@ output:
     number_sections: false
     code_folding: hide
 params:
-  metrics_file_list: "~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-5_cnmf-5-10-15_filtered/k_5_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-6_cnmf-5-10-15_filtered/k_6_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k_7_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-8_cnmf-5-10-15_filtered/k_8_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-9_cnmf-5-10-15_filtered/k_9_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/k_10_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k_11_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-12_cnmf-5-10-15_filtered/k_12_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-13_cnmf-5-10-15_filtered/k_13_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-14_cnmf-5-10-15_filtered/k_14_metaprograms-metrics.rds,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-15_cnmf-5-10-15_filtered/k_15_metaprograms-metrics.rds"
-  scores_file_list: "~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-5_cnmf-5-10-15_filtered/k-5_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-6_cnmf-5-10-15_filtered/k-6_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k-7_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-8_cnmf-5-10-15_filtered/k-8_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-9_cnmf-5-10-15_filtered/k-9_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/k-10_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k-11_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-12_cnmf-5-10-15_filtered/k-12_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-13_cnmf-5-10-15_filtered/k-13_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-14_cnmf-5-10-15_filtered/k-14_metaprogram_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-15_cnmf-5-10-15_filtered/k-15_metaprogram_scores.tsv"
-  background_scores_file_list: "~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-5_cnmf-5-10-15_filtered/k-5_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-6_cnmf-5-10-15_filtered/k-6_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k-7_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-8_cnmf-5-10-15_filtered/k-8_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-9_cnmf-5-10-15_filtered/k-9_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/k-10_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k-11_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-12_cnmf-5-10-15_filtered/k-12_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-13_cnmf-5-10-15_filtered/k-13_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-14_cnmf-5-10-15_filtered/k-14_background_scores.tsv,~/Documents/ALSF/git_repos/ews-nf/ews-nf-out/metaprograms/metaprograms-15_cnmf-5-10-15_filtered/k-15_background_scores.tsv"
-  sample_metadata_file: "../sample-info/sample-metadata.tsv"
+  metrics_file_list: NULL
+  scores_file_list: NULL
+  background_scores_file_list: NULL
   seed: 2026
 ---
 
@@ -332,6 +331,15 @@ sample_df <- readr::read_tsv(params$sample_metadata_file, col_types = "c")
 
 # define palette for disease timings shown here
 disease_timing_palette <- c(Primary = "#6A9FC0", Metastasis = "#C47A8A", Recurrence = "#5A9E82")
+
+# set figure heights based on if we have the smaller set of ks (5-15) 
+# or the larger set of ks (5-25)
+total_k <- length(n_metaprograms)
+if(total_k <= 12){
+  dynamic_fig_height <- 10
+} else {
+  dynamic_fig_height <- 20
+}
 ```
 
 
@@ -427,7 +435,7 @@ disease_timing_df <- mp_metrics_df |>
 ```
 
 ```{r}
-#| fig.height: 10
+#| fig.height: !r dynamic_fig_height
 #| fig.width: 10
 
 ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
@@ -480,7 +488,7 @@ neff_background_df <- metrics_list |>
 
 
 ```{r}
-#| fig.height: 15
+#| fig.height: !r dynamic_fig_height
 #| fig.width: 15
 
 plot_permutation_results(neff_background_df, neff_obs_df, metaprogram, eff_number_norm) +
@@ -827,7 +835,7 @@ var_df <- scores_df |>
 ```
 
 ```{r}
-#| fig.height: 10
+#| fig.height: !r dynamic_fig_height
 #| fig.width: 15
 
 # calculate pvalues for each cv 
@@ -922,7 +930,7 @@ random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value, random_eff
 ```
 
 ```{r}
-#| fig.height: 15
+#| fig.height: !r dynamic_fig_height
 #| fig.width: 15
 
 # plot the scores fore ach sample type and indicate the significance
