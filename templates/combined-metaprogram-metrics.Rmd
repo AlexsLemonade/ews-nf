@@ -961,16 +961,15 @@ In this section, we will combine some of the above metrics to define the optimal
 Each metric will have a single number reported for each value of k on a 0-1 scale where 1 indicates a good metaprogram. 
 The values we will include are: 
 
-* Proportion of metaprograms with a normalized effective sample size significantly greater than the null distribution (p ≥ 0.05)
+* Proportion of metaprograms with a normalized effective sample size significantly greater than the null distribution (p ≤ 0.05)
 * Proportion of metaprograms with a max correlation to all other metaprograms < 0.5
-* Binary value indicating if the specific k is above or below the elbow point for coherence. 
-Values of k at or below the elbow will be 1 and values above the elbow will be 0.
-* Binary value indicating if the overall gene set specificity is significantly greater than the null distribution (p ≥ 0.05).
+* Value indicating if the specific k is at, above, or below the elbow point for coherence. 
+The value of k at the elbow is prioritized and assigned a value of 1. 
+Values of k below the elbow will be 0.5 and values above the elbow will be 0.
+* Binary value indicating if the overall gene set specificity is significantly greater than the null distribution (p ≤ 0.05).
 Values of k that are significant will be 1 and those that are not significant will be 0.
-* Proportion of metaprograms with a CV significantly greater than the null distribution (p ≥ 0.05)
+* Proportion of metaprograms with a CV significantly greater than the null distribution (p ≤ 0.05)
 
-<!--TODO: Update this text based on using mean value or mean rank-->
-Finally, we will calculate the mean across all reported metrics and the value of k with the maximum mean will be reported as the optimal value of k. 
 
 ```{r}
 # define the metrics that we are going to use and the order we want to display them 
@@ -1008,7 +1007,11 @@ combined_metrics_df <- neff_sig_df |>
     # coherence and gss have to be classified by seeing if the value of k 
     # is significant or below/above the elbow 
     k = stringr::str_remove(n_metaprograms, "k_") |> as.numeric(),
-    coherence_elbow_passing = dplyr::if_else(k <= elbow_value, 1, 0) ,
+    coherence_elbow_passing = dplyr::case_when(
+      k == elbow_value ~ 1,
+      k < elbow_value ~ 0.5,
+      k > elbow_value ~ 0
+      ) ,
     gss_significant = dplyr::if_else(n_metaprograms %in% gss_sig_values, 1, 0)
   )
 
