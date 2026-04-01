@@ -3,6 +3,7 @@
 # This script is used to calculate a set of metrics on metaprograms
 # The output is a RDS file with:
 # mp_metrics_df: A dataframe of metrics calculated for each MP
+# top_genes: List of top 200 genes and gene weights for each MP
 # ora_results_df: A dataframe of all results output from ORA
 # background_mp_stats_df: A dataframe with the background values for metaprogram stats
 # background_specificity_df: Dataframe with background for gene set specificity
@@ -514,10 +515,18 @@ neff_pvalue_df <- calculate_permutation_significance(eff_number_norm,
 
 # ORA --------------------------------------------------------------------------
 
-# grab hallmarks to use in addition to the custom and Ews specific gene lists 
-hallmarks_msigdb_df <- msigdbr::msigdbr(species = "Homo sapiens", collection = "H") |> 
+# grab hallmarks and reactome to use in addition to the custom and Ews specific gene lists 
+hallmarks_msigdb_df <- msigdbr::msigdbr(
+  species = "Homo sapiens", 
+  collection = "H"
+  ) |> 
   dplyr::select(gs_name, ensembl_gene)
-# TODO: add in Gene ontology as a gene set? 
+reactome_msigdb_df <- msigdbr::msigdbr(
+  species = "Homo sapiens", 
+  collection = "C2",
+  subcollection = "CP:REACTOME"
+  ) |> 
+  dplyr::select(gs_name, ensembl_gene)
 
 # get genes in the EwS specific gene sets from MSigDB
 ef_msigdb_geneset_df <- prep_msigdb_genesets(ef_msigdb_df)
@@ -526,6 +535,7 @@ ef_msigdb_geneset_df <- prep_msigdb_genesets(ef_msigdb_df)
 all_term_df <- ef_msigdb_geneset_df |>
   dplyr::bind_rows(custom_geneset_df) |> 
   dplyr::bind_rows(hallmarks_msigdb_df) |> 
+  dplyr::bind_rows(reactome_msigdb_df) |> 
   tidyr::drop_na()
 
 # extract top genes
@@ -580,6 +590,7 @@ mp_metrics_df <- max_cor_df |>
 # create an object for exporting with mp metrics and ora results
 metrics_obj <- list(
   mp_metrics_df = mp_metrics_df,
+  top_genes = top_genes,
   ora_results_df = ora_results_df,
   background_mp_stats_df = background_mp_stats_df,
   background_specificity_df = background_specificity_df,
