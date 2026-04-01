@@ -970,6 +970,9 @@ Values of k below the elbow will be 0.5 and values above the elbow will be 0.
 Values of k that are significant will be 1 and those that are not significant will be 0.
 * Proportion of metaprograms with a CV significantly greater than the null distribution (p ≤ 0.05)
 
+For each metric, we will rank each value of k, assigning the same rank to any values of k with the exact same value for a specific metric. 
+We normalize this value by the total number of possible k so that the scale is still 0-1, where 1 indicates a good metaprogram.
+The optimal value of k is the k with the highest average rank.
 
 ```{r}
 # define the metrics that we are going to use and the order we want to display them 
@@ -980,17 +983,6 @@ metrics_columns <- c(
   "Coherence" = "coherence_elbow_passing",
   "Gene set specificity" = "gss_significant",
   "Coefficient of variation" = "proportion_significant_cv"
-)
-
-
-# custom row names 
-human_readable_rownames <- c(
-  "Effective sample size", 
-  "Correlation", 
-  "Coherence", 
-  "Gene set specificity",
-  "Coefficient of variation", 
-  "Total"
 )
 
 # pull out metaprograms that are significant for gene set specificity
@@ -1014,142 +1006,7 @@ combined_metrics_df <- neff_sig_df |>
       ) ,
     gss_significant = dplyr::if_else(n_metaprograms %in% gss_sig_values, 1, 0)
   )
-
-# add a column for total mean and format mtx for the heatmap
-mean_mtx <- combined_metrics_df |> 
-  dplyr::mutate(
-    total_mean = rowMeans(dplyr::across(dplyr::all_of(metrics_columns)))
-  ) |> 
-  dplyr::select(
-    n_metaprograms, 
-    metrics_columns,
-    total_mean
-  ) |> 
-  tibble::column_to_rownames("n_metaprograms") |> 
-  as.matrix() |>
-  t()
 ```
-
-
-```{r}
-#| fig.width: 10 
-#| fig.height: 5
-
-# define a color scale
-col_fun <- circlize::colorRamp2(
-  breaks = c(0, 0.75, 1),
-  colors = c("#2166AC", "white", "#B2182B")
-)
-
-# make the heatmap
-ht <- ComplexHeatmap::Heatmap(
-  mean_mtx,
-  name = "Value", 
-  row_labels = c(names(metrics_columns), "Mean score"),
-  col = col_fun,
-  # don't cluster and preserve our ordering
-  cluster_rows    = FALSE,
-  cluster_columns = FALSE,
-  # Split last row into its own section
-  row_split = c(rep("Metrics", nrow(mean_mtx) - 1), "Mean score"),
-  row_gap   = unit(0.3, "cm"),  # gap size between the two sections
-  # Labels
-  row_names_side    = "left",
-  column_names_side = "bottom",
-  row_names_gp      = grid::gpar(fontsize = 10),
-  column_names_gp   = grid::gpar(fontsize = 10),
-  column_names_rot  = 90,
-  # Cell appearance
-  rect_gp = grid::gpar(col = "white", lwd = 2), # white cell border
-  border  = FALSE, # no border around the whole thing
-  # Legend
-  heatmap_legend_param = list(
-    title          = "Value",
-    title_position = "leftcenter-rot", # rotate title on left
-    legend_height  = unit(4, "cm"),
-    at             = c(0, 0.25, 0.5, 0.75, 1),
-    labels         = c("0", "0.25", "0.5", "0.75", "1")
-  ),
-  # Axis labels
-  row_title      = "Metric",
-  row_title_side = "left",
-  row_title_gp   = grid::gpar(fontsize = 11),
-  # Square cells: set a fixed size per cell
-  cell_fun = NULL,
-  width  = unit(ncol(mean_mtx) * 0.8, "cm"),  # 0.8 cm per column
-  height = unit(nrow(mean_mtx) * 0.8, "cm")   # 0.8 cm per row (same as width = square)
-)
-
-ComplexHeatmap::draw(ht, heatmap_legend_side = "right")
-```
-
-```{r}
-# turn the mean back into a dataframe to get the optimal k
-# this is the one with max mean score
-optimal_k <- mean_mtx |> 
-  t() |> 
-  as.data.frame() |> 
-  tibble::rownames_to_column("n_metaprograms") |> 
-  dplyr::filter(total_mean == max(total_mean)) |> 
-  dplyr::pull(n_metaprograms)
-
-# find any metaprograms that are patient specific 
-single_patient_mps <- mp_metrics_df |> 
-  dplyr::filter(num_patients == 1 & n_metaprograms == optimal_k) |> 
-  dplyr::pull(metaprogram)
-
-# find any metaprograms that have low coherence 
-low_coherence_mps <- coherence_df |> 
-  dplyr::filter(!is_passing & n_metaprograms == optimal_k) |> 
-  dplyr::pull(metaprogram)
-```
-
-
-```{r}
-# compile text based on if there are any metaprograms with low coherence or patient specific
-main_text <- glue::glue(
-  "**The optimal value of k for this cohort is: {optimal_k}**"
-)
-
-patient_text <- glue::glue(
-  "This value of k has {length(single_patient_mps)} patient-specific metaprograms in which spectra come from a single patient."
-)
-
-if(length(single_patient_mps) > 0){
-  patient_text <- glue::glue(
-    "{patient_text}
-    This includes: {single_patient_mps}"
-  )
-}
-
-coherence_text <- glue::glue(
-  "For this value of k, {length(low_coherence_mps)} metaprogram(s) do not pass the minimum coherence of 0.1. "
-)
-
-if(length(low_coherence_mps) > 0){
-  coherence_text <- glue::glue(
-    "{coherence_text}
-    This includes: {low_coherence_mps}"
-  )
-}
-knitr::asis_output(
-  glue::glue(
-    "
-    {main_text}
-    
-    {patient_text}
-    
-    {coherence_text}
-    "
-  )
-)
-```
-
-
-<!--TODO: Pick either rank based or mean metric--> 
-For each metric, we will rank each value of k, assigning the same rank to any values of k with the exact same value for a specific metric. 
-We normalize this value by the max rank for each metric so that the scale is still 0-1. 
-The optimal value of k is the k with the highest average rank.
 
 ```{r}
 # remove the names for doing the ranks
@@ -1181,6 +1038,12 @@ rank_mtx <- combined_metrics_df |>
 
 
 ```{r}
+# define a color scale
+col_fun <- circlize::colorRamp2(
+  breaks = c(0, 0.75, 1),
+  colors = c("#2166AC", "white", "#B2182B")
+)
+
 # make the heatmap
 ht <- ComplexHeatmap::Heatmap(
   rank_mtx,
@@ -1222,7 +1085,7 @@ ht <- ComplexHeatmap::Heatmap(
 
 ComplexHeatmap::draw(ht, heatmap_legend_side = "right")
 ```
-<!--TODO: This is repeated from the above section, depending on what we decide we need to remove this or remove the other section-->
+
 ```{r}
 # turn the mean back into a dataframe to get the optimal k
 # this is the one with max mean score
