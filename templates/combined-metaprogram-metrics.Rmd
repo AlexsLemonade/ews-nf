@@ -13,6 +13,7 @@ params:
   scores_file_list: NULL
   background_scores_file_list: NULL
   sample_metadata_file: "../sample-info/sample-metadata.tsv"
+  output_k_file: NULL
   seed: 2026
 ---
 
@@ -1155,6 +1156,12 @@ knitr::asis_output(
   )
 )
 ```
+
+```{r}
+# finally export the value of k to a file to use for scoring in the next process
+readr::write_file(optimal_k, params$output_k_file)
+```
+
 
 ## Session info
 
