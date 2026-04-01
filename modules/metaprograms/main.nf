@@ -212,6 +212,7 @@ process combined_metaprogram_report {
       params = list(metrics_file_list = '${metrics_file_string}', \
                     scores_file_list = '${scores_file_string}', \
                     background_scores_file_list = '${background_scores_files_string}', \
+                    sample_metadata_file = '${params.sample_metadata_file}', \
                     seed = '${params.seed}'))"
     """
   stub:
