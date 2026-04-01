@@ -12,6 +12,7 @@ params:
   metrics_file_list: NULL
   scores_file_list: NULL
   background_scores_file_list: NULL
+  sample_metadata_file: "../sample-info/sample-metadata.tsv"
   seed: 2026
 ---
 
