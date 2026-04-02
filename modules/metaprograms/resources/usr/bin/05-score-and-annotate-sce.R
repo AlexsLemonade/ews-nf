@@ -42,7 +42,7 @@ opt <- parse_args(OptionParser(option_list = option_list))
 stopifnot(
   "Processed SCE file does not exist" = file.exists(opt$sce_file),
   "Annotations file does not exist" = file.exists(opt$annotations_file),
-  "Score file does not exist" = file.exists(opt$score_file),
+  "Score file does not exist" = file.exists(opt$scores_file),
   "Output file must end in .rds" = stringr::str_detect(opt$output_file, "\\.rds$")
 )
 
@@ -61,7 +61,7 @@ annotations_df <- readr::read_tsv(opt$annotations_file) |>
   dplyr::mutate(ews_nf_celltype_annotation = annotation_tier_0) 
 
 # read in scores file
-scores_df <- readr::read_tsv(opt$score_file)
+scores_df <- readr::read_tsv(opt$scores_file)
 # expand to have one row per barcode and one column per mp
 wide_scores_df <- scores_df |> 
   dplyr::select(-unique_id) |> 
