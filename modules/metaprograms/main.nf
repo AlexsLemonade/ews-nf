@@ -184,7 +184,7 @@ process combined_metaprogram_report {
     OPTIMAL_K_VALUE=\$(cat "optimal_k_value.txt")
 
     # for testing to make sure the value is actually getting exported
-    echo $OPTIMAL_K_VALUE
+    echo \$OPTIMAL_K_VALUE
     """
   stub:
     """
