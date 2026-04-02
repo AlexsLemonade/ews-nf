@@ -970,14 +970,14 @@ In this section, we will combine some of the above metrics to define the optimal
 Each metric will have a single number reported for each value of k on a 0-1 scale where 1 indicates a good metaprogram. 
 The values we will include are: 
 
-* Proportion of metaprograms with a normalized effective sample size significantly greater than the null distribution (p ≤ 0.05)
-* Proportion of metaprograms with a max correlation to all other metaprograms < 0.5
-* Value indicating if the specific k is at, above, or below the elbow point for coherence. 
+* `Effective sample size`: Proportion of metaprograms with a normalized effective sample size significantly greater than the null distribution (p ≤ 0.05).
+* `Correlation`: Proportion of metaprograms with a max correlation to all other metaprograms < 0.5.
+* `Coherence`: Value indicating if the specific k is at, above, or below the elbow point for coherence. 
 The value of k at the elbow is prioritized and assigned a value of 1. 
 Values of k below the elbow will be 0.5 and values above the elbow will be 0.
-* Binary value indicating if the overall gene set specificity is significantly greater than the null distribution (p ≤ 0.05).
+* `Gene set specificity`: Binary value indicating if the overall gene set specificity is significantly greater than the null distribution (p ≤ 0.05).
 Values of k that are significant will be 1 and those that are not significant will be 0.
-* Proportion of metaprograms with a CV significantly greater than the null distribution (p ≤ 0.05)
+* `Coefficient of variation`: Proportion of metaprograms with a CV significantly greater than the null distribution (p ≤ 0.05).
 
 For each metric, we will rank each value of k, assigning the same rank to any values of k with the exact same value for a specific metric. 
 We normalize this value by the total number of possible k so that the scale is still 0-1, where 1 indicates a good metaprogram.
