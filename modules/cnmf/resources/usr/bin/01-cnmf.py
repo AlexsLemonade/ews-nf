@@ -165,7 +165,10 @@ def main():
 
     # get the consensus for each value of k
     for k in k_range:
-        cnmf_obj.consensus(k=k, density_threshold=args.density_threshold)
+        try:
+            cnmf_obj.consensus(k=k, density_threshold=args.density_threshold)
+        except RuntimeError as e:
+            print(f"WARNING: consensus failed for k={k}: {e}")
 
 
 if __name__ == "__main__":
