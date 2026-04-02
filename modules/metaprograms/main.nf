@@ -305,7 +305,7 @@ workflow metaprograms {
 
     // render report
     // define path to template reports
-    individual_report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
+    individual_report_template_file = "${projectDir}/templates/individual-metaprogram-evaluation.Rmd" 
     combined_report_template_file = "${projectDir}/templates/combined-metaprogram-metrics.Rmd"
 
     // collect all metrics files for the combined report
