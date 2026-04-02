@@ -57,8 +57,7 @@ id <- basename(opt$sce_file) |>
 annotations_df <- readr::read_tsv(opt$annotations_file) |> 
   dplyr::filter(unique_id == id) |> 
   # match the column name for final annotations that is currenlty used in shared data
-  dplyr::mutate(ews_nf_celltype_annotation = annotation_tier_0) |> 
-  dplyr::
+  dplyr::mutate(ews_nf_celltype_annotation = annotation_tier_0) 
 
 # read in scores file
 scores_df <- readr::read_tsv(opt$score_file)
