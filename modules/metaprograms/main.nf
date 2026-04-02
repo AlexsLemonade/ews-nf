@@ -366,7 +366,7 @@ workflow metaprograms {
       .filter { n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k -> 
         n_metaprograms == optimal_k 
       }
-      // joining on n_metaprograms
+      // joining on n_metaprograms and metaprograms_publish_dir
       // drop the background files before joining
       .join(grouped_score_ch.map { it.dropRight(1) }, by: [0, 1])
       // drop publish directory and extra value of k 

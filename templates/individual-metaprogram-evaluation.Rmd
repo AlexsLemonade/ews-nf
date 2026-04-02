@@ -377,7 +377,7 @@ ef_repressed_genesets <- ef_category_df |>
   dplyr::pull(full_geneset_name)
 
 
-# grab hallmarks and reactome to use in addition to the custom and Ews specific gene lists 
+# grab hallmarks and reactome to use in addition to the custom and EwS specific gene lists 
 hallmarks_msigdb_df <- msigdbr::msigdbr(
   species = "Homo sapiens", 
   collection = "H"

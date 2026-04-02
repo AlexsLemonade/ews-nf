@@ -13,6 +13,7 @@ option_list <- list(
     opt_str = c("--sce_file"),
     type = "character",
     default = "",
+    help = "Path to processed SCE to add scores and annotations to"
   ),
   make_option(
     opt_str = c("--annotations_file"),
