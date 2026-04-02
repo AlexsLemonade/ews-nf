@@ -237,7 +237,7 @@ process score_and_annotate_sce {
           val(sample_id),
           path(sce_file),
           path(annotations_file),
-          path(score_file)
+          path(scores_file)
   output:
     path("${unique_id}_annotated.rds")
   script:
@@ -245,7 +245,7 @@ process score_and_annotate_sce {
     05-score-and-annotate-sce.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
-      --score_file ${score_file} \
+      --score_files ${scores_file} \
       --output_file "${unique_id}_annotated.rds"
     """
   stub:
