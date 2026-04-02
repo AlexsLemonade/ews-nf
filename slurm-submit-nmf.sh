@@ -75,9 +75,9 @@ filter_spectra=${filter_spectra:-1}
 n_metaprograms=${n_metaprograms:-"8,9,10,11"}
 
 # validate n_metaprograms has at least 4 values
-IFS=',' read -ra n_metaprograms_arr <<< "$n_metaprograms"
-if [[ ${#n_metaprograms_arr[@]} -lt 4 ]]; then
-    echo "ERROR: n_metaprograms must contain at least 4 values, got ${#n_metaprograms_arr[@]}: $n_metaprograms"
+length_n_metaprograms=$(echo "$n_metaprograms" | tr -cd ',' | wc -c)
+if [[ $length_n_metaprograms -lt 3 ]]; then
+    echo "ERROR: n_metaprograms must contain at least 4 values, got $length_n_metaprograms values instead"
     exit 1
 fi
 
