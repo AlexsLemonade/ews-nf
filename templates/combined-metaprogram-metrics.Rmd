@@ -285,6 +285,11 @@ metrics_list <- metrics_rds_files |>
 n_metaprograms <- metrics_list |> 
   purrr::map_dbl("n_metaprograms")
 
+# the elbow plot won't work if we don't have at least 4 values of k
+stopifnot(
+  "Must provide at least 4 values of k" = length(n_metaprograms) >= 4
+  )
+
 names(metrics_list) <- sprintf("k_%02d", n_metaprograms)
 
 # create dataframe with one row per metaprogram/n_metaprogram (k) combination 

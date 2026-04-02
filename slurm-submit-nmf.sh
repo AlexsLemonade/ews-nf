@@ -33,7 +33,8 @@
 #  can be either "all" or a comma separated string, default is "5,10,15"
 # filter_spectra: Used to filter orphan spectra prior to generating metaprograms, default is 1 (true)
 #  to keep all spectra, use --filter_spectra 0
-# n_metaprograms: Number of metaprograms to generate, can be a single number (as a string) or a comma separated list, default is 10
+# n_metaprograms: Comma separated string indicating the range of number of metaprograms to use for finding the optimal k, default is "8,9,10,11"
+# Must be at least 4 numbers for proper computation of metaprogram metrics
 # ews_dir: Path to the ews-nf repo, default is $HOME/ews-nf
 
 # To submit this script use the following example:
@@ -70,8 +71,15 @@ k_step_size=${k_step_size:-5}
 # metaprogram parameters
 cnmf_k_range=${cnmf_k_range:-"5,10,15"}
 filter_spectra=${filter_spectra:-1}
-# can be a single value or a comma separated list of values
-n_metaprograms=${n_metaprograms:-"10"}
+# comma separated list of values
+n_metaprograms=${n_metaprograms:-"8,9,10,11"}
+
+# validate n_metaprograms has at least 4 values
+IFS=',' read -ra n_metaprograms_arr <<< "$n_metaprograms"
+if [[ ${#n_metaprograms_arr[@]} -lt 4 ]]; then
+    echo "ERROR: n_metaprograms must contain at least 4 values, got ${#n_metaprograms_arr[@]}: $n_metaprograms"
+    exit 1
+fi
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
