@@ -182,6 +182,9 @@ process combined_metaprogram_report {
 
     # save optimal k as a variable to be used to score cells 
     OPTIMAL_K_VALUE=\$(cat "optimal_k_value.txt")
+
+    # for testing to make sure the value is actually getting exported
+    echo $OPTIMAL_K_VALUE
     """
   stub:
     """
@@ -350,7 +353,7 @@ workflow metaprograms {
       .join(sce_ch, by: 0)
       .map{ unique_id, score_file, sample_id, sce_file, annotations_file -> 
         [unique_id, sample_id, sce_file, annotations_file, score_file]
-      }
+      }.view()
 
     // output sces with annotations and scores for the optimal k value
     score_and_annotate_sce(score_and_annotate_ch)
@@ -366,7 +369,7 @@ workflow metaprograms {
       // instead we ouptut to the main metaprograms directory
       .map{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k, score_files -> 
         [n_metaprograms, metaprograms_file, score_files]
-      }
+      }.view()
 
     individual_metaprogram_report(
       report_ch,
