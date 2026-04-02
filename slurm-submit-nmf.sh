@@ -74,14 +74,6 @@ filter_spectra=${filter_spectra:-1}
 # comma separated list of values
 n_metaprograms=${n_metaprograms:-"8,9,10,11"}
 
-# validate n_metaprograms has at least 4 values
-length_n_metaprograms=$(echo "$n_metaprograms" | tr -cd ',' | wc -c | tr -d ' ')
-echo $length_n_metaprograms
-if [[ $length_n_metaprograms -lt 3 ]]; then
-    echo "ERROR: n_metaprograms must contain at least 4 values"
-    exit 1
-fi
-
 # grab arguments from command line
 while [ $# -gt 0 ]; do
     if [[ $1 == *'--'* ]]; then
@@ -90,6 +82,14 @@ while [ $# -gt 0 ]; do
     fi
     shift
 done
+
+# validate n_metaprograms has at least 4 values by counting the number of commas
+length_n_metaprograms=$(echo "$n_metaprograms" | tr -cd ',' | wc -c )
+echo $length_n_metaprograms
+if [[ $length_n_metaprograms -lt 3 ]]; then
+    echo "ERROR: n_metaprograms must contain at least 4 values"
+    exit 1
+fi
 
 # set flags for running specific samples
 if [ -n "$sample_ids" ]; then
