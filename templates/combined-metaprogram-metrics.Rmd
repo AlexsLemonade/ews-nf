@@ -270,7 +270,8 @@ stopifnot(
   "Some or all metrics files do not exist" = all(file.exists(metrics_rds_files)),
   "Some or all cell score files do not exist" = all(file.exists(scores_files)),
   "Some or all background cell score files do not exist" = all(file.exists(background_files)),
-  "Sample metadata file is missing" = file.exists(params$sample_metadata_file)
+  "Sample metadata file is missing" = file.exists(params$sample_metadata_file),
+  "Output k file must be provided" = !is.null(params$output_k_file)
 )
 ```
 

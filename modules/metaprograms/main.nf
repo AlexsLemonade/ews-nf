@@ -340,7 +340,9 @@ workflow metaprograms {
       }
       .combine(combined_metaprogram_report.out.optimal_k) // combine with optimal k value from combined report
       // filter to only get score outputs for optimal k value
-      .filter{ n_metaprograms, score_files, optimal_k -> n_metaprograms == optimal_k }
+      .filter{ n_metaprograms, score_files, optimal_k -> 
+        n_metaprograms == optimal_k 
+      }
       .map{ it.dropRight(1) } // drop extra k 
       // transpose channel to split up score files [[n_metaprograms, score_file], [n_metaprograms, score_file]]
       .transpose()
@@ -361,7 +363,9 @@ workflow metaprograms {
     // only render a report for the optimal k value
     report_ch = generate_metaprograms.out
       .combine(combined_metaprogram_report.out.optimal_k)
-      .filter { n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k -> n_metaprograms == optimal_k }
+      .filter { n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k -> 
+        n_metaprograms == optimal_k 
+      }
       // joining on n_metaprograms
       // drop the background files before joining
       .join(grouped_score_ch.map { it.dropRight(1) }, by: [0, 1])
