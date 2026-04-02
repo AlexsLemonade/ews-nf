@@ -1159,6 +1159,8 @@ knitr::asis_output(
 
 ```{r}
 # finally export the value of k to a file to use for scoring in the next process
+# want to export a number to match n_metaprograms in nextflow
+optimal_k <- stringr::str_remove(optimal_k, "k_") |> as.numeric()
 readr::write_lines(optimal_k, params$output_k_file)
 ```
 
