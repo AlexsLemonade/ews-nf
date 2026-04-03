@@ -247,7 +247,7 @@ process score_and_annotate_sce {
     05-score-and-annotate-sce.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
-      --score_files ${scores_file} \
+      --scores_files ${scores_file} \
       --output_file "${unique_id}_annotated.rds"
     """
   stub:
