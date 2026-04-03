@@ -282,6 +282,7 @@ workflow metaprograms {
       // if all the outputs exist for a given n_metaprogram, let's skip it 
       .branch { n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
         cached_metaprograms: 
+          !params.repeat_creating_metaprograms &&
           mp_file.exists() && 
           combined_scores_file.exists() && 
           combined_background_scores_file.exists() && 
