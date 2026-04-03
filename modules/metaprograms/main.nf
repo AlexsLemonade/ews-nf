@@ -236,7 +236,8 @@ process score_and_annotate_sce {
     tuple val(unique_id),
           val(sample_id),
           path(sce_file),
-          path(annotations_file),
+          path(annotations_file)
+    tuple val(n_metaprograms),
           path(scores_file)
   output:
     path("${unique_id}_annotated.rds")
@@ -271,6 +272,25 @@ workflow metaprograms {
       .map{n_metaprograms -> 
         // define the publish directory for metaprograms
         def metaprograms_publish_dir = "${params.outdir}/metaprograms/metaprograms-${n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
+        def mp_file = file("${metaprograms_publish_dir}/metaprograms.rds")
+        def combined_scores_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_metaprogram_scores.tsv")
+        def combined_background_scores_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_background_scores.tsv")
+        def metrics_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_metaprograms-metrics.rds")
+        [n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file]
+      }
+      // if all the outputs exist for a given n_metaprogram, let's skip it 
+      .branch { n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+        cached_metaprograms: 
+          mp_file.exists() && 
+          combined_scores_file.exists() && 
+          combined_background_scores_file.exists() && 
+          metrics_file.exists()
+        create_metaprograms: true
+      }
+
+    // input for creating metaprograms 
+    create_metaprograms_ch = n_metaprograms_ch.create_metaprograms
+      .map{ n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file -> 
         [n_metaprograms, metaprograms_publish_dir]
       }
 
@@ -278,7 +298,7 @@ workflow metaprograms {
     metaprograms_input_ch = cnmf_ch.collect{ unique_id, sample_id, cnmf_output -> cnmf_output }
 
     // generate metaprograms
-    generate_metaprograms(metaprograms_input_ch, n_metaprograms_ch)
+    generate_metaprograms(metaprograms_input_ch, create_metaprograms_ch)
 
     // score metaprograms for each sample
     // make sure to score for each sample for each value of n_metaprograms
@@ -308,17 +328,34 @@ workflow metaprograms {
     // define path to template reports
     individual_report_template_file = "${projectDir}/templates/individual-metaprogram-evaluation.Rmd" 
     combined_report_template_file = "${projectDir}/templates/combined-metaprogram-metrics.Rmd"
+    
+    // construct channels for skipped processes and mix with output from actual processes
+    all_metaprograms_ch = n_metaprograms_ch.cached_metaprograms
+      .map{ n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+        [n_metaprograms, metaprograms_publish_dir, mp_file]
+      }
+      .mix(generate_metaprograms.out)
+
+    all_scores_ch = n_metaprograms_ch.cached_metaprograms
+      .map{ n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+        [n_metaprograms, combined_scores_file, combined_background_scores_file]
+      }
+      .mix(combine_score_files.out)
 
     // collect all metrics files for the combined report
-    metrics_ch = metaprogram_metrics.out
+    metrics_ch = n_metaprograms_ch.cached_metaprograms
+      .map{ n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+        [n_metaprograms, metaprograms_publish_dir, metrics_file]
+      }
+      .mix(metaprogram_metrics.out) 
       .collect{ n_metaprograms, metaprograms_publish_dir, metrics_file -> metrics_file }
 
     // collect all score and background score files for the report
-    scores_ch = combine_score_files.out
-      .collect{ n_metaprograms, score_file, background_score_file -> score_file }
+    scores_ch = all_scores_ch
+      .collect{ n_metaprograms, combined_score_file, combined_background_score_file -> combined_score_file }
 
-    background_scores_ch = combine_score_files.out
-      .collect{ n_metaprograms, score_file, background_score_file -> background_score_file }
+    background_scores_ch = all_scores_ch
+      .collect{ n_metaprograms, combined_score_file, combined_background_score_file -> combined_background_score_file }
 
     // render combined report
     combined_metaprogram_report(
@@ -330,46 +367,32 @@ workflow metaprograms {
 
     // make a channel of sce file, annotation file and score file 
     // only for the optimal k value 
-    score_and_annotate_ch = grouped_score_ch
+    optimal_k_scores_ch = all_scores_ch
       // drop publish directory and background score files 
-      .map{ n_metaprograms, metaprograms_publish_dir, score_files, background_score_files -> 
-        [n_metaprograms, score_files]
+      .map{ n_metaprograms, combined_score_file, combined_background_score_file -> 
+        [n_metaprograms, combined_score_file]
       }
       .combine(combined_metaprogram_report.out.optimal_k) // combine with optimal k value from combined report
       // filter to only get score outputs for optimal k value
-      .filter{ n_metaprograms, score_files, optimal_k -> 
+      .filter{ n_metaprograms, combined_score_file, optimal_k -> 
         n_metaprograms == optimal_k 
       }
       .map{ it.dropRight(1) } // drop extra k 
-      // transpose channel to split up score files [[n_metaprograms, score_file], [n_metaprograms, score_file]]
-      .transpose()
-      // pull out unique id from score file name and use that to join with sce_ch 
-      .map{ n_metaprograms, score_file -> 
-        def unique_id = score_file.name.split("_")[0] // extract unique id from score file name
-        [unique_id, score_file]
-      }
-      // join with sce channel to add in sce file and annotation file for each sample
-      .join(sce_ch, by: 0)
-      .map{ unique_id, score_file, sample_id, sce_file, annotations_file -> 
-        [unique_id, sample_id, sce_file, annotations_file, score_file]
-      }
 
     // output sces with annotations and scores for the optimal k value
-    score_and_annotate_sce(score_and_annotate_ch)
+    score_and_annotate_sce(sce_ch, optimal_k_scores_ch)
 
     // only render a report for the optimal k value
-    report_ch = generate_metaprograms.out
+    report_ch = all_metaprograms_ch
       .combine(combined_metaprogram_report.out.optimal_k)
       .filter{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k -> 
         n_metaprograms == optimal_k 
       }
-      // joining on n_metaprograms and metaprograms_publish_dir
-      // drop the background files before joining
-      .join(grouped_score_ch.map { it.dropRight(1) }, by: [0, 1])
+      .join(optimal_k_scores_ch, by: 0) // join on n_metaprograms
       // drop publish directory and extra value of k 
       // instead we ouptut to the main metaprograms directory
-      .map{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k, score_files -> 
-        [n_metaprograms, metaprograms_file, score_files]
+      .map{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k, combined_score_files -> 
+        [n_metaprograms, metaprograms_file, combined_score_files]
       }
 
     individual_metaprogram_report(
