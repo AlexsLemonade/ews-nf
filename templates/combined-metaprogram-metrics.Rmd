@@ -1055,7 +1055,7 @@ rank_mtx <- combined_metrics_df |>
 
 
 ```{r}
-#| fig.width = 20
+#| fig.width: 10
 
 # define a color scale
 col_fun <- circlize::colorRamp2(
