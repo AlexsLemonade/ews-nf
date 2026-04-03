@@ -10,7 +10,7 @@ output:
     code_folding: hide
 params:
   metaprograms_object_file: "../metaprograms.rds"
-  scores_file_list: NULL
+  combined_scores_file: NULL
   geneset_file: "../genesets/custom-gene-sets.tsv"
   msigdb_geneset_file: "../genesets/msigdb-gene-sets.tsv"
   category_file: "../genesets/gene-set-categories.tsv"
@@ -120,18 +120,8 @@ all_cor_df <- mp_obj$spectra_cor_df
 ```
 
 ```{r}
-# list of scores files
-score_files <- stringr::str_split_1(params$scores_file_list, ",")
-
-# make sure all files exist
-stopifnot(
-  "Some or all score files do not exist" = all(file.exists(score_files))
-)
-
 # get a single dataframe with all scores
-score_df <- score_files |> 
-  purrr::map(readr::read_tsv) |> 
-  dplyr::bind_rows() |> 
+score_df <- readr::read_tsv(params$combined_scores_file, col_types = list(.default = "c", mp_score = "d")) |> 
   dplyr::mutate(
     sample_id = stringr::word(unique_id, -1, sep = "-")
   )
@@ -488,14 +478,17 @@ if(missing_mps != "") {
 
 To evaluate if the MPs are easily interpretable, we will make a heatmap that shows the significance of each gene set across all MPs. 
 Ideal MPs will show gene sets that are uniquely enriched in that MP instead of enriched across multiple MPs. 
-The rows represent all significant gene sets, the columns indicate the MP, and the heatmap color indicates the -log10(pvalue) for that gene set in that MP.
+The rows represent the all significant gene sets, the columns indicate the MP, and the heatmap color indicates the -log10(pvalue) for that gene set in that MP.
+Only the top 10 gene sets for each metaprogram are shown to save space.
 
 Only MPs with identified gene sets will be included. 
 
-```{r, fig.height=15, fig.width=10}
+```{r, fig.height=20, fig.width=10}
 # convert ora results into a heatmap of pvalues
 heatmap_mtx <- ora_results_df |> 
   dplyr::mutate(logp = -log10(p.adjust)) |> 
+  # only keep the top 10 gene sets
+  dplyr::slice_max(logp, n = 10, by = metaprogram) |>
   dplyr::select(metaprogram, ID, logp) |> 
   tidyr::pivot_wider(
     names_from = metaprogram,
@@ -540,23 +533,6 @@ ora_jaccard_heatmap(filtered_ora_results_df,
 ```
 
 ### Specificity and similarity of gene sets
-
-We can also look at each of the gene sets and calculate Shannon's entropy to indicate how diverse that gene set is, e.g., how many MPs is the gene set significant in.
-Ideally, gene sets are unique to a MP and have values close to 0.
-
-```{r}
-ora_results_df |> 
-  dplyr::group_by(ID) |>
-  # now the shannon index for each metaprogram 
-  dplyr::summarise(
-    shannon = -sum(pvalue * log(pvalue)), # entropy
-    num_mps = dplyr::n_distinct(metaprogram), # get unique value for printing
-    shannon_norm = shannon / log(num_mps),
-    metaprograms = paste0(metaprogram, collapse = ",")
-    ) |> 
-  dplyr::arrange(metaprograms) |> 
-  as.data.frame()
-```
 
 Here we will look at the identified gene sets for each metaprogram. 
 If multiple gene sets are returned, it's likely that they are biologically similar. 

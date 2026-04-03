@@ -201,6 +201,11 @@
           "default": 0.3,
           "description": "Minimum cross sample maximum required to keep spectra if filter_spectra is true"
         },
+         "repeat_creating_metaprograms": {
+          "type": "boolean",
+          "default": false,
+          "description": "Boolean indicating whether to re-create metaprograms if results already exist"
+        },
         "nreps" : {
           "type": "number",
           "default": 1000,
