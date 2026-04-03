@@ -20,6 +20,7 @@ process generate_metaprograms {
   script:
     def cnmf_results_string = cnmf_results_dirs.join(',')
     """
+    echo ${metaprograms_publish_dir}
     01-generate-metaprograms.R \
       --cnmf_results_dirs ${cnmf_results_string} \
       --cnmf_k_range ${params.cnmf_k_range} \
@@ -293,6 +294,7 @@ workflow metaprograms {
       .map{ n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file -> 
         [n_metaprograms, metaprograms_publish_dir]
       }
+      .view()
 
     // get all directories as one list
     metaprograms_input_ch = cnmf_ch.collect{ unique_id, sample_id, cnmf_output -> cnmf_output }
