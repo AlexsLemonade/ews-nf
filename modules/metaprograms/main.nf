@@ -360,7 +360,7 @@ workflow metaprograms {
     // only render a report for the optimal k value
     report_ch = generate_metaprograms.out
       .combine(combined_metaprogram_report.out.optimal_k)
-      .filter { n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k -> 
+      .filter{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k -> 
         n_metaprograms == optimal_k 
       }
       // joining on n_metaprograms and metaprograms_publish_dir

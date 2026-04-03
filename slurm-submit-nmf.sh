@@ -85,7 +85,6 @@ done
 
 # validate n_metaprograms has at least 4 values by counting the number of commas
 length_n_metaprograms=$(echo "$n_metaprograms" | tr -cd ',' | wc -c )
-echo $length_n_metaprograms
 if [[ $length_n_metaprograms -lt 3 ]]; then
     echo "ERROR: n_metaprograms must contain at least 4 values"
     exit 1

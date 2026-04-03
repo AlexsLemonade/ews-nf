@@ -288,7 +288,7 @@ n_metaprograms <- metrics_list |>
 # the elbow plot won't work if we don't have at least 4 values of k
 stopifnot(
   "Must provide at least 4 values of k" = length(n_metaprograms) >= 4
-  )
+)
 
 names(metrics_list) <- sprintf("k_%02d", n_metaprograms)
 
