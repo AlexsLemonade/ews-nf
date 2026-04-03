@@ -188,8 +188,8 @@
         },
         "n_metaprograms": {
           "type": "string",
-          "default": "10",
-          "description": "Number of metaprograms to create. Can be a single number or comma separated string of numbers."
+          "default": "8,9,10,11",
+          "description": "Comma separated string indicating the range of number of metaprograms to use for finding the optimal k"
         },
         "filter_spectra": {
           "type": "boolean",

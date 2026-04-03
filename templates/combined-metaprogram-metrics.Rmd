@@ -13,6 +13,7 @@ params:
   scores_file_list: NULL
   background_scores_file_list: NULL
   sample_metadata_file: "../sample-info/sample-metadata.tsv"
+  output_k_file: NULL
   seed: 2026
 ---
 
@@ -269,7 +270,8 @@ stopifnot(
   "Some or all metrics files do not exist" = all(file.exists(metrics_rds_files)),
   "Some or all cell score files do not exist" = all(file.exists(scores_files)),
   "Some or all background cell score files do not exist" = all(file.exists(background_files)),
-  "Sample metadata file is missing" = file.exists(params$sample_metadata_file)
+  "Sample metadata file is missing" = file.exists(params$sample_metadata_file),
+  "Output k file must be provided" = !is.null(params$output_k_file)
 )
 ```
 
@@ -282,6 +284,11 @@ metrics_list <- metrics_rds_files |>
 # pull out n_metaprograms to use as names of the list
 n_metaprograms <- metrics_list |> 
   purrr::map_dbl("n_metaprograms")
+
+# the elbow plot won't work if we don't have at least 4 values of k
+stopifnot(
+  "Must provide at least 4 values of k" = length(n_metaprograms) >= 4
+)
 
 names(metrics_list) <- sprintf("k_%02d", n_metaprograms)
 
@@ -1155,6 +1162,14 @@ knitr::asis_output(
   )
 )
 ```
+
+```{r}
+# finally export the value of k to a file to use for scoring in the next process
+# want to export a number to match n_metaprograms in nextflow
+optimal_k <- stringr::str_remove(optimal_k, "k_") |> as.numeric()
+readr::write_lines(optimal_k, params$output_k_file)
+```
+
 
 ## Session info
 

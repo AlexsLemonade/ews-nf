@@ -152,43 +152,6 @@ process metaprogram_metrics {
     """
 }
 
-// used for individual k values
-process individual_metaprogram_report {
-  container params.ews_nf_container
-  tag "${n_metaprograms}_metaprograms"
-  label 'mem_24'
-  time '2h'
-  publishDir "${metaprograms_publish_dir}", mode: 'copy'
-  input:
-    tuple val(n_metaprograms),
-          val(metaprograms_publish_dir),
-          path(metaprograms_file),
-          path(score_files)
-    path template_file
-    path custom_genesets_file
-    path msigdb_genesets_file
-    path gene_set_category_file
-  output:
-    tuple val(n_metaprograms), 
-          val(metaprograms_publish_dir),
-          path("metaprograms-summary-report.html")
-  script:
-    def score_file_string = score_files.join(',')
-    """
-    Rscript -e "rmarkdown::render('${template_file}', \
-      output_file = 'metaprograms-summary-report.html',\
-      params = list(metaprograms_object_file = '${metaprograms_file}', \
-                    scores_file_list = '${score_file_string}', \
-                    geneset_file = '${custom_genesets_file}', \
-                    msigdb_geneset_file = '${msigdb_genesets_file}', \
-                    category_file = '${gene_set_category_file}'))"
-    """
-  stub:
-    """
-    touch "metaprograms-summary-report.html"
-    """
-}
-
 // used for comparing across k values
 process combined_metaprogram_report {
   container params.ews_nf_container
@@ -201,7 +164,8 @@ process combined_metaprogram_report {
     path background_scores_files
     path template_file
   output:
-    path "combined-metaprograms-metrics.html"
+    path "combined-metaprograms-metrics.html", emit: combined_report
+    env "OPTIMAL_K_VALUE", emit: optimal_k
   script:
     def metrics_file_string = metrics_files.join(',')
     def scores_file_string = scores_files.join(',')
@@ -213,13 +177,83 @@ process combined_metaprogram_report {
                     scores_file_list = '${scores_file_string}', \
                     background_scores_file_list = '${background_scores_files_string}', \
                     sample_metadata_file = '${params.sample_metadata_file}', \
+                    output_k_file = 'optimal_k_value.txt', \
                     seed = '${params.seed}'))"
+
+    # save optimal k as a variable to be used to score cells 
+    OPTIMAL_K_VALUE=\$(cat "optimal_k_value.txt")
     """
   stub:
     """
     touch "combined-metaprograms-metrics.html"
+    OPTIMAL_K_VALUE=10
     """
 }
+
+// used for individual k values
+process individual_metaprogram_report {
+  container params.ews_nf_container
+  tag "${n_metaprograms}_metaprograms"
+  label 'mem_24'
+  time '2h'
+  publishDir "${params.outdir}/metaprograms", mode: 'copy'
+  input:
+    tuple val(n_metaprograms),
+          path(metaprograms_file),
+          path(score_files)
+    path template_file
+    path custom_genesets_file
+    path msigdb_genesets_file
+    path gene_set_category_file
+  output:
+    tuple val(n_metaprograms), 
+          path("k-${n_metaprograms}_metaprograms-summary-report.html")
+  script:
+    def score_file_string = score_files.join(',')
+    """
+    Rscript -e "rmarkdown::render('${template_file}', \
+      output_file = 'k-${n_metaprograms}_metaprograms-summary-report.html',\
+      params = list(metaprograms_object_file = '${metaprograms_file}', \
+                    scores_file_list = '${score_file_string}', \
+                    geneset_file = '${custom_genesets_file}', \
+                    msigdb_geneset_file = '${msigdb_genesets_file}', \
+                    category_file = '${gene_set_category_file}'))"
+    """
+  stub:
+    """
+    touch "k-${n_metaprograms}_metaprograms-summary-report.html"
+    """
+}
+
+// score and annotate objects 
+process score_and_annotate_sce {
+  container params.ews_nf_container
+  tag "${unique_id}"
+  label 'mem_24'
+  time '2h'
+  publishDir "${params.outdir}/metaprograms/scored-sces/${sample_id}", mode: 'copy'
+  input:
+    tuple val(unique_id),
+          val(sample_id),
+          path(sce_file),
+          path(annotations_file),
+          path(scores_file)
+  output:
+    path("${unique_id}_annotated.rds")
+  script:
+    """
+    05-score-and-annotate-sce.R \
+      --sce_file ${sce_file} \
+      --annotations_file ${annotations_file} \
+      --score_files ${scores_file} \
+      --output_file "${unique_id}_annotated.rds"
+    """
+  stub:
+    """
+    touch "${unique_id}_annotated.rds"
+    """
+}
+
 
 
 workflow metaprograms {
@@ -258,6 +292,7 @@ workflow metaprograms {
       // group by n_metaprograms to get list of score files and background score files for each n_metaprograms
       .groupTuple(by: [0,1]) // group by n_metaprograms and publish dir
 
+
     // create a single data frame for all observed and all background scores
     combine_score_files(grouped_score_ch)
 
@@ -271,21 +306,8 @@ workflow metaprograms {
 
     // render report
     // define path to template reports
-    individual_report_template_file = "${projectDir}/templates/metaprogram-evaluation.Rmd" 
+    individual_report_template_file = "${projectDir}/templates/individual-metaprogram-evaluation.Rmd" 
     combined_report_template_file = "${projectDir}/templates/combined-metaprogram-metrics.Rmd"
-
-    report_ch = generate_metaprograms.out
-      // joining on n_metaprograms and publish dir
-      // drop the background files before joining
-      .join(grouped_score_ch.map { it.dropRight(1) }, by: [0,1])
-
-    individual_metaprogram_report(
-      report_ch,
-      file(individual_report_template_file),
-      file(params.custom_genesets_file),
-      file(params.msigdb_genesets_file),
-      file(params.gene_set_category_file)
-    )
 
     // collect all metrics files for the combined report
     metrics_ch = metaprogram_metrics.out
@@ -304,6 +326,58 @@ workflow metaprograms {
       scores_ch, 
       background_scores_ch,
       file(combined_report_template_file)
+    )
+
+    // make a channel of sce file, annotation file and score file 
+    // only for the optimal k value 
+    score_and_annotate_ch = grouped_score_ch
+      // drop publish directory and background score files 
+      .map{ n_metaprograms, metaprograms_publish_dir, score_files, background_score_files -> 
+        [n_metaprograms, score_files]
+      }
+      .combine(combined_metaprogram_report.out.optimal_k) // combine with optimal k value from combined report
+      // filter to only get score outputs for optimal k value
+      .filter{ n_metaprograms, score_files, optimal_k -> 
+        n_metaprograms == optimal_k 
+      }
+      .map{ it.dropRight(1) } // drop extra k 
+      // transpose channel to split up score files [[n_metaprograms, score_file], [n_metaprograms, score_file]]
+      .transpose()
+      // pull out unique id from score file name and use that to join with sce_ch 
+      .map{ n_metaprograms, score_file -> 
+        def unique_id = score_file.name.split("_")[0] // extract unique id from score file name
+        [unique_id, score_file]
+      }
+      // join with sce channel to add in sce file and annotation file for each sample
+      .join(sce_ch, by: 0)
+      .map{ unique_id, score_file, sample_id, sce_file, annotations_file -> 
+        [unique_id, sample_id, sce_file, annotations_file, score_file]
+      }
+
+    // output sces with annotations and scores for the optimal k value
+    score_and_annotate_sce(score_and_annotate_ch)
+
+    // only render a report for the optimal k value
+    report_ch = generate_metaprograms.out
+      .combine(combined_metaprogram_report.out.optimal_k)
+      .filter{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k -> 
+        n_metaprograms == optimal_k 
+      }
+      // joining on n_metaprograms and metaprograms_publish_dir
+      // drop the background files before joining
+      .join(grouped_score_ch.map { it.dropRight(1) }, by: [0, 1])
+      // drop publish directory and extra value of k 
+      // instead we ouptut to the main metaprograms directory
+      .map{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k, score_files -> 
+        [n_metaprograms, metaprograms_file, score_files]
+      }
+
+    individual_metaprogram_report(
+      report_ch,
+      file(individual_report_template_file),
+      file(params.custom_genesets_file),
+      file(params.msigdb_genesets_file),
+      file(params.gene_set_category_file)
     )
 
   emit:
