@@ -10,7 +10,7 @@ output:
     code_folding: hide
 params:
   metaprograms_object_file: "../metaprograms.rds"
-  scores_file_list: NULL
+  combined_scores_file: NULL
   geneset_file: "../genesets/custom-gene-sets.tsv"
   msigdb_geneset_file: "../genesets/msigdb-gene-sets.tsv"
   category_file: "../genesets/gene-set-categories.tsv"
@@ -120,18 +120,8 @@ all_cor_df <- mp_obj$spectra_cor_df
 ```
 
 ```{r}
-# list of scores files
-score_files <- stringr::str_split_1(params$scores_file_list, ",")
-
-# make sure all files exist
-stopifnot(
-  "Some or all score files do not exist" = all(file.exists(score_files))
-)
-
 # get a single dataframe with all scores
-score_df <- score_files |> 
-  purrr::map(readr::read_tsv) |> 
-  dplyr::bind_rows() |> 
+score_df <- readr::read_tsv(params$combined_scores_file, col_types = list(.default = "c", mp_score = "d")) |> 
   dplyr::mutate(
     sample_id = stringr::word(unique_id, -1, sep = "-")
   )

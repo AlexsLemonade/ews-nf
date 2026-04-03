@@ -214,7 +214,7 @@ process individual_metaprogram_report {
     Rscript -e "rmarkdown::render('${template_file}', \
       output_file = 'k-${n_metaprograms}_metaprograms-summary-report.html',\
       params = list(metaprograms_object_file = '${metaprograms_file}', \
-                    scores_file_list = '${score_file_string}', \
+                    combined_scores_file = '${score_file_string}', \
                     geneset_file = '${custom_genesets_file}', \
                     msigdb_geneset_file = '${msigdb_genesets_file}', \
                     category_file = '${gene_set_category_file}'))"

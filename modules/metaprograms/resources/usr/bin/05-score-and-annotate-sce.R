@@ -25,7 +25,7 @@ option_list <- list(
     opt_str = c("--scores_file"),
     type = "character",
     default = "",
-    help = "Path to TSV file containing scores for all metaprograms and all cells"
+    help = "Path to TSV file containing scores for all metaprograms and all cells across all libraries"
   ),
   make_option(
     opt_str = c("--output_file"),
@@ -61,7 +61,9 @@ annotations_df <- readr::read_tsv(opt$annotations_file) |>
   dplyr::mutate(ews_nf_celltype_annotation = annotation_tier_0) 
 
 # read in scores file
-scores_df <- readr::read_tsv(opt$scores_file)
+scores_df <- readr::read_tsv(opt$scores_file) |> 
+  dplyr::filter(unique_id == id)
+
 # expand to have one row per barcode and one column per mp
 wide_scores_df <- scores_df |> 
   dplyr::select(-unique_id) |> 
