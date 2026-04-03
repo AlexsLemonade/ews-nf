@@ -190,7 +190,7 @@ calculate_permutation_significance <- function(
   # combine the observed values with the background
   combined_df <- observed_df |> 
     dplyr::select(
-      group_columns,
+      dplyr::all_of(group_columns),
       obs_value = {{ stat }}
     ) |> 
     dplyr::left_join(background_df, by = group_columns) |> 
@@ -444,11 +444,11 @@ disease_timing_df <- mp_metrics_df |>
 
 ```{r}
 #| fig.height: !r dynamic_fig_height
-#| fig.width: 10
+#| fig.width: 15
 
 ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
   geom_col(width = 0.7) +
-  facet_wrap(vars(n_metaprograms), scales = "free_x") +
+  facet_wrap(vars(n_metaprograms), scales = "free_x", ncol = 4) +
   scale_fill_manual(values = disease_timing_palette) +
   scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, 0.02))) +
   labs(
@@ -675,6 +675,7 @@ The R-squared shown in the plot indicates the strength of the correlation.
 The `*` indicates the slope is significantly different from zero, and the `ns` indicates the slope is not significantly different from zero.
 
 ```{r}
+#| fig.height: 10
 #| message: false
 
 # calculate the r2 and pvalue 
@@ -1054,6 +1055,8 @@ rank_mtx <- combined_metrics_df |>
 
 
 ```{r}
+#| fig.width = 20
+
 # define a color scale
 col_fun <- circlize::colorRamp2(
   breaks = c(0, 0.75, 1),
@@ -1110,6 +1113,8 @@ optimal_k <- rank_mtx |>
   as.data.frame() |> 
   tibble::rownames_to_column("n_metaprograms") |> 
   dplyr::filter(total_mean_rank == max(total_mean_rank)) |> 
+  # account for any ties and take the one with the highest rank in proportion significant cv
+  dplyr::slice_max(proportion_significant_cv, n = 1) |> 
   dplyr::pull(n_metaprograms)
 
 # find any metaprograms that are patient specific 
