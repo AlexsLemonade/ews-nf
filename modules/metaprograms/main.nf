@@ -379,12 +379,15 @@ workflow metaprograms {
       }
       .map{ it.dropRight(1) } // drop extra k 
 
-    // pull out just the combined scores file to use for annotating sces 
-    combined_scores_file = optimal_k_scores_ch
-      .collect{ n_metaprograms, combined_score_file -> combined_score_file }
+    // only score and annotate if specified 
+    if (params.score_sces) {
+      // pull out just the combined scores file to use for annotating sces 
+      combined_scores_file = optimal_k_scores_ch
+        .collect{ n_metaprograms, combined_score_file -> combined_score_file }
 
-    // output sces with annotations and scores for the optimal k value
-    score_and_annotate_sce(sce_ch, combined_scores_file)
+      // output sces with annotations and scores for the optimal k value
+      score_and_annotate_sce(sce_ch, combined_scores_file)
+    }
 
     // only render a report for the optimal k value
     report_ch = all_metaprograms_ch
