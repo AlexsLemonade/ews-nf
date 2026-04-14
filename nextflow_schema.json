@@ -206,6 +206,11 @@
           "default": false,
           "description": "Boolean indicating whether to re-create metaprograms if results already exist"
         },
+        "score_sces": {
+          "type": "boolean",
+          "default": false,
+          "description": "Boolean indicating whether to score and annotate sces with the optimal value of k"
+        },
         "nreps" : {
           "type": "number",
           "default": 1000,
