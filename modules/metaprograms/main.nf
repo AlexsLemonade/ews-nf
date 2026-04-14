@@ -200,10 +200,9 @@ process individual_metaprogram_report {
   input:
     tuple val(n_metaprograms),
           path(metaprograms_file),
+          path(metrics_file),
           path(score_files)
     path template_file
-    path custom_genesets_file
-    path msigdb_genesets_file
     path gene_set_category_file
   output:
     tuple val(n_metaprograms), 
@@ -214,10 +213,10 @@ process individual_metaprogram_report {
     Rscript -e "rmarkdown::render('${template_file}', \
       output_file = 'k-${n_metaprograms}_metaprograms-summary-report.html',\
       params = list(metaprograms_object_file = '${metaprograms_file}', \
+                    metaprograms_metrics_file = '${metrics_file}', \
                     combined_scores_file = '${score_file_string}', \
-                    geneset_file = '${custom_genesets_file}', \
-                    msigdb_geneset_file = '${msigdb_genesets_file}', \
-                    category_file = '${gene_set_category_file}'))"
+                    category_file = '${gene_set_category_file}', \
+                    sample_metadata_file = '${params.sample_metadata_file}'))"
     """
   stub:
     """
@@ -343,11 +342,13 @@ workflow metaprograms {
       .mix(combine_score_files.out)
 
     // collect all metrics files for the combined report
-    metrics_ch = n_metaprograms_ch.cached_metaprograms
+    all_metrics_ch = n_metaprograms_ch.cached_metaprograms
       .map{ n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
         [n_metaprograms, metaprograms_publish_dir, metrics_file]
       }
-      .mix(metaprogram_metrics.out) 
+      .mix(metaprogram_metrics.out)
+
+    metrics_file_ch = all_metrics_ch
       .collect{ n_metaprograms, metaprograms_publish_dir, metrics_file -> metrics_file }
 
     // collect all score and background score files for the report
@@ -359,7 +360,7 @@ workflow metaprograms {
 
     // render combined report
     combined_metaprogram_report(
-      metrics_ch,
+      metrics_file_ch,
       scores_ch, 
       background_scores_ch,
       file(combined_report_template_file)
@@ -395,18 +396,17 @@ workflow metaprograms {
       .filter{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k -> 
         n_metaprograms == optimal_k 
       }
-      .join(optimal_k_scores_ch, by: 0) // join on n_metaprograms
+      .join(all_metrics_ch, by: [0,1])// join on n_metaprograms and publish directory
+      .join(optimal_k_scores_ch, by: 0)  // join on n_metaprograms
       // drop publish directory and extra value of k 
       // instead we ouptut to the main metaprograms directory
-      .map{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k, combined_score_files -> 
-        [n_metaprograms, metaprograms_file, combined_score_files]
+      .map{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k, metrics_file, combined_score_files -> 
+        [n_metaprograms, metaprograms_file, metrics_file, combined_score_files]
       }
 
     individual_metaprogram_report(
       report_ch,
       file(individual_report_template_file),
-      file(params.custom_genesets_file),
-      file(params.msigdb_genesets_file),
       file(params.gene_set_category_file)
     )
 
