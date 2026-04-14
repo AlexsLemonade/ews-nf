@@ -201,6 +201,9 @@ options(
 )
 
 set.seed(2026)
+
+# define palette for disease timings shown in the report
+disease_timing_palette <- c(Primary = "#6A9FC0", Metastasis = "#C47A8A", Recurrence = "#5A9E82")
 ```
 
 
@@ -422,7 +425,7 @@ The values are normalized by the total number of samples in the metaprogram such
 mp_metrics_df <- mp_metrics$mp_metrics_df
 
 # grab shannons entropy and effective sample size from metrics 
-mp_prop_df <- mp_metrics_df |>
+mp_metrics_df |>
   dplyr::select(
     metaprogram, 
     num_samples, 
@@ -431,10 +434,7 @@ mp_prop_df <- mp_metrics_df |>
     proportion_of_patients,
     shannon_entropy_norm,
     eff_number_norm
-  ) 
-
-# print a table for the report
-mp_prop_df |> 
+  ) |>
   DT::datatable(colnames = c("Metaprogram", "Num Samples", "% Samples", "Num Patients", "% Patients", "Normalized Shannon's Entropy", "Normalized Effective Sample Size")
   ) |> 
   DT::formatPercentage(c("proportion_of_samples", "proportion_of_patients")) |> 
@@ -476,6 +476,41 @@ ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     legend.position = "none"
+  )
+```
+
+We can also look at the proportion of each sample type represented in each metaprogram. 
+
+```{r}
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/templates/combined-metaprogram-metrics.Rmd
+disease_timing_df <- mp_metrics_df |> 
+  tidyr::pivot_longer(
+    cols = c("num_primary_samples", "num_mets_samples", "num_recurrence_samples"),
+    names_to = "sample_type", 
+    values_to = "count"
+  ) |> 
+  dplyr::mutate(
+    proportion = count/ num_samples,
+    sample_type = stringr::word(sample_type, 2, sep = "_") |> 
+      factor(labels = c("Primary", "Metastasis", "Recurrence"))
+  ) |> 
+  dplyr::select(metaprogram, proportion, sample_type)
+```
+
+```{r}
+ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
+  geom_col(width = 0.7) +
+  scale_fill_manual(values = disease_timing_palette) +
+  scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, 0.02))) +
+  labs(
+    x    = "Metaprogram",
+    y    = "Proportion of samples",
+    fill = "Sample type"
+  ) +
+  theme(
+    strip.text         = element_text(face = "bold"),
+    legend.position    = "top",
+    axis.text.x        = element_text(angle = 90, hjust = 1, size = 10)
   )
 ```
 
@@ -752,9 +787,6 @@ random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value = 0.05, ran
 ```
 
 ```{r}
-# define palette for disease timings shown here
-disease_timing_palette <- c(Primary = "#6A9FC0", Metastasis = "#C47A8A", Recurrence = "#5A9E82")
-
 # plot the scores fore ach sample type and indicate the significance
 ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = disease_timing)) +
   geom_boxplot(outlier.size = 0.1) +
