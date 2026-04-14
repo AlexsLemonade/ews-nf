@@ -136,4 +136,5 @@ nextflow run "$ews_dir/main.nf" \
   $sample_flag \
   $cnmf_flag \
   $filter_spectra_flag \
-  $score_sces_flag 
+  $score_sces_flag
+  
