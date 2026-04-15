@@ -9,11 +9,11 @@ output:
     number_sections: false
     code_folding: hide
 params:
-  metaprograms_object_file: "../metaprograms.rds"
-  combined_scores_file: NULL
-  geneset_file: "../genesets/custom-gene-sets.tsv"
-  msigdb_geneset_file: "../genesets/msigdb-gene-sets.tsv"
+  metaprograms_object_file: "../ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/metaprograms.rds"
+  metaprograms_metrics_file: "../ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k-11_metaprograms-metrics.rds"
+  combined_scores_file: "../ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k-11_metaprogram_scores.tsv"
   category_file: "../genesets/gene-set-categories.tsv"
+  sample_metadata_file: "../sample-info/sample-metadata.tsv"
 ---
 
 This notebook evaluates a single set of metaprograms for a group of samples.
@@ -28,6 +28,8 @@ Additionally, we expect expression of these MPs to be variable within the cells 
 The metrics shown here will help evaluate if the identified MPs show these characteristics.
 
 ```{r define_functions}
+#| warning: FALSE
+
 # helper function for getting jaccard between two vectors
 calc_jaccard <- function(vec1, vec2) {
   length(intersect(vec1, vec2)) / length(union(vec1, vec2))
@@ -78,6 +80,99 @@ ora_jaccard_heatmap <- function(results_df, title){
                           column_title = title,
                           col = circlize::colorRamp2(c(0, max(jaccard_matrix)), colors = c("white", "darkslateblue")))  
 }
+
+# make a dotplot for ORA results from a single metaprogram 
+# modified from what we get with enrichplot::dotplot to take as input a dataframe 
+dotplot <- function(df, title = NULL) {
+  
+  df <- df |>
+    # only show the top 10 results
+    dplyr::slice_min(order_by = p.adjust, n = 10, with_ties = FALSE) |>
+    dplyr::mutate(
+      # convert GeneRatio to a numeric 
+      top_number = stringr::word(GeneRatio, 1, sep = "/") |> as.numeric(),
+      bottom_number = stringr::word(GeneRatio, -1, sep = "/") |> as.numeric(),
+      GeneRatio = top_number/ bottom_number,
+      # reformat the description shown for y labels 
+      # remove _, wrap and reorder by GeneRatio
+      Description = stringr::str_replace_all(Description, "_", " ") |> 
+        stringr::str_wrap(width = 30) |> 
+        forcats::fct_reorder(GeneRatio)
+        
+      )
+
+  ggplot2::ggplot(df, aes(
+    x     = GeneRatio,
+    y     = Description,
+    color = p.adjust,
+    size  = Count
+  )) +
+    geom_point() +
+    scale_color_continuous(
+      low = "#e06663", high = "#327eba",
+      name = "p.adjust",
+      guide = guide_colorbar(reverse = TRUE)
+    ) +
+    scale_size(range = c(2, 10)) +
+    labs(title = title, x = "GeneRatio", y = NULL) 
+}
+
+# helper function to calculate anova on a dataframe
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/08-cell-scoring-metrics.Rmd
+calculate_anova <- function(df, random_effect = NULL){
+  if (!is.null(random_effect)) {
+    # create formula with random effect
+    formula <- as.formula(glue::glue("log_mean_mp_score ~ disease_timing + (1 | {random_effect})"))
+    mod <- lmerTest::lmer(formula, data = df)
+    # Overall p-value for disease_timing (type III ANOVA)
+    anova_res <- anova(mod) |>
+      as.data.frame() |>
+      tibble::rownames_to_column("term")
+  } else {
+    # no random effect so use a regular ANOVA
+    mod <- lm(log_mean_mp_score ~ disease_timing, data = df)
+    anova_res <- anova(mod) |>
+      as.data.frame() |>
+      tibble::rownames_to_column("term") |>
+      dplyr::filter(term != "Residuals")
+  }
+  
+  return(anova_res)
+}
+
+# ANOVA test with/without random effect on log(mean mp score)
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/08-cell-scoring-metrics.Rmd
+grouped_anova <- function(data, sig_value, random_effect = NULL) {
+  
+  # for each metaprogram for each value of k, use a linear mixed effect model 
+  # then use ANOVA to calculate pvalues 
+  anova_results <- data |>
+    dplyr::group_by(metaprogram) |>
+    # using a lambda function requires two arguments
+    # can use ... to absorb the second one
+    dplyr::group_modify(\(df, ...) {
+      calculate_anova(df, random_effect)
+    }) |>
+    # classify as significant or not
+    dplyr::rename(f_value = `F value`, p_value = `Pr(>F)`) |>
+    dplyr::mutate(
+      p_adj = p.adjust(p_value, method = "BH"),
+      p_adj_signif = dplyr::if_else(p_adj <= sig_value, "*", "ns")
+    ) 
+  
+  full_results <- anova_results |>
+    # join with data/scores for plotting 
+    dplyr::left_join(
+      data |>
+        # we'll plot with zscore so want to use that to determine the y position of the label
+        dplyr::summarize(
+          max_mean_score = max(zscore_mean_mp_score, na.rm = TRUE),
+          .by = c("metaprogram")
+        )
+    )
+  
+  return(full_results)
+}
 ```
 
 
@@ -96,23 +191,45 @@ theme_set(
 # some helpful settings
 options(
   dplyr.summarise.inform = FALSE, 
-  readr.show_col_types = FALSE
+  DT.options = list(
+    scrollX = TRUE,
+    scrollY = "400px",
+    scrollCollapse = TRUE,
+    paging = FALSE,
+    searching = FALSE
+  )
 )
 
 set.seed(2026)
-```
 
-```{r}
-# read in custom gene lists and EF msigdb gene sets to use for ORA
-geneset_df <- readr::read_tsv(params$geneset_file)
-ef_msigdb_df <- readr::read_tsv(params$msigdb_geneset_file)
-ef_category_df <- readr::read_tsv(params$category_file)
+# define palette for disease timings shown in the report
+disease_timing_palette <- c(Primary = "#6A9FC0", Metastasis = "#C47A8A", Recurrence = "#5A9E82")
 ```
 
 
 ```{r}
+# check for files to make sure they exist
+stopifnot(
+  "Metaprogram object file does not exist" = file.exists(params$metaprograms_object_file),
+  "Metaprogram metrics file does not exist" = file.exists(params$metaprograms_metrics_file),
+  "Metaprogram scores file does not exist" = file.exists(params$combined_scores_file),
+  "Gene set category file does not exist" = file.exists(params$category_file),
+  "Sample metadata file does not exist" = file.exists(params$sample_metadata_file)
+)
+```
+
+
+```{r}
+# read in table of gene set categories
+# use this to pull out custom EF-high and EF-low gene sets
+ef_category_df <- readr::read_tsv(params$category_file, col_types = list(.default = "c"))
+
+# read in sample metadata
+sample_df <- readr::read_tsv(params$sample_metadata_file, col_types = list(.default = "c", subdiagnosis = "l", is_xenograft = "l", is_cell_line = "l"))
+
 # read in object
 mp_obj <- readr::read_rds(params$metaprograms_object_file)
+mp_metrics <- readr::read_rds(params$metaprograms_metrics_file)
 
 # pull out some items we are going to use multiple places to decrease typing later
 cor_mtx <- mp_obj$cor_matrix
@@ -120,13 +237,12 @@ all_cor_df <- mp_obj$spectra_cor_df
 ```
 
 ```{r}
-# get a single dataframe with all scores
+# read in tsv with all scores for all samples
 score_df <- readr::read_tsv(params$combined_scores_file, col_types = list(.default = "c", mp_score = "d")) |> 
   dplyr::mutate(
     sample_id = stringr::word(unique_id, -1, sep = "-")
   )
 ```
-
 
 
 ## Parameters
@@ -137,6 +253,11 @@ This notebook shows results for the following parameters:
 * Filtering of orphan spectra: `r mp_obj$filter_spectra`
 * Oprhan spectra cutoff (max cross sample correlation): `r mp_obj$orphan_cutoff`
 * Range of k used with cNMF (`all` indicates 5, 10, 15, 20, and 25 were used): `r mp_obj$cnmf_k_range`
+
+Metaprograms were derived from: 
+
+* `r mp_metrics$total_samples` samples
+* `r mp_metrics$total_patients` patients
 
 ```{r, results='asis'}
 missing_samples <- mp_obj$removed_unique_ids
@@ -265,7 +386,9 @@ mp_labels <- mp_cor_df |>
   ) 
 ```
 
-```{r, fig.width=8}
+```{r}
+#| fig.width: 8
+
 ggplot(mp_cor_df, aes(x = correlation, color = mp_comparison_group, fill = mp_comparison_group)) +
   geom_density(alpha = 0.25) +
   facet_wrap(vars(mp1), scales = "free_y") +
@@ -293,6 +416,33 @@ MPs should represent a mix of samples.
 This metric can be useful in filtering out any MPs that are sample-specific. 
 
 We will use Shannon's entropy to measure the diversity of each MP where a normalized value of 1 indicates high diversity. 
+Shannon's entropy is then used to calculate the normalized effective sample size or Hill number of order 1. 
+This represents the effective number of common or abundant samples.
+The values are normalized by the total number of samples in the metaprogram such that values close to 1 indicate all samples are equally abundant.
+
+```{r}
+# pull out metrics since we'll use this here and for score CVs
+mp_metrics_df <- mp_metrics$mp_metrics_df
+
+# grab shannons entropy and effective sample size from metrics 
+mp_metrics_df |>
+  dplyr::select(
+    metaprogram, 
+    num_samples, 
+    proportion_of_samples,
+    num_patients,
+    proportion_of_patients,
+    shannon_entropy_norm,
+    eff_number_norm
+  ) |>
+  DT::datatable(colnames = c("Metaprogram", "Num Samples", "% Samples", "Num Patients", "% Patients", "Normalized Shannon's Entropy", "Normalized Effective Sample Size")
+  ) |> 
+  DT::formatPercentage(c("proportion_of_samples", "proportion_of_patients")) |> 
+  DT::formatRound(c("shannon_entropy_norm", "eff_number_norm"))
+```
+
+The chart below shows the proportion of spectra from each metaprogram that are derived from individual samples. 
+Each box represents a unique sample and the length of the box represent the number of spectra from that sample that contribute to the overall metaprogram.
 
 ```{r}
 # add sample Id column to metaprogram/spectra map
@@ -301,7 +451,7 @@ mp_lookup <- mp_lookup |>
     sample_id = stringr::str_extract(spectra, "SCPCS[0-9]{6}")
   )
 
-total_samples <- length(unique(mp_lookup$sample_id))
+total_samples <- mp_metrics$total_samples
 
 mp_prop_df <- mp_lookup |> 
   dplyr::group_by(metaprogram, sample_id) |>
@@ -311,32 +461,13 @@ mp_prop_df <- mp_lookup |>
   # get the frequency of each sample compared to all other samples
   dplyr::mutate(p = n / sum(n),
                 num_samples = dplyr::n_distinct(sample_id)
-  )
-
-sample_diversity_df <- mp_prop_df |> 
-  # now the shannon index for each metaprogram 
-  dplyr::summarise(
-    shannon = -sum(p * log(p)), # entropy
-    num_samples = unique(num_samples), # get unique value for printing
-    proportion_of_samples = round(num_samples / total_samples, 2),
-    shannon_norm = shannon / log(num_samples)
-    ) |> 
-  dplyr::arrange(desc(shannon_norm)) 
-
-sample_diversity_df |>
-  as.data.frame()
-```
-
-The chart below shows the proportion of spectra from each metaprogram that are derived from individual samples. 
-
-```{r}
-mp_prop_df <- mp_prop_df |> 
+  ) |> 
   # ungroup before setting levels otherwise the plot doesn't work
   dplyr::ungroup() |> 
   dplyr::mutate(metaprogram = forcats::fct_reorder(metaprogram, num_samples))
 
 ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
-  geom_col() +
+  geom_col(color = "gray70") +
   labs(
     y = "Metaprogram",
     x = "Proportion of spectra",
@@ -349,116 +480,57 @@ ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
   )
 ```
 
+We can also look at the proportion of each sample type represented in each metaprogram. 
+
+```{r}
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/templates/combined-metaprogram-metrics.Rmd
+disease_timing_df <- mp_metrics_df |> 
+  tidyr::pivot_longer(
+    cols = c("num_primary_samples", "num_mets_samples", "num_recurrence_samples"),
+    names_to = "sample_type", 
+    values_to = "count"
+  ) |> 
+  dplyr::mutate(
+    proportion = count/ num_samples,
+    sample_type = stringr::word(sample_type, 2, sep = "_") |> 
+      factor(labels = c("Primary", "Metastasis", "Recurrence"))
+  ) |> 
+  dplyr::select(metaprogram, proportion, sample_type)
+```
+
+```{r}
+ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
+  geom_col(width = 0.7) +
+  scale_fill_manual(values = disease_timing_palette) +
+  scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, 0.02))) +
+  labs(
+    x    = "Metaprogram",
+    y    = "Proportion of samples",
+    fill = "Sample type"
+  ) +
+  theme(
+    strip.text         = element_text(face = "bold"),
+    legend.position    = "top",
+    axis.text.x        = element_text(angle = 90, hjust = 1, size = 10)
+  )
+```
+
 ## Biological interpretability 
 
 Ultimately, we want to be able to easily interpret the MPs. 
 We won't actually annotate them here, but we will look to see how biologically distinct the MPs might be. 
 
-To do that, we'll take the first 200 genes for all MPs and do ORA using the custom genesets we use for classifying EWS::FLI1 high and low cells and the Hallmarks collection from `MSigDb`. 
+To do that, we'll take the first 200 genes for all MPs and do ORA using the custom genesets we use for classifying EWS::FLI1 high and low cells, the Hallmarks collection from `MSigDb`, and the Reactome gene set from `MSigDb`. 
 
 ```{r}
-# get the EF activated and EF repressed gene sets for classifying later
-ef_activated_genesets <- ef_category_df |> 
-  dplyr::filter(geneset_category == "EF-activated") |> 
-  dplyr::pull(full_geneset_name)
-
-ef_repressed_genesets <- ef_category_df |> 
-  dplyr::filter(geneset_category == "EF-repressed") |> 
-  dplyr::pull(full_geneset_name)
-
-
-# grab hallmarks and reactome to use in addition to the custom and EwS specific gene lists 
-hallmarks_msigdb_df <- msigdbr::msigdbr(
-  species = "Homo sapiens", 
-  collection = "H"
-  ) |> 
-  dplyr::select(gs_name, ensembl_gene)
-reactome_msigdb_df <- msigdbr::msigdbr(
-  species = "Homo sapiens", 
-  collection = "C2",
-  subcollection = "CP:REACTOME"
-  ) |> 
-  dplyr::select(gs_name, ensembl_gene)
+# pull out the top genes and ora results from metrics df
+ora_results_df <- mp_metrics$ora_results_df
+mp_top_list <- mp_metrics$top_genes
 ```
 
 ```{r}
-# get list of categories that we need to grab from msigdb
-msigdb_category_list <- ef_msigdb_df |>
-  dplyr::select(category, subcategory) |>
-  unique() |>
-  purrr::transpose()
+#| results: 'asis'
 
-
-# list of msig genesets and names
-geneset_list <- ef_msigdb_df$geneset |>
-  purrr::set_names(ef_msigdb_df$name)
-
-# first pull out info for each category and then pull out specific genes for geneset
-ef_geneset_df <- msigdb_category_list |>
-  purrr::map(\(category_list){
-    # replace subcategory with default NULL
-    # can't use NULL in tsv since it gets read in as a character
-    if (is.na(category_list$subcategory)) {
-      subcategory <- NULL
-    } else {
-      subcategory <- category_list$subcategory
-    }
-    
-    msigdbr::msigdbr(
-      species = "Homo sapiens",
-      collection = category_list$category,
-      subcollection = subcategory
-    )
-  }) |>
-  dplyr::bind_rows() |>
-  # only keep relevant gene sets
-  dplyr::filter(gs_name %in% geneset_list) |> 
-  dplyr::select(gs_name, ensembl_gene)
-
-# combine into a single term2df for running GSEA and ORA
-all_term_df <- geneset_df |> 
-  dplyr::select(gs_name = geneset, ensembl_gene = ensembl_gene_id) |> 
-  dplyr::bind_rows(ef_geneset_df) |> 
-  dplyr::bind_rows(hallmarks_msigdb_df) |> 
-  dplyr::bind_rows(reactome_msigdb_df) |>
-  tidyr::drop_na()
-```
-
-
-```{r}
-# get the top 200 genes for each mp as a list to use with ora and scoring
-mp_top_list <- mp_obj$metaprogram_list |> 
-  purrr::map(\(scores){
-    scores |> 
-      sort(decreasing = TRUE) |> 
-      head(n=200)
-  })
-
-# run ORA using the top 200 genes
-ora_results <- mp_top_list |> 
-  purrr::map(\(scores){
-    
-    genes <- names(scores)
-    
-    ora_results <- clusterProfiler::enricher(
-      gene = genes,
-      universe = mp_obj$gene_universe,
-      TERM2GENE = all_term_df
-    )
-  })
-
-# combine ora results into a single dataframe
-# only include genesets with pvalue < 0.05, the default by enricher 
-ora_results_df <- ora_results |> 
-  purrr::imap(\(result, mp_name) {
-    result@result |> 
-      dplyr::mutate(metaprogram = mp_name) |> 
-      dplyr::filter(p.adjust <= 0.05) 
-  }) |>
-  purrr::list_rbind()
-```
-
-```{r, results='asis'}
 # print out a message about which MPs have 0 genesets 
 all_mps <- names(mp_top_list)
 missing_mps <- all_mps[!all_mps %in% unique(ora_results_df$metaprogram)] |> 
@@ -483,7 +555,11 @@ Only the top 10 gene sets for each metaprogram are shown to save space.
 
 Only MPs with identified gene sets will be included. 
 
-```{r, fig.height=20, fig.width=10}
+```{r}
+#| fig.height: 20
+#| fig.width: 10
+
+
 # convert ora results into a heatmap of pvalues
 heatmap_mtx <- ora_results_df |> 
   dplyr::mutate(logp = -log10(p.adjust)) |> 
@@ -523,6 +599,15 @@ The custom EF-activated and EF-repressed gene sets are likely to be found in mor
 To look at the uniqueness of non-EWS::FLI1 gene sets we will re-calculate the Jaccard index for all other gene sets. 
 
 ```{r}
+# get the EF activated and EF repressed gene sets
+ef_activated_genesets <- ef_category_df |> 
+  dplyr::filter(geneset_category == "EF-activated") |> 
+  dplyr::pull(full_geneset_name)
+
+ef_repressed_genesets <- ef_category_df |> 
+  dplyr::filter(geneset_category == "EF-repressed") |> 
+  dplyr::pull(full_geneset_name)
+
 # remove ef gene sets for jaccard calculations
 # we expect some overlap of these already so let's see how unique the remaining genesets are
 filtered_ora_results_df <- ora_results_df |> 
@@ -539,12 +624,15 @@ If multiple gene sets are returned, it's likely that they are biologically simil
 Having multiple gene sets that are biologically distinct is going to impede interpretation.
 This plot shows all gene sets, including EWS::FLI1 gene sets.
 
-```{r, fig.height=30, fig.width=15}
+```{r}
+#| fig.height: 25
+#| fig.width: 15
+
 # dot plots for all mps with at least 1 significant gene set
-ora_results |> 
+split(ora_results_df, ora_results_df$metaprogram) |> 
   purrr::imap(\(result, mp){
     if(nrow(result) > 0) {
-      enrichplot::dotplot(result, title = mp)
+      dotplot(result, title = mp)
     }
   }) |> 
   purrr::compact() |>
@@ -567,7 +655,8 @@ ora_results_df |>
     ef_high_score = round(sum(ef_high)/length(ef_activated_genesets), 2),
     ef_low_score = round(sum(ef_low)/length(ef_repressed_genesets),2),
     .by = "metaprogram"
-  )
+  ) |> 
+  DT::datatable()
 ```
 
 ## Using metaprograms to identify cell states 
@@ -583,9 +672,12 @@ First we look at the score distribution for all samples for each metaprogram.
 Good MPs will show variability within the dataset, in particular we are looking for a bimodal distribution.
 
 ```{r}
+#| message: FALSE
+#| warning: FALSE
+
 ggplot(score_df, 
        aes(x = mp_score, y = forcats::fct_rev(metaprogram))) +
-  ggridges::geom_density_ridges(alpha = 0.8, color = "white") +
+  ggridges::geom_density_ridges(alpha = 0.8, color = "white", rel_min_height = 0.01) +
   #facet_wrap(vars(sample_id), scales = "free_x", ncol = 4) +
   theme(
     strip.background = element_rect(fill = "grey90"),
@@ -595,20 +687,54 @@ ggplot(score_df,
   labs(
     x = "Score across all samples",
     y = "Metaprogram"
-  )
+  ) +
+  xlim(c(0,0.5))
 ```
 
-Now, look at the distribution of each sample individually. 
+Good metaprograms should show variation in the scores assigned to cells in the original dataset.
+To measure variation, we will use the coefficient of variation (CV), which reports a score's variance relative to the mean score across all cells. 
+
+```{r}
+# calculate the variance for each MP in each sample
+mp_var_df <- score_df |>
+  dplyr::summarise(
+    variance = stats::var(mp_score, na.rm = TRUE),
+    cv = sqrt(variance) / mean(mp_score),
+    .by = c("sample_id", "metaprogram")
+  )
+
+ggplot(
+  mp_var_df,
+  aes(
+    x = metaprogram,
+    y = cv
+  )
+) +
+  ggforce::geom_sina(size = 1, alpha = 0.8) +
+  labs(
+    x = "Metaprogram",
+    y = "CV across all cells in a sample"
+  )
+
+```
+
+Now, we'll look at the distribution for each sample individually. 
 Good MPs should show variability in multiple samples. 
 
-```{r, fig.height=30, message=FALSE, warning=FALSE}
+```{r}
+#| fig.height: 35
+#| fig.width: 12
+#| message: FALSE
+#| warning: FALSE 
+
+
 ggplot(score_df, 
        aes(x = mp_score, y = metaprogram, fill = metaprogram)) +
-  ggridges::geom_density_ridges(alpha = 0.8, color = "white", bw = 0.5) +
+  ggridges::geom_density_ridges(alpha = 0.8, color = "white", bw = 0.5, rel_min_height = 0.1) +
   facet_wrap(vars(sample_id), scales = "free_x", ncol = 4) +
   theme(
     strip.background = element_rect(fill = "grey90"),
-    axis.text.y = element_text(size = 8),
+    axis.text.y = element_text(size = 6),
     legend.position = "none"
   ) +
   labs(
@@ -618,31 +744,71 @@ ggplot(score_df,
   )
 ```
 
-Finally, we'll measure the variance of each MP in each sample and plot that in a sina plot. 
-Good MPs will have high variance. 
+### Comparison of scores across sample types 
+<!--Code and text are adapted from the Comparison of scores across sample types section in the combined metrics report-->
+
+Here we look at the distribution of cell scores across varying sample types (primary, metastatic, and recurrent tumors). 
+First, we calculate the mean score for each metaprogram for each sample. 
+As the scores are skewed towards zero, we log-transform the scores before calculating any statistics. 
+We then compare scores to determine if any metaprograms show significantly different distributions across sample types. 
+For the statistical test, we use a linear mixed model with patient as the random effect to account for within-patient correlation that is likely observed among different sample types from the same patient. 
+
+For visualization purposes, we calculate a z-score for all `log(mean(scores))` within each metaprogram and display that in the box plot below.
+The significance of the comparison among the three sample types is shown above the distributions for that metaprogram with `*` indicating that the distributions are significantly different from each other and `ns` indicating the distributions are not significantly different from each other. 
 
 ```{r}
-# calculate the variance for each MP in each sample
-mp_var_df <- score_df |>
-  dplyr::group_by(sample_id, metaprogram) |>
-  dplyr::summarise(
-    variance = stats::var(mp_score, na.rm = TRUE),
-    .groups = "drop"
-  )
+# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/templates/combined-metaprogram-metrics.Rmd
+# adapted to not consider n_metaprograms since here we just have one value of k 
 
-ggplot(
-  mp_var_df,
-  aes(
-    x = metaprogram,
-    y = variance
+mean_scores_df <- score_df |> 
+  dplyr::summarize(
+    mean_mp_score = mean(mp_score),
+    .by = c("unique_id", "metaprogram")
+  ) |> 
+  dplyr::mutate(
+    scpca_sample_id = stringr::word(unique_id, -1, sep = "-"),
+    # first log transform
+    log_mean_mp_score = log(mean_mp_score)
+  ) |>
+  # z-score the log scores within each k and metaprogram
+  # use these for plotting
+  dplyr::mutate(
+    zscore_mean_mp_score = scale(log_mean_mp_score), 
+    .by = c("metaprogram")
+  ) |> 
+  # add in the sample metadata including disease timing and patient information 
+  dplyr::left_join(
+    dplyr::select(
+      sample_df, 
+      c("scpca_sample_id", "participant_id", "disease_timing")
+    ), 
+    by = c("scpca_sample_id")
   )
-) +
-  ggforce::geom_sina(size = 2, alpha = 0.8) +
+```
+
+```{r}
+#| message: FALSE 
+# calculate anova with random effect
+random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value = 0.05, random_effect = "participant_id")
+```
+
+```{r}
+# plot the scores fore ach sample type and indicate the significance
+ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = disease_timing)) +
+  geom_boxplot(outlier.size = 0.1) +
+  geom_text(
+    data = random_effect_lmm_results,
+    color = "red",
+    aes(x = metaprogram, y = max_mean_score + 0.3, label = p_adj_signif),
+    inherit.aes = FALSE
+  ) +
+  scale_fill_manual(values = disease_timing_palette) +
   labs(
+    title = "ANOVA with patient as random effect",
+    fill = "Sample type",
     x = "Metaprogram",
-    y = "Variance of MP across all cells in a sample"
+    y = "Z-score computed from \nmean metaprogram score per sample"
   )
-
 ```
 
 ## Session info
