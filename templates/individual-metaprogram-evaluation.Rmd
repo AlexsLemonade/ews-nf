@@ -466,8 +466,8 @@ mp_prop_df <- mp_lookup |>
   dplyr::ungroup() |> 
   dplyr::mutate(metaprogram = forcats::fct_reorder(metaprogram, num_samples))
 
-ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id, color = "gray70")) +
-  geom_col() +
+ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
+  geom_col(color = "gray70") +
   labs(
     y = "Metaprogram",
     x = "Proportion of spectra",
@@ -722,7 +722,7 @@ Now, we'll look at the distribution for each sample individually.
 Good MPs should show variability in multiple samples. 
 
 ```{r}
-#| fig.height: 30
+#| fig.height: 35
 #| fig.width: 12
 #| message: FALSE
 #| warning: FALSE 
