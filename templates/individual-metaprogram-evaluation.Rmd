@@ -87,7 +87,7 @@ dotplot <- function(df, title = NULL) {
   
   df <- df |>
     # only show the top 10 results
-    dplyr::slice_min(order_by = p.adjust, n = 10) |>
+    dplyr::slice_min(order_by = p.adjust, n = 10, with_ties = FALSE) |>
     dplyr::mutate(
       # convert GeneRatio to a numeric 
       top_number = stringr::word(GeneRatio, 1, sep = "/") |> as.numeric(),
@@ -442,6 +442,7 @@ mp_metrics_df |>
 ```
 
 The chart below shows the proportion of spectra from each metaprogram that are derived from individual samples. 
+Each box represents a unique sample and the length of the box represent the number of spectra from that sample that contribute to the overall metaprogram.
 
 ```{r}
 # add sample Id column to metaprogram/spectra map
@@ -465,7 +466,7 @@ mp_prop_df <- mp_lookup |>
   dplyr::ungroup() |> 
   dplyr::mutate(metaprogram = forcats::fct_reorder(metaprogram, num_samples))
 
-ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
+ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id, color = "gray70")) +
   geom_col() +
   labs(
     y = "Metaprogram",
@@ -654,7 +655,8 @@ ora_results_df |>
     ef_high_score = round(sum(ef_high)/length(ef_activated_genesets), 2),
     ef_low_score = round(sum(ef_low)/length(ef_repressed_genesets),2),
     .by = "metaprogram"
-  )
+  ) |> 
+  DT::datatable()
 ```
 
 ## Using metaprograms to identify cell states 
@@ -670,9 +672,12 @@ First we look at the score distribution for all samples for each metaprogram.
 Good MPs will show variability within the dataset, in particular we are looking for a bimodal distribution.
 
 ```{r}
+#| message: FALSE
+#| warning: FALSE
+
 ggplot(score_df, 
        aes(x = mp_score, y = forcats::fct_rev(metaprogram))) +
-  ggridges::geom_density_ridges(alpha = 0.8, color = "white") +
+  ggridges::geom_density_ridges(alpha = 0.8, color = "white", rel_min_height = 0.01) +
   #facet_wrap(vars(sample_id), scales = "free_x", ncol = 4) +
   theme(
     strip.background = element_rect(fill = "grey90"),
@@ -682,7 +687,8 @@ ggplot(score_df,
   labs(
     x = "Score across all samples",
     y = "Metaprogram"
-  )
+  ) +
+  xlim(c(0,0.5))
 ```
 
 Good metaprograms should show variation in the scores assigned to cells in the original dataset.
@@ -724,7 +730,7 @@ Good MPs should show variability in multiple samples.
 
 ggplot(score_df, 
        aes(x = mp_score, y = metaprogram, fill = metaprogram)) +
-  ggridges::geom_density_ridges(alpha = 0.8, color = "white", bw = 0.5) +
+  ggridges::geom_density_ridges(alpha = 0.8, color = "white", bw = 0.5, rel_min_height = 0.1) +
   facet_wrap(vars(sample_id), scales = "free_x", ncol = 4) +
   theme(
     strip.background = element_rect(fill = "grey90"),
