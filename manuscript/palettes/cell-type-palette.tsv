@@ -1,0 +1,10 @@
+celltype	color
+T cell	#D4B906
+endothelial cell	#F90102
+myeloid leukocyte	#FF6B6B
+monocyte	#C2185B
+tumor-low	#3A0CA3
+tumor-high	#1F6FEB
+tumor	#00A6ED
+macrophage	#1FAA59
+other	#370707
