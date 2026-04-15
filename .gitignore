@@ -14,3 +14,11 @@ stub/ews-nf-out
 # ignore default input and output folders 
 scpca-nf-out/*
 ews-nf-out/*
+
+# ignore data directory for manuscript figures 
+manuscript/data/*
+# but keep the readme
+!manuscript/data/README.md
+
+
+
