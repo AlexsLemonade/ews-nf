@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 
 library(SingleCellExperiment)
+library(ggplot2)
 library(patchwork)
 
 # Set up -----------------------------------------------------------------------
@@ -76,11 +77,12 @@ panel_b <- columns_to_plot |>
   purrr::imap(\(column, title){
 
     ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = !!sym(column))) +
-      geom_point(alpha = 0.5, size = 0.5) +
+      geom_point(alpha = 0.5, size = 0.2) +
       scale_color_viridis_c(option = "turbo") +
       labs(
         color = title
       ) +
+      theme_bw() + 
       theme(
         axis.text = element_blank(),
         axis.ticks = element_blank(),
@@ -90,13 +92,13 @@ panel_b <- columns_to_plot |>
         legend.position = "bottom",
         legend.justification = "center",
         legend.title.position = "top"
-      )
+      ) 
 
   }) |>
   patchwork::wrap_plots(ncol = 3) &
   patchwork::plot_annotation(title = sample_id)
 
-ggsave(aucell_cnv_png_file)
+ggsave(aucell_cnv_png_file, height = 7, width = 7)
 
 # UMAP of final cell type annotations ------------------------------------------
 
@@ -108,6 +110,7 @@ panel_c <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = ews_lumped_annotati
     override.aes = list(size = 2, alpha = 1)
   )) +
   labs(color = "ews-nf cell type annotation") +
+  theme_bw() + 
   theme(
     axis.text = element_blank(),
     axis.ticks = element_blank(),
@@ -118,7 +121,7 @@ panel_c <- ggplot(umap_df, aes(x = UMAP1, y = UMAP2, color = ews_lumped_annotati
     legend.title = element_text(hjust = 0.5)
   )
 
-ggsave(celltype_umap_png_file)
+ggsave(celltype_umap_png_file, height = 7, width = 7)
 
 # Ewing specific CNV plot ------------------------------------------------------
 
@@ -150,8 +153,9 @@ panel_d <- ggplot(cnv_df, aes(x = zscore, y = forcats::fct_rev(ews_lumped_annota
     y = "",
     fill = ""
   ) +
+  theme_bw() +
   theme(legend.position = "top",
         aspect.ratio = 1,
         strip.background = element_rect(fill = "transparent"))
 
-ggsave(cnv_ridgeplot_png_file)
+ggsave(cnv_ridgeplot_png_file, height = 7, width = 7)
