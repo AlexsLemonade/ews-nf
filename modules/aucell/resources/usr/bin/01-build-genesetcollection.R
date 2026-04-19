@@ -114,4 +114,4 @@ collection <- genes_list |>
   purrr::imap(\(genes, name) GSEABase::GeneSet(genes, setName = name)) |>
   GSEABase::GeneSetCollection()
 
-readr::write_rds(collection, opt$output_file)
+readr::write_rds(collection, opt$output_file, compress = "bz2")

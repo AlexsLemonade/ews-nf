@@ -80,4 +80,4 @@ colData(sce) <- colData(sce) |>
   dplyr::left_join(wide_scores_df, by = "barcodes") |> 
   DataFrame(row.names = colnames(sce))
 
-readr::write_rds(sce, opt$output_file)
+readr::write_rds(sce, opt$output_file, compress = "bz2")

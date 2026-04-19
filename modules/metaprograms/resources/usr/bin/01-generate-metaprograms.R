@@ -310,4 +310,4 @@ mp_info_list <- list(
   "removed_unique_ids" = removed_unique_ids
 )
 
-readr::write_rds(mp_info_list, opt$output_file)
+readr::write_rds(mp_info_list, opt$output_file, compress = "bz2")

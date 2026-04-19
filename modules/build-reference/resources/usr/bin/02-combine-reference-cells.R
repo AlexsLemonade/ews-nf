@@ -61,5 +61,5 @@ annotations_df <- colData(combined_ref_sce) |>
 
 # export annotations and sce 
 readr::write_tsv(annotations_df, opt$output_annotation_file)
-readr::write_rds(combined_ref_sce, opt$output_sce_file)
+readr::write_rds(combined_ref_sce, opt$output_sce_file, compress = "bz2")
 
