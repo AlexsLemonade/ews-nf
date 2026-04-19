@@ -55,29 +55,29 @@ process score_metaprograms {
           val(metaprograms_publish_dir),
           val(unique_id),
           val(sample_id),
-          path("${unique_id}_metaprogram_scores.tsv"),
-          path("${unique_id}_scores_background.tsv")
+          path("${unique_id}_metaprogram_scores.tsv.gz"),
+          path("${unique_id}_scores_background.tsv.gz")
   script:
     """
     02-score-metaprograms.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
       --metaprograms_file ${metaprograms_file} \
-      --output_file "${unique_id}_metaprogram_scores.tsv" \
+      --output_file "${unique_id}_metaprogram_scores.tsv.gz" \
       --seed ${params.seed}
 
     03-calculate-score-background.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
       --metaprograms_file ${metaprograms_file} \
-      --output_file "${unique_id}_scores_background.tsv" \
+      --output_file "${unique_id}_scores_background.tsv.gz" \
       --seed ${params.seed}
     """
 
   stub:
     """
-    touch ${unique_id}_metaprogram_scores.tsv
-    touch ${unique_id}_scores_background.tsv
+    touch ${unique_id}_metaprogram_scores.tsv.gz
+    touch ${unique_id}_scores_background.tsv.gz
     """
 }
 
@@ -95,23 +95,23 @@ process combine_score_files {
           path(background_score_files) // list of background score files for each sample
   output:
     tuple val(n_metaprograms),
-          path("k-${n_metaprograms}_metaprogram_scores.tsv"),
-          path("k-${n_metaprograms}_background_scores.tsv")
+          path("k-${n_metaprograms}_metaprogram_scores.tsv.gz"),
+          path("k-${n_metaprograms}_background_scores.tsv.gz")
   script:
     """
     03a-combine-score-files.R \
       --input_tsv_files ${score_files.join(',')} \
-      --output_file "k-${n_metaprograms}_metaprogram_scores.tsv"
+      --output_file "k-${n_metaprograms}_metaprogram_scores.tsv.gz"
 
     03a-combine-score-files.R \
       --input_tsv_files ${background_score_files.join(',')} \
-      --output_file "k-${n_metaprograms}_background_scores.tsv"
+      --output_file "k-${n_metaprograms}_background_scores.tsv.gz"
     """
 
   stub:
     """
-    touch "k-${n_metaprograms}_metaprogram_scores.tsv"
-    touch "k-${n_metaprograms}_background_scores.tsv"
+    touch "k-${n_metaprograms}_metaprogram_scores.tsv.gz"
+    touch "k-${n_metaprograms}_background_scores.tsv.gz"
     """
 }
 

@@ -88,7 +88,7 @@ stopifnot(
   "Processed SCE file does not exist" = file.exists(opt$sce_file),
   "Annotations file does not exist" = file.exists(opt$annotations_file),
   "Metaprograms file does not exist" = file.exists(opt$metaprograms_file),
-  "Output file must end in .tsv" = stringr::str_detect(opt$output_file, "\\.tsv$")
+  "Output file must end in .tsv or .tsv.gz" = stringr::str_detect(opt$output_file, "\\.tsv$|\\.tsv\\.gz$")
 )
 
 # read in files
