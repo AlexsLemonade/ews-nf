@@ -29,7 +29,8 @@ opt <- parse_args(OptionParser(option_list = option_list))
 
 # make sure all ref files exist and output file is an rds file 
 stopifnot(
-  "Output file must end in .rds" = stringr::str_detect(opt$output_file, "\\.rds$"),
+  "Output SCE file must end in .rds" = stringr::str_detect(opt$output_sce_file, "\\.rds$"),
+  "Output annotation file must end in .tsv or .tsv.gz" = stringr::str_detect(opt$output_annotation_file, "\\.tsv$|\\.tsv\\.gz$"),
   "List of input SCEs to combine is missing" = !is.null(opt$ref_file_list)
 )
 
@@ -50,6 +51,15 @@ suppressPackageStartupMessages({
 # read in sce 
 ref_sce_list <- ref_sce_files |> 
   purrr::map(readr::read_rds) 
+
+# account for libraries from different techs and only keep shared genes
+shared_features <- ref_sce_list |>
+  purrr::map(rownames) |>
+  purrr::reduce(intersect)
+
+# subset each SCE to common genes only
+ref_sce_list <- purrr::map(ref_sce_list, \(sce) sce[shared_features, ])
+
 # combine into a single reference sce 
 combined_ref_sce <- do.call(cbind, ref_sce_list)
 
