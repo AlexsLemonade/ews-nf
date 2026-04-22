@@ -26,11 +26,13 @@ workflow reference {
   // create a channel of [unique_id, sample id, path to processed SCE file]
   // this includes all samples
   library_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed.rds", type: 'file')
-    .map{ file -> tuple(
-      file.name.replace("_processed.rds", ""), // extract unique id which will be either library_id or <library_id>-<sample_id>
-      file.parent.name, // extract sample id from file path
-      file // full path to file
-    )}
+    .map{ file -> 
+      def file_id = file.name.replace("_processed.rds", "") // extract unique id which will be either library_id or <library_id>-<sample_id>
+      def sample_id = file.parent.name // extract sample id from file path
+      def unique_id = file_id.contains("-") ? file_id : "${file_id}-${sample_id}" // if unique id doesn't already contain sample id, append it
+      
+      [unique_id, sample_id, file] // emit tuple of unique id, sample id, and file path
+    }
     .branch{
       include: it[2].size() > 0 || it[2].name.startsWith("STUB")
       skip: true
@@ -64,11 +66,13 @@ workflow {
 
   // create a channel of [unique_id, sample id, path to processed SCE file]
   library_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed.rds", type: 'file')
-    .map{ file -> tuple(
-      file.name.replace("_processed.rds", ""), // extract unique id which will be either library_id or <library_id>-<sample_id>
-      file.parent.name, // extract sample id from file path
-      file // full path to file
-    )}
+    .map{ file -> 
+      def file_id = file.name.replace("_processed.rds", "") // extract unique id which will be either library_id or <library_id>-<sample_id>
+      def sample_id = file.parent.name // extract sample id from file path
+      def unique_id = file_id.contains("-") ? file_id : "${file_id}-${sample_id}" // if unique id doesn't already contain sample id, append it
+      
+      [unique_id, sample_id, file] // emit tuple of unique id, sample id, and file path
+    }
     // filter to only specified samples
     // use either unique id or sample id for filtering
     .filter{ run_all || (it[0] in sample_ids) || (it[1] in sample_ids) }
@@ -105,12 +109,14 @@ workflow nmf_metaprograms {
   run_all = sample_ids[0] == "All"
 
   // create a channel of [unique_id, sample id, path to processed H5 file]
-  sample_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed_rna.h5ad", type: 'file')
-    .map{ file -> tuple(
-      file.name.replace("_processed_rna.h5ad", ""), // extract unique id which will be either library_id or <library_id>-<sample_id>
-      file.parent.name, // extract sample id from file path
-      file // full path to file
-    )}
+  sample_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed.rds", type: 'file')
+    .map{ file -> 
+      def file_id = file.name.replace("_processed.rds", "") // extract unique id which will be either library_id or <library_id>-<sample_id>
+      def sample_id = file.parent.name // extract sample id from file path
+      def unique_id = file_id.contains("-") ? file_id : "${file_id}-${sample_id}" // if unique id doesn't already contain sample id, append it
+      
+      [unique_id, sample_id, file] // emit tuple of unique id, sample id, and file path
+    }
     // filter to only specified samples
     // use either unique id or sample id for filtering
     .filter{ unique_id, sample_id, _h5_file -> 
