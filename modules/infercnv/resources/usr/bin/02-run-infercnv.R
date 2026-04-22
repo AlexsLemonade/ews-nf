@@ -154,10 +154,13 @@ colnames(sce) <- glue::glue("{unique_id}_{colnames(sce)}")
 duplicated_cells <- intersect(colnames(ref_sce), colnames(sce))
 sce <- sce[, !(colnames(sce) %in% duplicated_cells)]
 
+# identify shared genes between query and ref SCE 
+shared_genes <- intersect(rownames(sce), rownames(ref_sce))
+
 # Create input matrix by combining library SCE and reference SCE counts assays
 raw_counts_matrix <- cbind(
-  counts(sce),
-  counts(ref_sce)
+  counts(sce)[shared_genes, ],
+  counts(ref_sce)[shared_genes, ]
 )
 
 # Check that we removed the duplicates:
