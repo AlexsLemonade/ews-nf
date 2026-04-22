@@ -50,6 +50,12 @@ option_list <- list(
     help = "Path to annotations file output from ews-nf with tumor cell annotations"
   ),
   make_option(
+    opt_str = c("--unique_id"),
+    type = "character",
+    default = "",
+    help = "Unique Id for library"
+  ),
+  make_option(
     opt_str = c("--metaprograms_file"),
     type = "character",
     default = "metaprograms.rds",
@@ -97,8 +103,7 @@ annotations_df <- readr::read_tsv(opt$annotations_file)
 mp_obj <- readr::read_rds(opt$metaprograms_file)
 
 # pull out unique Id to save to TSV 
-unique_id <- basename(opt$sce_file) |> 
-  stringr::word(1, sep = "_")
+unique_id <- params$unique_id
 
 # Prep gene expr mtx -----------------------------------------------------------
 

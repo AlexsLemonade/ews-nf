@@ -62,6 +62,7 @@ process score_metaprograms {
     02-score-metaprograms.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
+      --unique_id ${unique_id} \
       --metaprograms_file ${metaprograms_file} \
       --output_file "${unique_id}_metaprogram_scores.tsv.gz" \
       --seed ${params.seed}
@@ -69,6 +70,7 @@ process score_metaprograms {
     03-calculate-score-background.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
+      --unique_id ${unique_id} \
       --metaprograms_file ${metaprograms_file} \
       --output_file "${unique_id}_scores_background.tsv.gz" \
       --seed ${params.seed}
@@ -243,6 +245,7 @@ process score_and_annotate_sce {
     """
     05-score-and-annotate-sce.R \
       --sce_file ${sce_file} \
+      --unique_id ${unique_id} \
       --annotations_file ${annotations_file} \
       --scores_file ${combined_scores_file} \
       --output_file "${unique_id}_annotated.rds"

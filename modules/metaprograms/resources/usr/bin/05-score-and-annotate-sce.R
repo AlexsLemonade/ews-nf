@@ -16,6 +16,12 @@ option_list <- list(
     help = "Path to processed SCE to add scores and annotations to"
   ),
   make_option(
+    opt_str = c("--unique_id"),
+    type = "character",
+    default = "",
+    help = "Unique Id for library"
+  ),
+  make_option(
     opt_str = c("--annotations_file"),
     type = "character",
     default = "",
@@ -49,20 +55,15 @@ stopifnot(
 # read in files
 sce <- readr::read_rds(opt$sce_file)
 
-# pull out unique Id to use for filtering
-# can't name it unique id otherwise it messes up filtering later
-id <- basename(opt$sce_file) |> 
-  stringr::word(1, sep = "_")
-
 # read in annotations and filter to only cells from that library 
 annotations_df <- readr::read_tsv(opt$annotations_file) |> 
-  dplyr::filter(unique_id == id) |> 
+  dplyr::filter(unique_id == params$unique_id) |> 
   # match the column name for final annotations that is currenlty used in shared data
   dplyr::mutate(ews_nf_celltype_annotation = annotation_tier0) 
 
 # read in scores file
 scores_df <- readr::read_tsv(opt$scores_file) |> 
-  dplyr::filter(unique_id == id)
+  dplyr::filter(unique_id == params$unique_id)
 
 # expand to have one row per barcode and one column per mp
 wide_scores_df <- scores_df |> 

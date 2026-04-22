@@ -17,6 +17,12 @@ option_list <- list(
     help = "Path to RDS file containing a processed SingleCellExperiment object to extract reference cells from."
   ),
   make_option(
+    opt_str = c("--unique_id"),
+    type = "character",
+    default = "",
+    help = "Unique Id for library"
+  ),
+  make_option(
     opt_str = c("--reference_celltypes_file"),
     type = "character",
     help = "Path to TSV with list of consensus annotations to include in the reference cells."
@@ -63,8 +69,6 @@ ref_celltypes <- readr::read_tsv(opt$reference_celltypes_file) |>
 
 # Extract reference cells ------------------------------------------------------
 
-# extract unique id to save to tsv file based on sce file name 
-unique_id <- stringr::word(basename(opt$sce_file), sep = "_", 1)
 # save sample id as column
 sample_id <- metadata(sce)$sample_id
 
@@ -72,7 +76,7 @@ sample_id <- metadata(sce)$sample_id
 ref_celltype_df <- colData(sce) |> 
   as.data.frame() |> 
   dplyr::select(barcodes, consensus_celltype_annotation, consensus_celltype_ontology) |> 
-  dplyr::mutate(unique_id = unique_id,
+  dplyr::mutate(unique_id = params$unique_id,
                 sample_id = sample_id) |> 
   dplyr::filter(consensus_celltype_annotation %in% ref_celltypes) 
 
