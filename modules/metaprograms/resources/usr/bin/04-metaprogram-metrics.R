@@ -604,5 +604,5 @@ metrics_obj <- list(
   total_patients = length(unique(sample_df$participant_id))
 )
 
-readr::write_rds(metrics_obj, opt$output_file)
+readr::write_rds(metrics_obj, opt$output_file, compress = "bz2")
 

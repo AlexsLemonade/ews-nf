@@ -28,6 +28,12 @@ option_list <- list(
     help = "Path to the SCE file to run inferCNV on"
   ),
   make_option(
+    opt_str = c("--unique_id"),
+    type = "character",
+    default = "",
+    help = "Unique Id for library"
+  ),
+  make_option(
     opt_str = "--reference_file",
     type = "character",
     help = "Path to the normal reference SCE"
@@ -136,8 +142,7 @@ sce <- readr::read_rds(opt$sce_file)
 ref_sce <- readr::read_rds(opt$reference_file)
 
 # get unique id and construct scratch directory
-unique_id <- stringr::word(basename(opt$sce_file), sep = "_", 1)
-
+unique_id <- params$unique_id
 
 # define path to output files in scratch directory that will be copied and saved as output from script 
 scratch_metadata_file <- file.path(opt$temp_dir, "map_metadata_from_infercnv.txt")
@@ -154,10 +159,13 @@ colnames(sce) <- glue::glue("{unique_id}_{colnames(sce)}")
 duplicated_cells <- intersect(colnames(ref_sce), colnames(sce))
 sce <- sce[, !(colnames(sce) %in% duplicated_cells)]
 
+# identify shared genes between query and ref SCE 
+shared_genes <- intersect(rownames(sce), rownames(ref_sce))
+
 # Create input matrix by combining library SCE and reference SCE counts assays
 raw_counts_matrix <- cbind(
-  counts(sce),
-  counts(ref_sce)
+  counts(sce)[shared_genes, ],
+  counts(ref_sce)[shared_genes, ]
 )
 
 # Check that we removed the duplicates:

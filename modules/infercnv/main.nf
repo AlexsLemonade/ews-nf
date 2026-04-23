@@ -50,6 +50,7 @@ process run_infercnv {
     """
     02-run-infercnv.R \
       --sce_file ${sce_file} \
+      --unique_id ${unique_id} \
       --reference_file ${reference_cells_file} \
       --gene_order_file ${gene_order_file} \
       --output_metadata_file ${infercnv_metadata} \
