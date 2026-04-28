@@ -98,7 +98,7 @@ if(ncol(small_ref_sce) == 0){
 }
 
 # add library id to colnames 
-colnames(small_ref_sce) <- glue::glue("{unique_id}_{colnames(small_ref_sce)}")
+colnames(small_ref_sce) <- glue::glue("{opt$unique_id}_{colnames(small_ref_sce)}")
 
 # save to rds file
 readr::write_rds(small_ref_sce, opt$output_file, compress = "bz2")

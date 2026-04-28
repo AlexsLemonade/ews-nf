@@ -22,6 +22,12 @@ option_list <- list(
     help = "Path to RDS file containing a processed SingleCellExperiment object to use with AUCell."
   ),
   make_option(
+    opt_str = c("--unique_id"),
+    type = "character",
+    default = "",
+    help = "Unique Id for library"
+  ),
+  make_option(
     opt_str = c("--gene_set_collection_file"),
     type = "character",
     default = "",
@@ -133,8 +139,8 @@ if(opt$is_reference){
   ref_cells <- ref_aucell_df$cell_id |> 
     unique()
   
-  # extract unique id to save to results file from sce file name 
-  unique_id <- stringr::word(basename(opt$sce_file), sep = "_", 1)
+  # save some typing and grab unique id
+  unique_id <- opt$unique_id
   
   # get the coldata to join with results later
   coldata_df <- data.frame(
