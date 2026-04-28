@@ -16,6 +16,10 @@
 # Rscript 02-run-infercnv.R --help
 #
 
+# set options for large cell numbers with inferCNV 
+# see https://github.com/broadinstitute/infercnv/issues/396
+options(scipen = 100)
+
 suppressPackageStartupMessages({
   library(SingleCellExperiment)
   library(optparse)
@@ -108,7 +112,6 @@ option_list <- list(
 
 # Parse options ----------------
 opt <- parse_args(OptionParser(option_list = option_list))
-
 
 # check inputs and outputs 
 stopifnot(
