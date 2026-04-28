@@ -1,3 +1,13 @@
+// Utility functions for ews-nf
+
+/**
+  * Parses the processed file path to extract unique id, sample id, and number of processed cells from metadata json file
+  * 
+  * @param processed_file path to processed file (either .rds or .h5ad)
+  * @param extension file extension to remove to get unique id (default is "_processed.rds")
+  * @return tuple of unique id, sample id, path to processed file, and number of processed cells
+**/
+
 
 def parseProcessedFile(processed_file, extension = "_processed.rds") {
 
