@@ -76,7 +76,7 @@ sample_id <- metadata(sce)$sample_id
 ref_celltype_df <- colData(sce) |> 
   as.data.frame() |> 
   dplyr::select(barcodes, consensus_celltype_annotation, consensus_celltype_ontology) |> 
-  dplyr::mutate(unique_id = params$unique_id,
+  dplyr::mutate(unique_id = opt$unique_id,
                 sample_id = sample_id) |> 
   dplyr::filter(consensus_celltype_annotation %in% ref_celltypes) 
 

@@ -142,7 +142,7 @@ sce <- readr::read_rds(opt$sce_file)
 ref_sce <- readr::read_rds(opt$reference_file)
 
 # get unique id and construct scratch directory
-unique_id <- params$unique_id
+unique_id <- opt$unique_id
 
 # define path to output files in scratch directory that will be copied and saved as output from script 
 scratch_metadata_file <- file.path(opt$temp_dir, "map_metadata_from_infercnv.txt")

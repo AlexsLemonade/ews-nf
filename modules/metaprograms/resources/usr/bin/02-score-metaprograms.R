@@ -103,7 +103,7 @@ annotations_df <- readr::read_tsv(opt$annotations_file)
 mp_obj <- readr::read_rds(opt$metaprograms_file)
 
 # pull out unique Id to save to TSV 
-unique_id <- params$unique_id
+unique_id <- opt$unique_id
 
 # Prep gene expr mtx -----------------------------------------------------------
 
