@@ -210,6 +210,7 @@ infercnv_obj <- infercnv::run(
   HMM_type = opt$hmm_model, # specifies i3 or i6
   save_rds = FALSE, # don't save the intermediate rds files
   num_threads = opt$threads,
+  useRaster = FALSE, # too many reference cells so turn off rasterization
   ###### clustering settings
   leiden_function = opt$leiden_function,
   leiden_method = opt$leiden_method,
