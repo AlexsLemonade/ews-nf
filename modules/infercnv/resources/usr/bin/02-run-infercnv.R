@@ -86,11 +86,6 @@ option_list <- list(
     help = "Path to file to save inferCNV results as a TSV"
   ),
   make_option(
-    opt_str = "--output_heatmap_file",
-    type = "character",
-    help = "Path to file to save inferCNV heatmap as a PNG file"
-  ),
-  make_option(
     opt_str = c("--temp_dir"),
     type = "character",
     help = "Temp directory to store intermediate files when running inferCNV"
@@ -119,7 +114,6 @@ stopifnot(
   "reference_file does not exist" = file.exists(opt$reference_file),
   "gene_order_file does not exist" = file.exists(opt$gene_order_file),
   "output_metadata_file must end in .tsv" = stringr::str_detect(opt$output_metadata_file, "\\.tsv$"),
-  "output_heatmap_file must end in .png" = stringr::str_detect(opt$output_heatmap_file, "\\.png$"),
   "hmm_model not properly specified" = opt$hmm_model %in% c("i3", "i6")
 )
 
@@ -210,7 +204,7 @@ infercnv_obj <- infercnv::run(
   HMM_type = opt$hmm_model, # specifies i3 or i6
   save_rds = FALSE, # don't save the intermediate rds files
   num_threads = opt$threads,
-  useRaster = FALSE, # too many reference cells so turn off rasterization
+  no_plot = TRUE, # too many reference cells so turn off the plotting
   ###### clustering settings
   leiden_function = opt$leiden_function,
   leiden_method = opt$leiden_method,
@@ -287,5 +281,3 @@ all_cnv_df |>
   dplyr::left_join(zscore_df, by = "cell_id") |> 
   readr::write_tsv(opt$output_metadata_file)
 
-# copy png file to output directory
-fs::file_copy(scratch_png, opt$output_heatmap_file, overwrite = TRUE)

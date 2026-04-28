@@ -3,7 +3,6 @@ params:
   unique_id: "SCPCL001228-SCPCS000844"
   sce_file: "../scpca-nf-out/SCPCP000026/SCPCS000844/SCPCL001228-SCPCS000844_processed.rds"
   annotations_results_file: "../ews-nf-out/annotations/SCPCS000844/SCPCL001228-SCPCS000844_annotations.tsv"
-  infercnv_heatmap_file: "../ews-nf-out/infercnv/SCPCS000844/SCPCL001228-SCPCS000844_infercnv-heatmap.png"
   validation_groups_file: "../references/consensus-validation-groups.tsv"
   marker_genes_file: "../references/validation-markers.tsv"
   color_palette_file: "../palettes/validation-group-palette.tsv"
@@ -102,7 +101,6 @@ plot_density()
 stopifnot(
   "sce file does not exist" = file.exists(params$sce_file),
   "annotations results file does not exist" = file.exists(params$annotations_results_file),
-  "infercnv heatmap file does not exist" = file.exists(params$infercnv_heatmap_file),
   "validation groups file does not exist" = file.exists(params$validation_groups_file),
   "marker genes file does not exist" = file.exists(params$marker_genes_file),
   "color palette file does not exist" = file.exists(params$color_palette_file)
@@ -574,13 +572,6 @@ all_df_list |>
 ## `inferCNV` summary
 
 [`inferCNV`](https://github.com/broadinstitute/inferCNV/wiki) was run using all normal cell types that are listed in [`references/reference-celltype.tsv`](https://github.com/AlexsLemonade/ews-nf/blob/main/references/reference-celltypes.tsv) as a reference. 
-
-### Heatmap 
-
-Below is the heatmap showing chromosome gains and losses as output by `inferCNV`. 
-
-![](`r params$infercnv_heatmap_file`)
-
 
 ### All CNVs {.tabset}
 

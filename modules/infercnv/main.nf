@@ -42,11 +42,9 @@ process run_infercnv {
   output:
     tuple val(unique_id),
           val(sample_id),
-          path(infercnv_metadata),
-          path(infercnv_heatmap)
+          path(infercnv_metadata)
   script:
     infercnv_metadata = "${unique_id}_infercnv-metadata.tsv"
-    infercnv_heatmap = "${unique_id}_infercnv-heatmap.png"
     """
     02-run-infercnv.R \
       --sce_file ${sce_file} \
@@ -54,7 +52,6 @@ process run_infercnv {
       --reference_file ${reference_cells_file} \
       --gene_order_file ${gene_order_file} \
       --output_metadata_file ${infercnv_metadata} \
-      --output_heatmap_file ${infercnv_heatmap} \
       --temp_dir \$PWD \
       --threads ${task.cpus} \
       --seed ${params.seed}
@@ -62,10 +59,8 @@ process run_infercnv {
 
   stub:
     infercnv_metadata = "${unique_id}_infercnv-metadata.tsv"
-    infercnv_heatmap = "${unique_id}_infercnv-heatmap.png"
     """
     touch ${infercnv_metadata}
-    touch ${infercnv_heatmap}
     """
 }
 
@@ -81,9 +76,7 @@ workflow infercnv {
         sample_id, 
         sce_file,
         // path to metadata file
-        file("${params.outdir}/infercnv/${sample_id}/${unique_id}_infercnv-metadata.tsv"),
-        // path to heatmap file
-        file("${params.outdir}/infercnv/${sample_id}/${unique_id}_infercnv-heatmap.png")
+        file("${params.outdir}/infercnv/${sample_id}/${unique_id}_infercnv-metadata.tsv")
       )}
       .branch{
         // branch samples based on if infercnv exists and skip_infercnv is used 
@@ -98,7 +91,7 @@ workflow infercnv {
 
     // run infercnv using a normal reference 
     run_infercnv_ch = infercnv_ch.run_infercnv
-      .map{ unique_id, sample_id, sce_file, _metadata_file, _heatmap_file -> tuple(
+      .map{ unique_id, sample_id, sce_file, _metadata_file -> tuple(
         unique_id,
         sample_id,
         sce_file
@@ -113,16 +106,15 @@ workflow infercnv {
 
     output_ch = infercnv_ch.skip_infercnv
       // drop sce file from channel where infercnv wasn't run
-      .map{ unique_id, sample_id, _sce_file, metadata_file, heatmap_file -> tuple(
+      .map{ unique_id, sample_id, _sce_file, metadata_file -> tuple(
         unique_id,
         sample_id,
-        metadata_file,
-        heatmap_file
+        metadata_file
       )}
       // mix with samples that were run
       .mix(run_infercnv.out)
 
 
   emit:
-    output_ch // [unique_id, sample_id, infercnv metadata, infercnv heatmap]
+    output_ch // [unique_id, sample_id, infercnv metadata]
 }

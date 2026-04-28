@@ -45,15 +45,15 @@ workflow annotate_tumor_cells {
     library_ch  // [unique_id, sample_id, path to processed SCE file]
     aucell_query // [unique id, sample_id, path to aucell results]
     aucell_ref // path to file with all reference cell results from aucell 
-    infercnv_ch // [unique id, sample_id, path to cnv heatmap, path to cnv metadata]
+    infercnv_ch // [unique id, sample_id, path to cnv metadata]
   main:
 
     // join sce file with aucell results 
     annotation_ch = library_ch
       .join(aucell_query, by: [0,1])
       .join(infercnv_ch, by: [0,1])
-      // drop the extra sample id and heatmap from joining 
-      .map{ unique_id, sample_id, sce, aucell_file, cnv_metadata, _cnv_heatmap -> tuple(
+      // drop the extra sample id from joining 
+      .map{ unique_id, sample_id, sce, aucell_file, cnv_metadata -> tuple(
         unique_id,
         sample_id,
         sce, 
