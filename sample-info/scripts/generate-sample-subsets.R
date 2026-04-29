@@ -23,17 +23,17 @@ get_sample_subset <- function(sample_df, size){
   # as long as the max samples per patient > cap get a subset 
   while(max_samples_per_patient > per_patient_cap) {
     
-    subset <- sample(sample_df$scpca_sample_id, size)
+    sample_subset <- sample(sample_df$scpca_sample_id, size)
     
     max_samples_per_patient <- sample_df |> 
-      dplyr::filter(scpca_sample_id %in% subset) |> 
+      dplyr::filter(scpca_sample_id %in% sample_subset) |> 
       dplyr::count(participant_id) |> 
       dplyr::pull(n) |> 
       max() 
   }
   
   # sort so we can check that we don't get any duplicate subsets
-  return(sort(subset))
+  return(sort(sample_subset))
   
 }
 

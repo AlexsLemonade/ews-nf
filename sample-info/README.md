@@ -12,3 +12,4 @@ The `scripts` directory contains any scripts used to set up metadata files.
 * `generate-sample-subsets.R`: This script creates the `sample-subsets.tsv` file by randomly sampling sample IDs to create subsets of various sizes. 
 In particular, we create subsets of size 10 to 100 with a step size of 10. 
 For each size, sampling is repeated five times. 
+For each subset, we ensure that a given patient comprises no more than 10% of samples.
