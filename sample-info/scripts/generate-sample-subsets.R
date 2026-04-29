@@ -13,10 +13,10 @@
 #' @param size Size of subset to obtain, e.g. 10
 #'
 #' @returns A list of sample ids with length equivalent to `size`
-get_sample_subset <- function(sample_df, size){
+get_sample_subset <- function(sample_df, size, max_patient_fraction){
   
   # set the per patient cap to be 10% of all samples
-  per_patient_cap <- floor(0.10 * size)
+  per_patient_cap <- floor(max_patient_fraction * size)
   # start with this value being above the per patient cap 
   max_samples_per_patient <- per_patient_cap + 1
   
@@ -40,6 +40,27 @@ get_sample_subset <- function(sample_df, size){
 # set up -----------------------------------------------------------------------
 
 set.seed(2026)
+
+library(optparse)
+
+option_list <- list(
+  make_option(
+    opt_str = c("--n_replicates"),
+    type = "numeric",
+    default = 5,
+    help = "Number of replicates for each subset size"
+  ),
+  make_option(
+    opt_str = c("--max_patient_fraction"),
+    type = "numeric",
+    default = 0.1,
+    help = "Maximum fraction of samples that can be from a single patient in a single subset"
+  )
+)
+
+# Parse options
+opt <- parse_args(OptionParser(option_list = option_list))
+
 
 # define intput and output files
 sample_metadata_file <- here::here("sample-info", "sample-metadata.tsv")
@@ -69,9 +90,12 @@ subset_df <- subset_sizes |>
     # this ensures the first subset is grabbed and checked for duplicates 
     duplicates_present <- TRUE
     
-    while(any(duplicates_present)){
+    while(any(duplicates_present) & counter <= 10){
       # get a dataframe with one column per replicate of subsets 
-      subsets <- replicate(5, get_sample_subset(sample_df, size))
+      subsets <- replicate(
+        opt$n_replicates, 
+        get_sample_subset(sample_df, size, opt$max_patient_fraction)
+      )
       
       # check that there's no identical subsets that were chosen
       # if so, try again
