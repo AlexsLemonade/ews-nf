@@ -81,8 +81,7 @@ workflow infercnv {
         skip_infercnv: 
         (
           params.skip_infercnv 
-          && it[3].exists() 
-          && it[4].exists()
+          && it[3].exists()
         )
         run_infercnv: true
       }
