@@ -4,8 +4,7 @@
 
 process make_gene_order_file {
   container params.ews_nf_container
-  label 'mem_8'
-  time '2h'
+  label 'bigmem'
   publishDir "${params.outdir}/reference", mode: 'copy'
   input:
     path gtf_file
