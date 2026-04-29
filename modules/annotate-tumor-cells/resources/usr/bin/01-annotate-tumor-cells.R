@@ -147,7 +147,6 @@ all_aucell_df <- aucell_df |>
 # combine celltypes, aucell, and infercnv information together
 # only keep cells that are in the object, we don't need to classify the reference cells from other libraries
 results_df <- all_aucell_df |> 
-  dplyr::filter(stringr::str_detect(cell_id, opt$unique_id)) |> 
   # aucell results
   # again using full join here since we want to keep both library unknown and reference cells
   dplyr::left_join(coldata_df, by = "cell_id") |> 
