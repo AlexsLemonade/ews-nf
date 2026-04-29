@@ -29,6 +29,8 @@ jobs:
 
       - name: Setup Nextflow
         uses: nf-core/setup-nextflow@v2
+        with: 
+          version: '25.10.4'
 
       - name: Check Nextflow workflow with reference building
         run: nextflow -log stub-run.log run main.nf -entry reference -stub -profile stub -ansi-log false
