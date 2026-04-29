@@ -205,6 +205,7 @@ infercnv_obj <- infercnv::run(
   save_rds = FALSE, # don't save the intermediate rds files
   num_threads = opt$threads,
   no_plot = TRUE, # too many reference cells so turn off the plotting
+  no_prelim_plot = TRUE, # make sure absolutely no plots are made
   ###### clustering settings
   leiden_function = opt$leiden_function,
   leiden_method = opt$leiden_method,
