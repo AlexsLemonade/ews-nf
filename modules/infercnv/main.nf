@@ -4,7 +4,8 @@
 
 process make_gene_order_file {
   container params.ews_nf_container
-  label 'bigmem'
+  label 'mem_8'
+  time '2h'
   publishDir "${params.outdir}/reference", mode: 'copy'
   input:
     path gtf_file
@@ -28,9 +29,7 @@ process make_gene_order_file {
 process run_infercnv {
   container params.ews_nf_container
   tag "${unique_id}"
-  label 'mem_96'
-  cpus 4
-  time '12h'
+  label 'big_mem'
   publishDir "${params.outdir}/infercnv/${sample_id}", mode: 'copy'
   input:
     tuple val(unique_id),
