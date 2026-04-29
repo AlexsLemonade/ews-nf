@@ -4,6 +4,7 @@
 
 process render_report {
   container params.ews_nf_container
+  tag "${unique_id}"
   label 'mem_8'
   time '2h'
   publishDir "${params.outdir}/reports/${sample_id}"

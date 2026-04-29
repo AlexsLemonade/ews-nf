@@ -76,6 +76,7 @@ process run_aucell {
     """
     02-aucell.R \
       --sce_file ${sce_file} \
+      --unique_id ${unique_id} \
       --gene_set_collection_file ${geneset_collection_file} \
       --max_rank_threshold ${params.aucell_max_rank_threshold} \
       --output_file "${unique_id}_aucell-results.tsv" \
