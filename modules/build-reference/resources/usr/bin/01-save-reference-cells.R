@@ -76,7 +76,7 @@ sample_id <- metadata(sce)$sample_id
 ref_celltype_df <- colData(sce) |> 
   as.data.frame() |> 
   dplyr::select(barcodes, consensus_celltype_annotation, consensus_celltype_ontology) |> 
-  dplyr::mutate(unique_id = params$unique_id,
+  dplyr::mutate(unique_id = opt$unique_id,
                 sample_id = sample_id) |> 
   dplyr::filter(consensus_celltype_annotation %in% ref_celltypes) 
 
@@ -98,7 +98,7 @@ if(ncol(small_ref_sce) == 0){
 }
 
 # add library id to colnames 
-colnames(small_ref_sce) <- glue::glue("{unique_id}_{colnames(small_ref_sce)}")
+colnames(small_ref_sce) <- glue::glue("{opt$unique_id}_{colnames(small_ref_sce)}")
 
 # save to rds file
 readr::write_rds(small_ref_sce, opt$output_file, compress = "bz2")

@@ -16,6 +16,10 @@
 # Rscript 02-run-infercnv.R --help
 #
 
+# set options for large cell numbers with inferCNV 
+# see https://github.com/broadinstitute/infercnv/issues/396
+options(scipen = 100)
+
 suppressPackageStartupMessages({
   library(SingleCellExperiment)
   library(optparse)
@@ -82,11 +86,6 @@ option_list <- list(
     help = "Path to file to save inferCNV results as a TSV"
   ),
   make_option(
-    opt_str = "--output_heatmap_file",
-    type = "character",
-    help = "Path to file to save inferCNV heatmap as a PNG file"
-  ),
-  make_option(
     opt_str = c("--temp_dir"),
     type = "character",
     help = "Temp directory to store intermediate files when running inferCNV"
@@ -109,14 +108,12 @@ option_list <- list(
 # Parse options ----------------
 opt <- parse_args(OptionParser(option_list = option_list))
 
-
 # check inputs and outputs 
 stopifnot(
   "sce_file does not exist" = file.exists(opt$sce_file),
   "reference_file does not exist" = file.exists(opt$reference_file),
   "gene_order_file does not exist" = file.exists(opt$gene_order_file),
   "output_metadata_file must end in .tsv" = stringr::str_detect(opt$output_metadata_file, "\\.tsv$"),
-  "output_heatmap_file must end in .png" = stringr::str_detect(opt$output_heatmap_file, "\\.png$"),
   "hmm_model not properly specified" = opt$hmm_model %in% c("i3", "i6")
 )
 
@@ -142,7 +139,7 @@ sce <- readr::read_rds(opt$sce_file)
 ref_sce <- readr::read_rds(opt$reference_file)
 
 # get unique id and construct scratch directory
-unique_id <- params$unique_id
+unique_id <- opt$unique_id
 
 # define path to output files in scratch directory that will be copied and saved as output from script 
 scratch_metadata_file <- file.path(opt$temp_dir, "map_metadata_from_infercnv.txt")
@@ -207,6 +204,8 @@ infercnv_obj <- infercnv::run(
   HMM_type = opt$hmm_model, # specifies i3 or i6
   save_rds = FALSE, # don't save the intermediate rds files
   num_threads = opt$threads,
+  no_plot = TRUE, # too many reference cells so turn off the plotting
+  no_prelim_plot = TRUE, # make sure absolutely no plots are made
   ###### clustering settings
   leiden_function = opt$leiden_function,
   leiden_method = opt$leiden_method,
@@ -283,5 +282,3 @@ all_cnv_df |>
   dplyr::left_join(zscore_df, by = "cell_id") |> 
   readr::write_tsv(opt$output_metadata_file)
 
-# copy png file to output directory
-fs::file_copy(scratch_png, opt$output_heatmap_file, overwrite = TRUE)

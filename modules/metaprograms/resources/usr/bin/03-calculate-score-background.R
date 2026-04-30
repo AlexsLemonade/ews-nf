@@ -123,7 +123,7 @@ gene_universe <- mp_object$gene_universe
 shuffled_mp_list <- mp_object$shuffled_metaprograms
 
 # save unique id
-unique_id <- params$unique_id
+unique_id <- opt$unique_id
 
 # Calculate scores and export --------------------------------------------------
 

@@ -4,6 +4,7 @@
 
 process render_report {
   container params.ews_nf_container
+  tag "${unique_id}"
   label 'mem_8'
   time '2h'
   publishDir "${params.outdir}/reports/${sample_id}"
@@ -11,8 +12,7 @@ process render_report {
     tuple val(unique_id),
           val(sample_id),
           path(sce_file), 
-          path(annotations_file),
-          path(infercnv_heatmap)
+          path(annotations_file)
     path template_file
     path plotting_functions_file
     path validation_groups_file
@@ -30,7 +30,6 @@ process render_report {
       params = list(unique_id = '${unique_id}', \
                     sce_file = '${sce_file}', \
                     annotations_results_file = '${annotations_file}', \
-                    infercnv_heatmap_file = '${infercnv_heatmap}', \
                     validation_groups_file = '${validation_groups_file}', \
                     marker_genes_file = '${marker_genes_file}', \
                     color_palette_file = '${color_palette_file}', \
@@ -61,12 +60,11 @@ workflow summary_report {
       .join(annotations_ch, by: [0,1])
       .join(infercnv_ch, by:  [0,1])
       // drop the cnv metadata after joining
-      .map{ unique_id, sample_id, sce, annotations_file, cnv_metadata, cnv_heatmap -> tuple(
+      .map{ unique_id, sample_id, sce, annotations_file, cnv_metadata -> tuple(
         unique_id,
         sample_id,
         sce, 
-        annotations_file,
-        cnv_heatmap
+        annotations_file
       )}
 
     // render report 
