@@ -15,7 +15,7 @@
 #' @returns A list of sample ids with length equivalent to `size`
 get_sample_subset <- function(sample_df, size, max_patient_fraction){
   
-  # set the per patient cap to be 10% of all samples
+  # set the per patient cap as a fraction of all samples
   per_patient_cap <- floor(max_patient_fraction * size)
   # start with this value being above the per patient cap 
   max_samples_per_patient <- per_patient_cap + 1
@@ -90,7 +90,7 @@ subset_df <- subset_sizes |>
     # this ensures the first subset is grabbed and checked for duplicates 
     duplicates_present <- TRUE
     
-    while(any(duplicates_present) & counter <= 10){
+    while(any(duplicates_present)){
       # get a dataframe with one column per replicate of subsets 
       subsets <- replicate(
         opt$n_replicates, 
