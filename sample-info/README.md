@@ -1,6 +1,7 @@
 
 This folder contains files with sample metadata used in the workflow.  
 
+<!--TODO: Update sample metadata after we clarify disease timing column in ScPCA-admin-->
 * `sample-metadata.tsv`: This file is the sample metadata file copied from [`ScPCA-admin/sample_info/bailey_cillo/sample-metadata.tsv`](https://github.com/AlexsLemonade/ScPCA-admin/blob/main/sample_info/bailey_cillo/sample-metadata.tsv). 
 * `low-cell-count-metadata.tsv`: This file contains a list of sample IDs that should be excluded when generating subsets of samples. 
 These samples have fewer than 200 cells in the processed objects. 
