@@ -35,7 +35,7 @@ workflow reference {
     }
     .branch{ _unique_id, _sample_id, rds_file, num_processed_cells -> 
       // only include samples with at least 200 processed cells
-      include: rds_file.size() > 0 || num_processed_cells >= 200 || rds_file.name.startsWith("STUB")
+      include: (rds_file.size() > 0 && num_processed_cells >= 200) || rds_file.name.startsWith("STUB")
       skip: true
     }
 
@@ -81,7 +81,7 @@ workflow {
     .filter{ run_all || (it[0] in sample_ids) || (it[1] in sample_ids) }
     .branch{ _unique_id, _sample_id, rds_file, num_processed_cells -> 
       // only include samples with at least 200 processed cells
-      run_workflow: rds_file.size() > 0 || num_processed_cells >= 200 || rds_file.name.startsWith("STUB")
+      run_workflow: (rds_file.size() > 0 && num_processed_cells >= 200) || rds_file.name.startsWith("STUB")
       skip_workflow: true
     }
 
@@ -128,7 +128,7 @@ workflow nmf_metaprograms {
       run_all || (unique_id in sample_ids) || (sample_id in sample_ids) 
     }
     .branch{ _unique_id, _sample_id, h5_file, num_processed_cells -> 
-      run_workflow: h5_file.size() > 0 || num_processed_cells >= 200 || h5_file.name.startsWith("STUB")
+      run_workflow: (h5_file.size() > 0 && num_processed_cells >= 200) || h5_file.name.startsWith("STUB")
       skip_workflow: true
     }
 

@@ -57,13 +57,13 @@ sce <- readr::read_rds(opt$sce_file)
 
 # read in annotations and filter to only cells from that library 
 annotations_df <- readr::read_tsv(opt$annotations_file) |> 
-  dplyr::filter(unique_id == params$unique_id) |> 
+  dplyr::filter(unique_id == opt$unique_id) |> 
   # match the column name for final annotations that is currenlty used in shared data
   dplyr::mutate(ews_nf_celltype_annotation = annotation_tier0) 
 
 # read in scores file
 scores_df <- readr::read_tsv(opt$scores_file) |> 
-  dplyr::filter(unique_id == params$unique_id)
+  dplyr::filter(unique_id == opt$unique_id)
 
 # expand to have one row per barcode and one column per mp
 wide_scores_df <- scores_df |> 
