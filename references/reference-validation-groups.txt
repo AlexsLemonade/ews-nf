@@ -1,0 +1,11 @@
+B cell
+T cell
+dendritic cell
+endothelial cell
+histamine secreting cell
+innate lymphoid cell
+macrophage
+monocyte
+myeloid cell
+natural killer cell
+plasma cell
