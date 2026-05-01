@@ -143,7 +143,6 @@ unique_id <- opt$unique_id
 
 # define path to output files in scratch directory that will be copied and saved as output from script 
 scratch_metadata_file <- file.path(opt$temp_dir, "map_metadata_from_infercnv.txt")
-scratch_png <- file.path(opt$temp_dir, "infercnv.png")
 
 message("files read in")
 
@@ -206,6 +205,9 @@ infercnv_obj <- infercnv::run(
   num_threads = opt$threads,
   no_plot = TRUE, # too many reference cells so turn off the plotting
   no_prelim_plot = TRUE, # make sure absolutely no plots are made
+  # it seems that this is how inferCNV actually decides about heatmaps ugh
+  # https://github.com/broadinstitute/infercnv/blob/65e6bf554600c92e7d5c121e98247d9c3f888a0d/R/inferCNV_heatmap.R#L406
+  output_format = NA,
   ###### clustering settings
   leiden_function = opt$leiden_function,
   leiden_method = opt$leiden_method,
