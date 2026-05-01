@@ -207,7 +207,7 @@ infercnv_obj <- infercnv::run(
   no_prelim_plot = TRUE, # make sure absolutely no plots are made
   # it seems that this is how inferCNV actually decides about heatmaps ugh
   # https://github.com/broadinstitute/infercnv/blob/65e6bf554600c92e7d5c121e98247d9c3f888a0d/R/inferCNV_heatmap.R#L406
-  output_method = NA,
+  output_format = NA,
   useRaster = FALSE,
   ###### clustering settings
   leiden_function = opt$leiden_function,
