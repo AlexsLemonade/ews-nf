@@ -67,7 +67,7 @@ workdir="$home_dir/work"
 # cnmf parameters
 skip_cnmf=${skip_cnmf:-0}
 k_components_lower=${k_components_lower:-5}
-k_components_upper=${k_components_upper:-25}
+k_components_upper=${k_components_upper:-15}
 k_step_size=${k_step_size:-5}
 
 # metaprogram parameters

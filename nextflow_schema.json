@@ -168,7 +168,7 @@
         },
         "k_components_upper": {
           "type": "number",
-          "default": 25,
+          "default": 15,
           "description": "Upper bound for number of components to run with cNMF"
         },
         "k_step_size": {
