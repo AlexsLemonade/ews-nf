@@ -21,7 +21,3 @@ ref_celltypes_df <- readr::read_tsv(consensus_validation_groups_file) |>
   dplyr::select(consensus_annotation, consensus_ontology)
 
 readr::write_tsv(ref_celltypes_df, ref_celltypes_file)
-
-
-old_ref_celltypes <- readr::read_tsv("references/reference-celltypes.tsv") |> 
-  dplyr::pull(consensus_annotation)
