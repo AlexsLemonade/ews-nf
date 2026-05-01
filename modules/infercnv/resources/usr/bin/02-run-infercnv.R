@@ -209,6 +209,8 @@ infercnv_obj <- infercnv::run(
   # https://github.com/broadinstitute/infercnv/blob/65e6bf554600c92e7d5c121e98247d9c3f888a0d/R/inferCNV_heatmap.R#L406
   output_format = NA,
   useRaster = FALSE,
+  # maybe we also need to make sure we don't plot any subclusters
+  inspect_subclusters = FALSE,
   ###### clustering settings
   leiden_function = opt$leiden_function,
   leiden_method = opt$leiden_method,
