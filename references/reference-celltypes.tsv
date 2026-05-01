@@ -1,29 +1,65 @@
 consensus_annotation	consensus_ontology
-myeloid leukocyte	CL:0000766
-granulocyte	CL:0000094
-neutrophil	CL:0000775
-mononuclear phagocyte	CL:0000113
-monocyte	CL:0000576
-hematopoietic precursor cell	CL:0008001
-T cell	CL:0000084
-"CD4-positive, alpha-beta T cell"	CL:0000624
-mature alpha-beta T cell	CL:0000791
-mature T cell	CL:0002419
-regulatory T cell	CL:0000815
-memory T cell	CL:0000813
-natural killer cell	CL:0000623
-innate lymphoid cell	CL:0001065
 B cell	CL:0000236
 lymphocyte of B lineage	CL:0000945
 mature B cell	CL:0000785
 naive B cell	CL:0000788
 memory B cell	CL:0000787
-macrophage	CL:0000235
-erythroid lineage cell	CL:0000764
-megakaryocyte	CL:0000556
-endothelial cell	CL:0000115
+class switched memory B cell	CL:0000972
+B cell, CD19-positive	CL:0001201
+antibody secreting cell	CL:0000946
+T cell	CL:0000084
+CD4-positive, alpha-beta T cell	CL:0000624
+mature alpha-beta T cell	CL:0000791
+mature T cell	CL:0002419
+regulatory T cell	CL:0000815
+memory T cell	CL:0000813
+central memory CD4-positive, alpha-beta T cell	CL:0000904
+CD4-positive, alpha-beta memory T cell, CD45RO-positive	CL:0001204
+naive T cell	CL:0000898
+CD8-positive, alpha-beta T cell	CL:0000625
+CD8-positive, alpha-beta memory T cell, CD45RO-positive	CL:0001203
+effector memory CD8-positive, alpha-beta T cell	CL:0000913
+gamma-delta T cell	CL:0000798
+central memory CD8-positive, alpha-beta T cell	CL:0000907
+thymocyte	CL:0000893
+effector memory CD4-positive, alpha-beta T cell	CL:0000905
+CD8-positive, alpha-beta memory T cell	CL:0000909
+mature NK T cell	CL:0000814
+CD4-positive, alpha-beta memory T cell	CL:0000897
+T follicular helper cell	CL:0002038
+CD4-positive helper T cell	CL:0000492
+effector T cell	CL:0000911
+alpha-beta T cell	CL:0000789
 dendritic cell	CL:0000451
-eosinophil	CL:0000771
-plasma cell	CL:0000786
+plasmacytoid dendritic cell	CL:0000784
+conventional dendritic cell	CL:0000990
+Langerhans cell	CL:0000453
+endothelial cell	CL:0000115
 blood vessel endothelial cell	CL:0000071
 microvascular endothelial cell	CL:2000008
+endothelial cell of vascular tree	CL:0002139
+endothelial cell of artery	CL:1000413
+perivascular cell	CL:4033054
+histamine secreting cell	CL:0002274
+innate lymphoid cell	CL:0001065
+macrophage	CL:0000235
+tissue-resident macrophage	CL:0000864
+lung macrophage	CL:1001603
+alveolar macrophage	CL:0000583
+Kupffer cell	CL:0000091
+inflammatory macrophage	CL:0000863
+elicited macrophage	CL:0000861
+microglial cell	CL:0000129
+monocyte	CL:0000576
+myeloid leukocyte	CL:0000766
+granulocyte	CL:0000094
+neutrophil	CL:0000775
+mononuclear phagocyte	CL:0000113
+erythroid lineage cell	CL:0000764
+megakaryocyte	CL:0000556
+eosinophil	CL:0000771
+platelet	CL:0000233
+erythrocyte	CL:0000232
+mast cell	CL:0000097
+natural killer cell	CL:0000623
+plasma cell	CL:0000786
