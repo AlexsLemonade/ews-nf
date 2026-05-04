@@ -120,7 +120,16 @@ tumor_cells <- annotations_df |>
 # get expression matrix for tumor cells and mp genes of interest 
 # only pull out genes that are actually in this object and part of the gene universe
 genes_to_use <- intersect(mp_obj$gene_universe, rownames(sce))
-expr <- logcounts(sce)[genes_to_use,tumor_cells] 
+
+# add some temp messages for debugging 
+message("SCE dimensions: ", paste(dim(sce), collapse=" x "))
+message("genes_to_use length: ", length(genes_to_use))
+message("tumor_cells length: ", length(tumor_cells))
+message("All genes in SCE: ", all(genes_to_use %in% rownames(sce)))
+message("All cells in SCE: ", all(tumor_cells %in% colnames(sce)))
+message("logcounts exists: ", "logcounts" %in% assayNames(sce))
+
+expr <- logcounts(sce)[genes_to_use, tumor_cells] 
 
 # quantile normalize the scores 
 # preprocessCore requires a regular matrix
