@@ -15,7 +15,11 @@ quantile_norm_tumor_cells <- function(sce, annotations_df, gene_universe){
     dplyr::pull(barcodes)
   
   # get expression matrix for tumor cells and mp genes of interest 
-  expr <- logcounts(sce)[gene_universe,tumor_cells] 
+  # only pull out genes that are actually in this object and part of the gene universe
+  genes_to_use <- intersect(gene_universe, rownames(sce))
+  
+  # get expression matrix for tumor cells and mp genes of interest 
+  expr <- logcounts(sce)[genes_to_use,tumor_cells] 
   
   # quantile normalize the scores 
   # preprocessCore requires a regular matrix
@@ -32,12 +36,17 @@ score_mp <- function(mp_weights, norm_expr_mtx){
   
   # make sure gene names are present and in the object
   stopifnot(
-    "Provided weights are missing gene names" = !is.null(names(mp_weights)),
-    "genes are not found in the SCE object" = all(names(mp_weights) %in% rownames(norm_expr_mtx))
+    "Provided weights are missing gene names" = !is.null(names(mp_weights))
   )
   
-  # mp genes 
-  mp_genes <- names(mp_weights)
+  # only consider genes that are present in the sce
+  mp_genes <- intersect(names(mp_weights), rownames(norm_expr_mtx))
+  mp_weights <- mp_weights[mp_genes]
+  
+  # check to make sure there are at least some genes present
+  stopifnot(
+    "No genes found in the SCE object" = length(mp_genes) > 0 
+  )
   
   # expression subset: genes × cells
   sub_expr <- norm_expr_mtx[mp_genes, ]
@@ -52,7 +61,6 @@ score_mp <- function(mp_weights, norm_expr_mtx){
   
   return(df)
 }
-
 # Read in arguments ------------------------------------------------------------
 
 library(optparse)
