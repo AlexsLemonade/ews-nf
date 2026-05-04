@@ -16,10 +16,10 @@ theme_set(
 
 ```{r}
 # metaprograms file for k=11
-k_11_dir <- here::here("ews-nf-out", "metaprograms", "metaprograms-11_cnmf-5-10-15_filtered") 
+k_7_dir <- here::here("ews-nf-out", "metaprograms", "metaprograms-7_cnmf-5-10-15_filtered") 
 
-metaprograms_file <- file.path(k_11_dir, "metaprograms.rds")
-scores_file <- file.path(k_11_dir, "k-11_metaprogram_scores.tsv")
+metaprograms_file <- file.path(k_7_dir, "metaprograms.rds")
+scores_file <- file.path(k_7_dir, "k-7_metaprogram_scores.tsv.gz")
 
 # annotations output directories
 annotations_dir <- here::here("ews-nf-out", "annotations")
@@ -32,12 +32,27 @@ annotations_file_list <- list.files(
 ```
 
 ```{r}
-metaprograms_object <- readr::read_rds("metaprograms_file")
+metaprograms_object <- readr::read_rds(metaprograms_file)
 scores_df <- readr::read_tsv(scores_file, col_types = list(.default = "c", mp_score = "d"))
 
 annotations_df <- annotations_file_list |> 
   # TODO specify columns
-  purrr::map(readr::read_tsv) |> 
+  purrr::map(readr::read_tsv,
+             col_types = list(
+               .default = "c",
+               'EF-activated' = "d",
+               'EF-repressed' = "d",
+               'EMT-ECM' = "d",
+               'STAG2-loss' = "d",
+               'chemo-resistance' = "d",
+               'ews-multiome' = "d",
+               cnv_zscore = "d",
+               chr1_gain_zscore = "d",
+               chr8_gain_zscore = "d",
+               chr12_gain_zscore = "d",
+               chr16_loss_zscore = "d"
+             )
+  )|> 
   dplyr::bind_rows() |> 
   # we're only interested in tumor cells that we actually ran NMF on 
   dplyr::filter(stringr::str_detect(annotation_tier0, "tumor"))
@@ -113,49 +128,6 @@ all_info_wide_df |>
   geom_jitter(size = 0.1,alpha = 0.1)  # alpha low given 400k cells
 ```
 
-```{r}
-mp_cols |> 
-  purrr::map(\(col){
-    all_info_wide_df |> 
-      dplyr::filter(top_mp == col) |> 
-      dplyr::count(consensus_celltype_annotation) |> 
-      dplyr::arrange(desc(n))
-  })
-
-table(annotations_df$consensus_celltype_annotation)
-
-annotations_df |> 
-  dplyr::filter(consensus_celltype_annotation != "Unknown") |> 
-  dplyr::pull(unique_id) |> 
-  unique()
-
-ref_celltypes <- readr::read_tsv(here::here("references", "reference-celltypes.tsv")) |> 
-  dplyr::pull(consensus_annotation)
-
-intersect(ref_celltypes, unique(annotations_df$consensus_celltype_annotation))
-
-unique(annotations_df$consensus_celltype_annotation)
-missing_samples <- annotations_df |> 
-  dplyr::filter(consensus_celltype_annotation %in% ref_celltypes) |> 
-  dplyr::count(unique_id) |> 
-  dplyr::arrange(unique_id) |> 
-  dplyr::pull(unique_id)
-
-ref_samples <- readr::read_tsv("~/Desktop/all-ref-annotations.tsv") |> 
-  dplyr::pull(sample_id) |> 
-  unique()
-
-ref_samples
-
-intersect(ref_samples, missing_samples)
-
-new_ref_samples <- readr::read_tsv("~/Desktop/all-ref-annotations.tsv") |> 
-  dplyr::pull(sample_id) |> 
-  unique()
-
-intersect(ref_samples, new_ref_samples)
-```
-
 
 ```{r}
 all_info_wide_df |>
@@ -173,4 +145,11 @@ all_info_wide_df |>
 
 
 Now do the same thing for each of the Ewing specific CNVs
+
+```{r}
+all_info_wide_df |>
+  ggplot(aes(x = top_mp, y = `chemo-resistance`)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(size = 0.1,alpha = 0.1)  # alpha low given 400k cells
+```
 
