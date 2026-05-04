@@ -102,6 +102,8 @@ stopifnot(
   "Output file must end in .tsv or .tsv.gz" = stringr::str_detect(opt$output_file, "\\.tsv$|\\.tsv\\.gz$")
 )
 
+message("this is a new script")
+
 # read in files
 sce <- readr::read_rds(opt$sce_file)
 annotations_df <- readr::read_tsv(opt$annotations_file)
