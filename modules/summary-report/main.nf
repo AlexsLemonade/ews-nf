@@ -7,7 +7,7 @@ process render_report {
   tag "${unique_id}"
   label 'mem_8'
   time '2h'
-  publishDir "${params.outdir}/reports/${sample_id}"
+  publishDir "${params.outdir}/reports/${sample_id}", mode: 'copy'
   input:
     tuple val(unique_id),
           val(sample_id),
