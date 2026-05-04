@@ -72,6 +72,12 @@ option_list <- list(
     help = "TSV with tumor cell type annotations"
   ),
   make_option(
+    opt_str = c("--unique_id"),
+    type = "character",
+    default = "",
+    help = "Unique Id for library"
+  ),
+  make_option(
     opt_str = c("--metaprograms_file"),
     type = "character",
     default = here::here("ews-nf-out/metaprograms/metaprograms-10_cnmf-5-10-15_filtered/metaprograms.rds"),
@@ -104,7 +110,7 @@ stopifnot(
   "SCE file does not exist" = file.exists(opt$sce_file),
   "Annotations TSV file does not exist" = file.exists(opt$annotations_file),
   "Metaprograms file does not exist" = file.exists(opt$metaprograms_file),
-  "Output file must end in .tsv" = stringr::str_detect(opt$output_file, "\\.tsv$")
+  "Output file must end in .tsv or .tsv.gz" = stringr::str_detect(opt$output_file, "\\.tsv$|\\.tsv\\.gz$")
 )
 
 # read in files
@@ -116,8 +122,8 @@ mp_object <- readr::read_rds(opt$metaprograms_file)
 gene_universe <- mp_object$gene_universe
 shuffled_mp_list <- mp_object$shuffled_metaprograms
 
-# extract unique id from file name
-unique_id <- stringr::word(basename(opt$sce_file), 1, sep = "_")
+# save unique id
+unique_id <- opt$unique_id
 
 # Calculate scores and export --------------------------------------------------
 

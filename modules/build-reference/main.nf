@@ -18,6 +18,7 @@ process save_normal_ref {
     """
     01-save-reference-cells.R \
       --sce_file ${sce_file} \
+      --unique_id ${unique_id} \
       --reference_celltypes_file ${ref_celltypes_file} \
       --output_file ${ref_rds}
     """

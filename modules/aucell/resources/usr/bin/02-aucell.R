@@ -22,6 +22,12 @@ option_list <- list(
     help = "Path to RDS file containing a processed SingleCellExperiment object to use with AUCell."
   ),
   make_option(
+    opt_str = c("--unique_id"),
+    type = "character",
+    default = "",
+    help = "Unique Id for library"
+  ),
+  make_option(
     opt_str = c("--gene_set_collection_file"),
     type = "character",
     default = "",
@@ -133,17 +139,14 @@ if(opt$is_reference){
   ref_cells <- ref_aucell_df$cell_id |> 
     unique()
   
-  # extract unique id to save to results file from sce file name 
-  unique_id <- stringr::word(basename(opt$sce_file), sep = "_", 1)
-  
   # get the coldata to join with results later
   coldata_df <- data.frame(
     barcodes = colnames(sce),
     sample_id = metadata(sce)$sample_id,
-    unique_id = unique_id
+    unique_id = opt$unique_id
   ) |> 
     # label based on if cells are part of the reference or query cells
-    dplyr::mutate(cell_id = glue::glue("{unique_id}_{barcodes}"),
+    dplyr::mutate(cell_id = glue::glue("{opt$unique_id}_{barcodes}"),
                   ref_or_query = dplyr::if_else(cell_id %in% ref_cells, "reference", "query"))
   
   # set names of sce to be cell_id to keep labeling consistent across run modes

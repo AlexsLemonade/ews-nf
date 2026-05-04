@@ -10,6 +10,8 @@ include { summary_report } from './modules/summary-report'
 include { cnmf } from './modules/cnmf'
 include { metaprograms } from './modules/metaprograms'
 
+include { parseProcessedFile } from './lib/utils.nf'
+
 // **** Parameter checks ****
 include { validateParameters; paramsSummaryLog } from 'plugin/nf-schema'
 param_error = false
@@ -23,23 +25,24 @@ log.info paramsSummaryLog(workflow)
 // use to build all reference files 
 workflow reference {
 
-  // create a channel of [unique_id, sample id, path to processed SCE file]
+  // create a channel of [unique_id, sample id, path to processed SCE file, number of processed cells]
   // this includes all samples
   library_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed.rds", type: 'file')
-    .map{ file -> tuple(
-      file.name.replace("_processed.rds", ""), // extract unique id which will be either library_id or <library_id>-<sample_id>
-      file.parent.name, // extract sample id from file path
-      file // full path to file
-    )}
-    .branch{
-      include: it[2].size() > 0 || it[2].name.startsWith("STUB")
+    .map{ file -> 
+      def (unique_id, sample_id, rds_file, num_processed_cells) = parseProcessedFile(file)
+
+      [unique_id, sample_id, rds_file, num_processed_cells] // emit tuple of unique id, sample id, file path, and number of processed cells
+    }
+    .branch{ _unique_id, _sample_id, rds_file, num_processed_cells -> 
+      // only include samples with at least 200 processed cells
+      include: (rds_file.size() > 0 && num_processed_cells >= 200) || rds_file.name.startsWith("STUB")
       skip: true
     }
 
   // send unique ids for all libraries that don't have enough cells to log 
   library_ch.skip
     .subscribe{
-      log.error("There are no cells found in the processed object for ${it[0]} and will not be included when building the normal cell reference.")
+      log.error("There are fewer than 200 cells found in the processed object for ${it[0]} and will not be included when building the normal cell reference.")
     }
 
   // define tuple of output ref files 
@@ -48,7 +51,11 @@ workflow reference {
     params.ref_annotations_file
   )
   // build reference of normal cells
-  build_ref(library_ch.include, ref_files)
+  include_library_ch = library_ch.include
+    .map{ unique_id, sample_id, rds_file, num_processed_cells -> 
+      [unique_id, sample_id, rds_file] // emit tuple of unique id, sample id, and file path for included samples
+    }
+  build_ref(include_library_ch, ref_files)
 
   // create gene order file to use with inferCNV
   make_gene_order_file(
@@ -64,26 +71,30 @@ workflow {
 
   // create a channel of [unique_id, sample id, path to processed SCE file]
   library_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed.rds", type: 'file')
-    .map{ file -> tuple(
-      file.name.replace("_processed.rds", ""), // extract unique id which will be either library_id or <library_id>-<sample_id>
-      file.parent.name, // extract sample id from file path
-      file // full path to file
-    )}
+    .map{ file -> 
+      def (unique_id, sample_id, rds_file, num_processed_cells) = parseProcessedFile(file)
+      
+      [unique_id, sample_id, rds_file, num_processed_cells] // emit tuple of unique id, sample id, file path, and number of processed cells
+    }
     // filter to only specified samples
     // use either unique id or sample id for filtering
     .filter{ run_all || (it[0] in sample_ids) || (it[1] in sample_ids) }
-    .branch{
-      run_workflow: it[2].size() > 0 || it[2].name.startsWith("STUB")
+    .branch{ _unique_id, _sample_id, rds_file, num_processed_cells -> 
+      // only include samples with at least 200 processed cells
+      run_workflow: (rds_file.size() > 0 && num_processed_cells >= 200) || rds_file.name.startsWith("STUB")
       skip_workflow: true
     }
 
   // send unique ids for all libraries that don't have enough cells to log 
   library_ch.skip_workflow
     .subscribe{
-      log.error("There are no cells found in the processed object for ${it[0]}.")
+      log.error("There are fewer than 200 cells found in the processed object for ${it[0]}.")
     }
 
   run_ch = library_ch.run_workflow
+    .map{ unique_id, sample_id, rds_file, num_processed_cells -> 
+      [unique_id, sample_id, rds_file] // emit tuple of unique id, sample id, and file path for included samples
+    }
 
   // run aucell 
   aucell(run_ch)
@@ -106,29 +117,29 @@ workflow nmf_metaprograms {
 
   // create a channel of [unique_id, sample id, path to processed H5 file]
   sample_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed_rna.h5ad", type: 'file')
-    .map{ file -> tuple(
-      file.name.replace("_processed_rna.h5ad", ""), // extract unique id which will be either library_id or <library_id>-<sample_id>
-      file.parent.name, // extract sample id from file path
-      file // full path to file
-    )}
+    .map{ file -> 
+      def (unique_id, sample_id, h5_file, num_processed_cells) = parseProcessedFile(file, "_processed_rna.h5ad")
+      
+      [unique_id, sample_id, h5_file, num_processed_cells] // emit tuple of unique id, sample id, file path, and number of processed cells
+    }
     // filter to only specified samples
     // use either unique id or sample id for filtering
-    .filter{ unique_id, sample_id, _h5_file -> 
+    .filter{ unique_id, sample_id, _h5_file, _num_processed_cells -> 
       run_all || (unique_id in sample_ids) || (sample_id in sample_ids) 
     }
-    .branch{ _unique_id, _sample_id, h5_file -> 
-      run_workflow: h5_file.size() > 0 || h5_file.name.startsWith("STUB")
+    .branch{ _unique_id, _sample_id, h5_file, num_processed_cells -> 
+      run_workflow: (h5_file.size() > 0 && num_processed_cells >= 200) || h5_file.name.startsWith("STUB")
       skip_workflow: true
     }
 
   // send unique ids for all libraries that don't have enough cells to log 
   sample_ch.skip_workflow
     .subscribe{
-      log.error("There are no cells found in the processed object for ${it[0]}.")
+      log.error("There are fewer than 200 cells found in the processed object for ${it[0]}.")
     }
 
   nmf_run_ch = sample_ch.run_workflow
-    .map { unique_id, sample_id, h5_file ->
+    .map { unique_id, sample_id, h5_file, num_processed_cells ->
       def annotations_file = file("${params.outdir}/annotations/${sample_id}/${unique_id}_annotations.tsv", checkIfExists: true)
       [unique_id, sample_id, h5_file, annotations_file]
     }
