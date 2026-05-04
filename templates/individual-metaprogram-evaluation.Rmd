@@ -556,8 +556,8 @@ Only the top 5 gene sets for each metaprogram are shown to save space.
 Only MPs with identified gene sets will be included. 
 
 ```{r}
-#| fig.height: 15
-#| fig.width: 30
+#| fig.height: 10
+#| fig.width: 22
 
 
 # convert ora results into a heatmap of pvalues
