@@ -205,7 +205,7 @@ infercnv_obj <- infercnv::run(
   num_threads = opt$threads,
   no_plot = TRUE, # too many reference cells so turn off the plotting
   no_prelim_plot = TRUE, # make sure absolutely no plots are made
-  # it seems that this is how inferCNV actually decides about heatmaps ugh
+  # it seems that this is how inferCNV actually decides about heatmaps
   # https://github.com/broadinstitute/infercnv/blob/65e6bf554600c92e7d5c121e98247d9c3f888a0d/R/inferCNV_heatmap.R#L406
   output_format = NA,
   useRaster = FALSE,

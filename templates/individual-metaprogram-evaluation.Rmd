@@ -563,7 +563,7 @@ Only MPs with identified gene sets will be included.
 # convert ora results into a heatmap of pvalues
 heatmap_mtx <- ora_results_df |> 
   dplyr::mutate(logp = -log10(p.adjust)) |> 
-  # only keep the top 10 gene sets
+  # only keep the top 5 gene sets
   dplyr::slice_max(logp, n = 5, by = metaprogram) |>
   dplyr::select(metaprogram, ID, logp) |> 
   tidyr::pivot_wider(
