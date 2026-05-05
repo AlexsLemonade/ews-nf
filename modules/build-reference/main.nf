@@ -31,7 +31,7 @@ process save_normal_ref {
 
 process combine_normal_ref {
   container params.ews_nf_container
-  publishDir "${params.outdir}/reference"
+  publishDir "${params.outdir}/reference", mode: 'copy'
   // TODO: Bump memory here once we have more samples to work with
   label 'mem_8'
   time '2h'

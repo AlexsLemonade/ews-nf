@@ -55,8 +55,8 @@ module load singularity
 ews_dir=$HOME/ews-nf
 
 # path to input and output data 
-# default is a directory in the ix1 node for Cillo lab
-home_dir="/ix1/acillo/$USER"
+# default is a directory in the vast node for Cillo lab
+home_dir="/vast/acillo/$USER"
 
 # set defaults for all arguments
 sample_ids=""
@@ -67,7 +67,7 @@ workdir="$home_dir/work"
 # cnmf parameters
 skip_cnmf=${skip_cnmf:-0}
 k_components_lower=${k_components_lower:-5}
-k_components_upper=${k_components_upper:-25}
+k_components_upper=${k_components_upper:-15}
 k_step_size=${k_step_size:-5}
 
 # metaprogram parameters
