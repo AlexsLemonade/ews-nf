@@ -35,6 +35,9 @@
 #  to keep all spectra, use --filter_spectra 0
 # n_metaprograms: Comma separated string indicating the range of number of metaprograms to use for finding the optimal k, default is "8,9,10,11"
 # Must be at least 4 numbers for proper computation of metaprogram metrics
+# subset_mode: Boolean indicating whether to run in subset mode, default is 0 (false)
+#  in subset mode, the workflow will run on individual subsets of the data defined by the sample-info/sample-subsets.tsv
+# subset_ids: Comma separated string indicating which subsets to run in subset mode, default is empty string which will run all subsets
 # score_sces: Boolean indicating whether to score and annotate sces with the optimal value of k, default is 0 (false)
 #  to score and annotate sces, use --score_sces 1
 # ews_dir: Path to the ews-nf repo, default is $HOME/ews-nf
@@ -77,6 +80,10 @@ filter_spectra=${filter_spectra:-1}
 n_metaprograms=${n_metaprograms:-"8,9,10,11"}
 score_sces=${score_sces:-0}
 
+# turn on subset mode to run individual subsets instead of the full cohort
+subset_mode=${subset_mode:-0}
+subset_ids=""
+
 # grab arguments from command line
 while [ $# -gt 0 ]; do
     if [[ $1 == *'--'* ]]; then
@@ -100,6 +107,13 @@ else
     sample_flag=""
 fi
 
+# set flags for running specific subsets
+if [ -n "$subset_ids" ]; then
+    subset_id_flag="--subset_ids $subset_ids"
+else
+    subset_flag=""
+fi
+
 # flag for cnmf
 if [[ $skip_cnmf -eq 1 ]]; then 
     cnmf_flag="--skip_cnmf"
@@ -114,6 +128,13 @@ else
     filter_spectra_flag=""
 fi
 
+# flag for subset mode
+if [[ $subset_mode -eq 1 ]]; then 
+    subset_mode_flag="--subset_mode"
+else 
+    subset_mode_flag=""
+fi
+
 # flag for scoring sces
 if [[ $score_sces -eq 1 ]]; then 
     score_sces_flag="--score_sces"
@@ -124,7 +145,7 @@ fi
 # run ews-nf workflow with specified parameters
 nextflow run "$ews_dir/main.nf" \
   -profile "pitt_htc" \
-  -entry nmf_metaprograms \
+  --workflow nmf_metaprograms \
   -work-dir "$workdir" \
   --scpca_nf_dir "$scpca_nf_dir" \
   --outdir "$outdir" \
@@ -136,5 +157,7 @@ nextflow run "$ews_dir/main.nf" \
   $sample_flag \
   $cnmf_flag \
   $filter_spectra_flag \
-  $score_sces_flag
+  $score_sces_flag \
+  $subset_mode_flag \
+  $subset_id_flag
   

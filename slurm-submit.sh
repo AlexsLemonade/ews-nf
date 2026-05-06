@@ -80,7 +80,7 @@ gene_order_file="${outdir}/reference/Homo_sapiens.GRCh38.110.gene_order.txt"
 # if the ref files don't exist or we are overwriting the reference run the workflow with -entry reference
 if [[ ! -f $ref_annotations_file || ! -f $ref_sce_file || ! -f $gene_order_file || $overwrite_reference -eq 1 ]]; then 
     nextflow run "$project_dir/main.nf" \
-      -entry reference \
+      --workflow reference \
       -profile "pitt_htc" \
       --scpca_nf_dir "$scpca_nf_dir" \
       --outdir "$outdir" \
