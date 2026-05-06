@@ -4,21 +4,25 @@
 
 process generate_metaprograms {
   container params.ews_nf_container
-  tag "${n_metaprograms}_metaprograms"
+  tag "${subset_id}-${n_metaprograms}_metaprograms"
   label 'mem_96'
   cpus 2
   time '12h'
   publishDir "${metaprograms_publish_dir}", mode: 'copy'
   input:
-    path cnmf_results_dirs
-    tuple val(n_metaprograms), 
+    tuple val(subset_id), 
+          val(n_metaprograms), 
+          val(unique_id_tuple),
+          path(cnmf_output_dirs),
           val(metaprograms_publish_dir)
   output:
-    tuple val(n_metaprograms), 
+    tuple val(subset_id),
+          val(n_metaprograms), 
+          val(unique_id_tuple),
           val(metaprograms_publish_dir), 
           path("metaprograms.rds")
   script:
-    def cnmf_results_string = cnmf_results_dirs.join(',')
+    def cnmf_results_string = cnmf_output_dirs.join(',')
     """
     01-generate-metaprograms.R \
       --cnmf_results_dirs ${cnmf_results_string} \
@@ -38,20 +42,22 @@ process generate_metaprograms {
 
 process score_metaprograms {
   container params.ews_nf_container
-  tag "${unique_id}-${n_metaprograms}_metaprograms"
+  tag "${subset_id}-${unique_id}-${n_metaprograms}_metaprograms"
   label 'mem_24'
   cpus 2
   time '12h'
   input:
-    tuple val(unique_id),
+    tuple val(unique_id), 
+          val(subset_id), 
+          val(n_metaprograms),  
+          val(metaprograms_publish_dir),
+          path(metaprograms_file),
           val(sample_id),
-          path(sce_file),
-          path(annotations_file),
-          val(n_metaprograms), 
-          val(metaprograms_publish_dir), 
-          path(metaprograms_file)
+          path(sce_file), 
+          path(annotations_file)
   output:
-    tuple val(n_metaprograms),
+    tuple val(subset_id), 
+          val(n_metaprograms),
           val(metaprograms_publish_dir),
           val(unique_id),
           val(sample_id),
@@ -85,18 +91,20 @@ process score_metaprograms {
 
 process combine_score_files {
   container params.ews_nf_container
-  tag "${n_metaprograms}_metaprograms"
+  tag "${subset_id}-${n_metaprograms}_metaprograms"
   publishDir "${metaprograms_publish_dir}", mode: 'copy'
   label 'mem_24'
   cpus 2
   time '12h'
   input:
-    tuple val(n_metaprograms), 
+    tuple val(subset_id),
+          val(n_metaprograms), 
           val(metaprograms_publish_dir),
           path(score_files), // list of score files for each sample, 
           path(background_score_files) // list of background score files for each sample
   output:
-    tuple val(n_metaprograms),
+    tuple val(subset_id),
+          val(n_metaprograms),
           path("k-${n_metaprograms}_metaprogram_scores.tsv.gz"),
           path("k-${n_metaprograms}_background_scores.tsv.gz")
   script:
@@ -121,19 +129,22 @@ process combine_score_files {
 
 process metaprogram_metrics {
   container params.ews_nf_container
-  tag "${n_metaprograms}_metaprograms"
+  tag "${subset_id}-${n_metaprograms}_metaprograms"
   label 'mem_24'
   time '2h'
   publishDir "${metaprograms_publish_dir}", mode: 'copy'
   input:
-    tuple val(n_metaprograms), 
+    tuple val(subset_id),
+          val(n_metaprograms), 
+          val(unique_id_tuple),
           val(metaprograms_publish_dir), 
           path(metaprograms_file)
     path custom_genesets_file
     path msigdb_genesets_file
     path gene_set_category_file
   output:
-    tuple val(n_metaprograms), 
+    tuple val(subset_id),
+          val(n_metaprograms),
           val(metaprograms_publish_dir), 
           path("k-${n_metaprograms}_metaprograms-metrics.rds")
   script:
@@ -159,15 +170,19 @@ process combined_metaprogram_report {
   container params.ews_nf_container
   label 'mem_24'
   time '2h'
-  publishDir "${params.outdir}/metaprograms", mode: 'copy'
+  tag "${subset_id}"
+  publishDir "${params.outdir}/metaprograms/${subset_id}", mode: 'copy'
   input:
-    path metrics_files
-    path scores_files
-    path background_scores_files
+    tuple val(subset_id),
+          val(n_metaprograms),
+          path(metrics_files), // list of metrics files for each n_metaprograms
+          path(scores_files), // list of combined score files for each n_metaprograms
+          path(background_scores_files) // list of combined background score files for each n_metaprograms
     path template_file
-  output:
-    path "combined-metaprograms-metrics.html", emit: combined_report
-    env "OPTIMAL_K_VALUE", emit: optimal_k
+  output:  
+    tuple val(subset_id),
+          env("OPTIMAL_K_VALUE"), 
+          path("combined-metaprograms-metrics.html")
   script:
     def metrics_file_string = metrics_files.join(',')
     def scores_file_string = scores_files.join(',')
@@ -195,19 +210,21 @@ process combined_metaprogram_report {
 // used for individual k values
 process individual_metaprogram_report {
   container params.ews_nf_container
-  tag "${n_metaprograms}_metaprograms"
+  tag "${subset_id}-${n_metaprograms}_metaprograms"
   label 'mem_24'
   time '2h'
-  publishDir "${params.outdir}/metaprograms", mode: 'copy'
+  publishDir "${params.outdir}/metaprograms/${subset_id}", mode: 'copy'
   input:
-    tuple val(n_metaprograms),
+    tuple val(subset_id), 
+          val(n_metaprograms),
           path(metaprograms_file),
           path(metrics_file),
           path(score_files)
     path template_file
     path gene_set_category_file
   output:
-    tuple val(n_metaprograms), 
+    tuple val(subset_id),
+          val(n_metaprograms), 
           path("k-${n_metaprograms}_metaprograms-summary-report.html")
   script:
     def score_file_string = score_files.join(',')
@@ -260,7 +277,7 @@ process score_and_annotate_sce {
 
 workflow metaprograms {
   take:
-    cnmf_ch  // [unique_id, sample_id, cnmf output]
+    cnmf_ch  // [sample_id, unique_id, cnmf output, subset_id]
     sce_ch   // [unique_id, sample_id, sce_file, annotations_file]
   main:
 
@@ -270,17 +287,34 @@ workflow metaprograms {
 
     // channel of n_metaprograms and publish directory for each version of metaprograms
     n_metaprograms_ch = channel.fromList(params.n_metaprograms.toString().tokenize(","))
-      .map{n_metaprograms -> 
-        // define the publish directory for metaprograms
-        def metaprograms_publish_dir = "${params.outdir}/metaprograms/metaprograms-${n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
+
+    metaprograms_ch = cnmf_ch
+      .groupTuple(by: 3) // group by subset id
+       // add in n_metaprograms for each subset id
+      .combine(n_metaprograms_ch)
+      .map{ sample_id_tuple, unique_id_tuple, cnmf_output_dirs, subset_id, n_metaprograms -> 
+        
+        // define the publish directory and expected output files
+        def metaprograms_publish_dir = "${params.outdir}/metaprograms/${subset_id}/metaprograms-${n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
         def mp_file = file("${metaprograms_publish_dir}/metaprograms.rds")
         def combined_scores_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_metaprogram_scores.tsv.gz")
         def combined_background_scores_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_background_scores.tsv.gz")
         def metrics_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_metaprograms-metrics.rds")
-        [n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file]
+
+        [
+          subset_id, 
+          n_metaprograms,
+          unique_id_tuple,
+          cnmf_output_dirs, 
+          metaprograms_publish_dir, 
+          mp_file, 
+          combined_scores_file, 
+          combined_background_scores_file, 
+          metrics_file
+        ]
       }
-      // if all the outputs exist for a given n_metaprogram, let's skip it 
-      .branch { n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+      // if all the outputs exist for a given n_metaprogram and subset id, let's skip it 
+      .branch { subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
         cached_metaprograms: 
           !params.repeat_creating_metaprograms &&
           mp_file.exists() && 
@@ -291,28 +325,33 @@ workflow metaprograms {
       }
 
     // input for creating metaprograms 
-    create_metaprograms_ch = n_metaprograms_ch.create_metaprograms
-      .map{ n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file -> 
-        [n_metaprograms, metaprograms_publish_dir]
+    create_metaprograms_ch = metaprograms_ch.create_metaprograms
+      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file -> 
+        [subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir]
       }
 
-    // get all directories as one list
-    metaprograms_input_ch = cnmf_ch.collect{ unique_id, sample_id, cnmf_output -> cnmf_output }
-
     // generate metaprograms
-    generate_metaprograms(metaprograms_input_ch, create_metaprograms_ch)
+    generate_metaprograms(create_metaprograms_ch)
 
     // score metaprograms for each sample
     // make sure to score for each sample for each value of n_metaprograms
-    score_input_ch = sce_ch.combine(generate_metaprograms.out)
+    score_input_ch = generate_metaprograms.out
+      .transpose(by: 2) // transpose unique id and subset/n metaprogram information 
+       // pull out unique id as first element for joining
+      .map{ subset_id, n_metaprograms, unique_id, metaprograms_publish_dir, mp_file -> 
+        [unique_id, subset_id, n_metaprograms, metaprograms_publish_dir, mp_file]
+      }
+      // combine with sce channel to get sce file and annotation file information for each unique id in each subset
+      .combine(sce_ch, by: 0) // combine on unique id
+
     score_metaprograms(score_input_ch)
 
     grouped_score_ch = score_metaprograms.out
-      .map{ n_metaprograms, metaprograms_publish_dir, unique_id, sample_id, score_file, background_score_file -> 
-        [n_metaprograms, metaprograms_publish_dir, score_file, background_score_file]
+      .map{ subset_id, n_metaprograms, metaprograms_publish_dir, unique_id, sample_id, score_file, background_score_file -> 
+        [subset_id, n_metaprograms, metaprograms_publish_dir, score_file, background_score_file]
       }
       // group by n_metaprograms to get list of score files and background score files for each n_metaprograms
-      .groupTuple(by: [0,1]) // group by n_metaprograms and publish dir
+      .groupTuple(by: [0,1,2]) // group by subset_id, n_metaprograms and publish dir
 
 
     // create a single data frame for all observed and all background scores
@@ -332,40 +371,43 @@ workflow metaprograms {
     combined_report_template_file = "${projectDir}/templates/combined-metaprogram-metrics.Rmd"
     
     // construct channels for skipped processes and mix with output from actual processes
-    all_metaprograms_ch = n_metaprograms_ch.cached_metaprograms
-      .map{ n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
-        [n_metaprograms, metaprograms_publish_dir, mp_file]
+    all_metaprograms_ch = metaprograms_ch.cached_metaprograms
+      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+        [subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, mp_file]
       }
       .mix(generate_metaprograms.out)
 
-    all_scores_ch = n_metaprograms_ch.cached_metaprograms
-      .map{ n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
-        [n_metaprograms, combined_scores_file, combined_background_scores_file]
+    all_scores_ch = metaprograms_ch.cached_metaprograms
+      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+        [subset_id, n_metaprograms, combined_scores_file, combined_background_scores_file]
       }
       .mix(combine_score_files.out)
 
     // collect all metrics files for the combined report
-    all_metrics_ch = n_metaprograms_ch.cached_metaprograms
-      .map{ n_metaprograms, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
-        [n_metaprograms, metaprograms_publish_dir, metrics_file]
+    all_metrics_ch = metaprograms_ch.cached_metaprograms
+      // match the output of the metaprograms metrics process so we can combine them 
+      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+        [subset_id, n_metaprograms, metaprograms_publish_dir, metrics_file]
       }
       .mix(metaprogram_metrics.out)
 
-    metrics_file_ch = all_metrics_ch
-      .collect{ n_metaprograms, metaprograms_publish_dir, metrics_file -> metrics_file }
+    grouped_metrics_ch = all_metrics_ch
+      // group by subset id to get list of metrics files for each
+      .groupTuple(by: 0)
+      // drop publish directory since we don't need it 
+      .map{ subset_id, n_metaprograms, metaprograms_publish_dir, metrics_files -> 
+        [subset_id, n_metaprograms, metrics_files]
+      }
 
-    // collect all score and background score files for the report
-    scores_ch = all_scores_ch
-      .collect{ n_metaprograms, combined_score_file, combined_background_score_file -> combined_score_file }
-
-    background_scores_ch = all_scores_ch
-      .collect{ n_metaprograms, combined_score_file, combined_background_score_file -> combined_background_score_file }
+    // create input channel for combined report 
+    metrics_report_ch = grouped_metrics_ch
+      // group scores channel by subset id 
+      // then combine with metrics files using subset id
+      .combine(all_scores_ch.groupTuple(by:0), by: [0, 1])
 
     // render combined report
     combined_metaprogram_report(
-      metrics_file_ch,
-      scores_ch, 
-      background_scores_ch,
+      metrics_report_ch,
       file(combined_report_template_file)
     )
 
@@ -373,39 +415,42 @@ workflow metaprograms {
     // only for the optimal k value 
     optimal_k_scores_ch = all_scores_ch
       // drop publish directory and background score files 
-      .map{ n_metaprograms, combined_score_file, combined_background_score_file -> 
-        [n_metaprograms, combined_score_file]
+      .map{ subset_id, n_metaprograms, combined_score_file, combined_background_score_file -> 
+        [subset_id, n_metaprograms, combined_score_file]
       }
-      .combine(combined_metaprogram_report.out.optimal_k) // combine with optimal k value from combined report
+      .combine(combined_metaprogram_report.out, by: 0) // combine by subset id to get optimal k for each subset
       // filter to only get score outputs for optimal k value
-      .filter{ n_metaprograms, combined_score_file, optimal_k -> 
+      .filter{ subset_id, n_metaprograms, combined_score_file, optimal_k, combined_report -> 
         n_metaprograms == optimal_k 
       }
-      .map{ it.dropRight(1) } // drop extra k 
+      // drop extra k and report
+      .map{ subset_id, n_metaprograms, combined_score_file, optimal_k, combined_report -> 
+        [subset_id, optimal_k, combined_score_file]
+      }
 
-    // only score and annotate if specified 
-    if (params.score_sces) {
+    // only score and annotate if specified and subset mode is not used
+    if (params.score_sces && !params.subset_mode) {
       // pull out just the combined scores file to use for annotating sces 
       combined_scores_file = optimal_k_scores_ch
-        .collect{ n_metaprograms, combined_score_file -> combined_score_file }
+        .collect{ subset_id, optimal_k, combined_score_file -> combined_score_file }
 
       // output sces with annotations and scores for the optimal k value
       score_and_annotate_sce(sce_ch, combined_scores_file)
     }
 
     // only render a report for the optimal k value
+    // need a tuple of [subset_id, n_metaprograms, metaprograms_file, metrics_file, combined_score_files] for the report
     report_ch = all_metaprograms_ch
-      .combine(combined_metaprogram_report.out.optimal_k)
-      .filter{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k -> 
+      .combine(combined_metaprogram_report.out, by: 0 ) // combine by subset id and get optimal k for each subset
+      .filter{ subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file, optimal_k, combined_report -> 
         n_metaprograms == optimal_k 
       }
-      .join(all_metrics_ch, by: [0,1])// join on n_metaprograms and publish directory
-      .join(optimal_k_scores_ch, by: 0)  // join on n_metaprograms
-      // drop publish directory and extra value of k 
-      // instead we ouptut to the main metaprograms directory
-      .map{ n_metaprograms, metaprograms_publish_dir, metaprograms_file, optimal_k, metrics_file, combined_score_files -> 
-        [n_metaprograms, metaprograms_file, metrics_file, combined_score_files]
+      .map { subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file, optimal_k, combined_report -> 
+        [subset_id, optimal_k, metaprograms_file]
       }
+      .join(grouped_metrics_ch.transpose(by: [1, 2]), by: [0, 1]) // join on subset_id and n_metaprograms to keep only the optimal k metrics file for each subset
+      .join(optimal_k_scores_ch, by: [0,1]) // join on subset_id and optimal_k
+
 
     individual_metaprogram_report(
       report_ch,
@@ -414,7 +459,7 @@ workflow metaprograms {
     )
 
   emit:
-    metaprograms = generate_metaprograms.out // [n_metaprograms, metaprograms_publish_dir, "metaprograms.rds"]
-    metaprogram_scores = score_metaprograms.out // [n_metaprograms, unique_id, sample_id, metaprogram scores tsv, background scores tsv]
-    metaprogram_metrics = metaprogram_metrics.out // [n_metaprograms, metaprograms_publish_dir, "metaprogram-metrics.rds"]
+    metaprograms = all_metaprograms_ch // [subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file]
+    scores = all_scores_ch // [subset_id, n_metaprograms, combined_score_file, combined_background_score_file]
+    metrics = all_metrics_ch // [subset_id, n_metaprograms, metaprograms_publish_dir, metrics_file]
 }

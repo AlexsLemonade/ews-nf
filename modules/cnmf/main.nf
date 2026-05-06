@@ -10,13 +10,13 @@ process run_cnmf {
   time '12h'
   publishDir "${params.outdir}/cnmf/${sample_id}", mode: 'copy'
   input:
-    tuple val(unique_id),
-          val(sample_id),
+    tuple val(sample_id),
+          val(unique_id),
           path(h5_file),
           path(annotations_file)
   output:
-    tuple val(unique_id),
-          val(sample_id),
+    tuple val(sample_id),
+          val(unique_id),
           path(output_dir)
   script:
     // output files will be saved to a folder named with unique ID
@@ -47,14 +47,14 @@ process run_cnmf {
 
 workflow cnmf {
   take:
-    sample_ch  // [unique_id, sample_id, path to processed H5 file, annotations file]
+    sample_ch  // [unique_id, sample_id, path to processed H5 file, annotations file, subset id]
   main:
 
     cnmf_ch = sample_ch
-      .map{ unique_id, sample_id, h5_file, annotations_file -> 
+      .map{ sample_id, unique_id, h5_file, annotations_file -> 
         [
-          unique_id,
-          sample_id, 
+          sample_id,
+          unique_id, 
           h5_file,
           annotations_file,
           // path to cnmf output
@@ -82,9 +82,9 @@ workflow cnmf {
 
     output_ch = cnmf_ch.skip_cnmf
       // drop sce file from channel where infercnv wasn't run
-      .map{ unique_id, sample_id, _h5_file, _annotations_file, cnmf_output_dir -> tuple(
-        unique_id,
+      .map{ sample_id, unique_id, _h5_file, _annotations_file, cnmf_output_dir -> tuple(
         sample_id,
+        unique_id,
         cnmf_output_dir
       )}
       // mix with samples that were run
@@ -92,5 +92,5 @@ workflow cnmf {
 
 
   emit:
-    output_ch // [unique_id, sample_id, cnmf output]
+    output_ch // [subset_id, unique_id, sample_id, cnmf output]
 }
