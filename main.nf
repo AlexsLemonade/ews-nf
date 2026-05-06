@@ -65,10 +65,12 @@ workflow reference {
 }
 
 // default entry point to run main workflow 
-workflow {
-  sample_ids = params.sample_ids?.tokenize(';, ') ?: []
-  run_all = sample_ids[0] == "All"
+workflow annotation {
+  take:
+  sample_ids
+  run_all
 
+  main:
   // create a channel of [unique_id, sample id, path to processed SCE file]
   library_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed.rds", type: 'file')
     .map{ file -> 
@@ -112,22 +114,16 @@ workflow {
 
 // workflow for generating metaprograms using NMF across all samples 
 workflow nmf_metaprograms {
-  sample_ids = params.sample_ids?.tokenize(';, ') ?: []
-  run_all = sample_ids[0] == "All"
 
   // create a channel of [unique_id, sample id, path to processed H5 file]
   sample_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed_rna.h5ad", type: 'file')
     .map{ file -> 
       def (unique_id, sample_id, h5_file, num_processed_cells) = parseProcessedFile(file, "_processed_rna.h5ad")
       
-      [unique_id, sample_id, h5_file, num_processed_cells] // emit tuple of unique id, sample id, file path, and number of processed cells
+      // note that here we will use sample id first for easier joining with subset ids in this workflow
+      [sample_id, unique_id, h5_file, num_processed_cells] // emit tuple of sample id, unique id, file path, and number of processed cells
     }
-    // filter to only specified samples
-    // use either unique id or sample id for filtering
-    .filter{ unique_id, sample_id, _h5_file, _num_processed_cells -> 
-      run_all || (unique_id in sample_ids) || (sample_id in sample_ids) 
-    }
-    .branch{ _unique_id, _sample_id, h5_file, num_processed_cells -> 
+    .branch{ _sample_id, _unique_id, h5_file, num_processed_cells -> 
       run_workflow: (h5_file.size() > 0 && num_processed_cells >= 200) || h5_file.name.startsWith("STUB")
       skip_workflow: true
     }
@@ -135,25 +131,76 @@ workflow nmf_metaprograms {
   // send unique ids for all libraries that don't have enough cells to log 
   sample_ch.skip_workflow
     .subscribe{
-      log.error("There are fewer than 200 cells found in the processed object for ${it[0]}.")
+      log.error("There are fewer than 200 cells found in the processed object for ${it[1]}.")
     }
 
+  // if a subset tsv file is provided AND subset mode is enabled
+  // create the sample grouping channel with subset ids and sample ids based on the provided tsv file
+  if( file(params.subset_tsv).exists() && params.subset_mode ) {
+
+    // define subsets to run based on parameter
+    subset_ids = params.subset_ids?.tokenize(';, ') ?: []
+    run_all_subsets = subset_ids[0] == "All"
+
+    // set group ids to run 
+    sample_group_ch = Channel.fromPath(params.subset_tsv, type: 'file')
+      .splitCsv(header: true, sep: '\t')
+      .map{ row -> 
+        def sample_id = row['scpca_sample_id']
+        def subset_id = row['subset_id']
+        [sample_id, subset_id]
+      }
+      // keep all subsets or filter to specified subset ids
+      .filter{ it -> run_all_subsets || it[1] in subset_ids }
+
+  } else {
+    // if using the full mode and not subset mode then grab all samples identified 
+    // provide a subset id of "full_cohort"
+    sample_group_ch = sample_ch.run_workflow
+      .map{ sample_id, unique_id, h5_file, num_processed_cells -> 
+        [sample_id, "full_cohort"] 
+      }
+
+  }
+
+  sample_ids = sample_group_ch.collect{ sample_id, subset_id -> sample_id }
+
   nmf_run_ch = sample_ch.run_workflow
-    .map { unique_id, sample_id, h5_file, num_processed_cells ->
+    .map { sample_id, unique_id, h5_file, num_processed_cells ->
       def annotations_file = file("${params.outdir}/annotations/${sample_id}/${unique_id}_annotations.tsv", checkIfExists: true)
-      [unique_id, sample_id, h5_file, annotations_file]
+      [sample_id, unique_id, h5_file, annotations_file]
     }
+    .filter{ it -> it[0] in sample_ids.getVal() } // filter to only samples included in sample group channel
 
   // run cnmf on each sample and output 
   cnmf(nmf_run_ch)
 
+  metaprograms_input_ch = cnmf.out
+    .combine(sample_group_ch, by: 0) // combine on sample id to add subset id information to cnmf output
+
   // channel of sce files and annotations to use as input for scoring metaprograms
-  sce_ch = nmf_run_ch.map{ unique_id, sample_id, h5_file, annotations_file ->
+  sce_ch = nmf_run_ch.map{ sample_id, unique_id, h5_file, annotations_file ->
     def sce_file = file(h5_file.toUriString().replaceAll(/_processed_rna\.h5ad$/, "_processed.rds"), checkIfExists: true)
     [unique_id, sample_id, sce_file, annotations_file]
   }
 
   // generate and score metaprograms across all samples 
-  metaprograms(cnmf.out, sce_ch)
+  metaprograms(metaprograms_input_ch, sce_ch)
+
+}
+
+
+// entry workflow
+workflow {
+  sample_ids = params.sample_ids?.tokenize(';, ') ?: []
+  run_all = sample_ids[0] == "All"
+
+  if (params.workflow == "reference") {
+    reference()
+  } else if (params.workflow == "nmf_metaprograms") {
+    nmf_metaprograms()
+  } else {
+    annotation(sample_ids, run_all)
+  }
 
 }
