@@ -36,7 +36,7 @@ jobs:
         run: nextflow -log stub-run.log run main.nf --workflow reference -stub -profile stub -ansi-log false
 
       - name: Check Nextflow workflow for main annotation
-        run: nextflow -log stub-run.log run main.nf -profile stub -ansi-log false
+        run: nextflow -log stub-run.log run main.nf -stub -profile stub -ansi-log false
 
       - name: Check Nextflow workflow for nmf metaprograms
         run: nextflow -log stub-run.log run main.nf --workflow nmf_metaprograms -stub -profile stub -ansi-log false
