@@ -8,7 +8,7 @@ process generate_metaprograms {
   label 'mem_96'
   cpus 2
   time '12h'
-  publishDir "${metaprograms_publish_dir}", mode: 'copy'
+  publishDir "${metaprograms_publish_dir}", mode: 'copy', enabled: !params.subset_mode
   input:
     tuple val(subset_id), 
           val(n_metaprograms), 
@@ -20,7 +20,7 @@ process generate_metaprograms {
           val(n_metaprograms), 
           val(unique_id_tuple),
           val(metaprograms_publish_dir), 
-          path("metaprograms.rds")
+          path("k-${n_metaprograms}_metaprograms.rds")
   script:
     def cnmf_results_string = cnmf_output_dirs.join(',')
     """
@@ -30,13 +30,13 @@ process generate_metaprograms {
       --n_metaprograms ${n_metaprograms} \
       --filter_spectra ${params.filter_spectra} \
       --orphan_cutoff ${params.orphan_cutoff} \
-      --output_file "metaprograms.rds" \
+      --output_file "k-${n_metaprograms}_metaprograms.rds" \
       --seed ${params.seed}
     """
 
   stub:
     """
-    touch metaprograms.rds
+    touch "k-${n_metaprograms}_metaprograms.rds"
     """
 }
 
@@ -92,7 +92,7 @@ process score_metaprograms {
 process combine_score_files {
   container params.ews_nf_container
   tag "${subset_id}-${n_metaprograms}_metaprograms"
-  publishDir "${metaprograms_publish_dir}", mode: 'copy'
+  publishDir "${metaprograms_publish_dir}", mode: 'copy', enabled: !params.subset_mode
   label 'mem_24'
   cpus 2
   time '12h'
@@ -132,7 +132,7 @@ process metaprogram_metrics {
   tag "${subset_id}-${n_metaprograms}_metaprograms"
   label 'mem_24'
   time '2h'
-  publishDir "${metaprograms_publish_dir}", mode: 'copy'
+  publishDir "${metaprograms_publish_dir}", mode: 'copy', enabled: !params.subset_mode
   input:
     tuple val(subset_id),
           val(n_metaprograms), 
@@ -219,21 +219,23 @@ process individual_metaprogram_report {
           val(n_metaprograms),
           path(metaprograms_file),
           path(metrics_file),
-          path(score_files)
+          path(combined_score_file)
     path template_file
     path gene_set_category_file
   output:
     tuple val(subset_id),
           val(n_metaprograms), 
+          path(metaprograms_file),
+          path(metrics_file),
+          path(combined_score_file),
           path("k-${n_metaprograms}_metaprograms-summary-report.html")
   script:
-    def score_file_string = score_files.join(',')
     """
     Rscript -e "rmarkdown::render('${template_file}', \
       output_file = 'k-${n_metaprograms}_metaprograms-summary-report.html',\
       params = list(metaprograms_object_file = '${metaprograms_file}', \
                     metaprograms_metrics_file = '${metrics_file}', \
-                    combined_scores_file = '${score_file_string}', \
+                    combined_scores_file = '${combined_score_file}', \
                     category_file = '${gene_set_category_file}', \
                     sample_metadata_file = '${params.sample_metadata_file}'))"
     """
