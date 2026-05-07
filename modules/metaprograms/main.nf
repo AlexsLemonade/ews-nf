@@ -299,7 +299,7 @@ workflow metaprograms {
         
         // define the publish directory and expected output files
         def metaprograms_publish_dir = "${params.outdir}/metaprograms/${subset_id}/metaprograms-${n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
-        def mp_file = file("${metaprograms_publish_dir}/metaprograms.rds")
+        def mp_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_metaprograms.rds")
         def combined_scores_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_metaprogram_scores.tsv.gz")
         def combined_background_scores_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_background_scores.tsv.gz")
         def metrics_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_metaprograms-metrics.rds")
