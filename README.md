@@ -61,19 +61,19 @@ The processed `SingleCellExperiment` and `AnnData` objects output from that work
 
 ### Building the normal reference
 
-Prior to annotating the cells in individual samples, the `reference` entrypoint should be used to build the necessary reference files. 
+Prior to annotating the cells in individual samples, the `reference` workflow should be used to build the necessary reference files. 
 This includes the pooled normal cell reference files and the gene order file to be used with `InferCNV`. 
 The pooled reference will include cells from all samples present in the specified `scpca-nf` output directory (`scpca_nf_out` parameter). 
 
 The following command can be used to run the reference part of the workflow: 
 
 ```sh
-nextflow run main.nf -entry reference
+nextflow run main.nf --workflow reference
 ```
 
 ### Running the main annotation workflow
 
-After creating the reference files with the `reference` entrypoint, the following command can be run from within the cloned repository and will run the workflow locally with all default parameters (see more below):
+After creating the reference files with the `reference` workflow, the following command can be run from within the cloned repository and will run the workflow locally with all default parameters (see more below):
 
 ```sh
 nextflow run main.nf
@@ -81,13 +81,13 @@ nextflow run main.nf
 
 ### Running the metaprogram identification workflow
 
-After annotating tumor cells using the main workflow, the `nmf_metaprograms` entrypoint can be used to identify metapgrograms across a group of samples. 
+After annotating tumor cells using the main workflow, the `nmf_metaprograms` workflow can be used to identify metapgrograms across a group of samples. 
 This workflow requires the processed `AnnData` objects (`processed_rna.h5ad` files) output from `scpca-nf` and the tumor cell annotations TSV (`annotations/<sample_id>/<library_id>_annotations.tsv`) file output from the main `ews-nf` workflow. 
 
 The following command can be used to run the NMF part of the workflow: 
 
 ```sh
-nextflow run main.nf -entry nmf_metaprograms
+nextflow run main.nf --workflow nmf_metaprograms
 ```
 
 ### Parameters
@@ -145,7 +145,7 @@ nextflow run main.nf -profile stub -stub
 ### Running the workflow on the Pittsburgh High Throughput Cluster
 
 The `slurm-submit.sh` script can be used to run `ews-nf` on the Pittsburgh High Throughput Cluster (HTC) using the `pitt_htc` profile. 
-This script runs the workflow with `-entry reference` to build the pooled reference for all samples and then runs the main annotation workflow. 
+This script runs the workflow with `--workflow reference` to build the pooled reference for all samples and then runs the main annotation workflow. 
 
 You will need to clone the repository into your home directory and then use the following command to submit the workflow to the SLURM workload manager: 
 
@@ -177,7 +177,7 @@ To skip running inferCNV for any samples with existing inferCNV results, use:
 sbatch slurm-submit.sh --skip_infercnv 1
 ```
 
-By default, if the reference files exist, the reference building (`-entry reference`) will not be re-run. 
+By default, if the reference files exist, the reference building (`--workflow reference`) will not be re-run. 
 To overwrite an existing reference, use `--overwrite_reference 1`
 
 ```sh
@@ -220,7 +220,7 @@ You must be a member of the `SeanKarlCohort` organization and have access to the
 
 ## Output files 
 
-Running the workflow with the `reference` entry point will output three reference files found in `<output_dir>/reference`: 
+Running the workflow with the `reference` workflow will output three reference files found in `<output_dir>/reference`: 
 
 - A gene order file for use with `inferCNV`. 
 The name of the file will be representative of the Ensembl version used to create the file, e.g., `Homo_sapiens.GRCh38.110.gene_order.txt`. 
