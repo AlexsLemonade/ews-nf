@@ -66,11 +66,10 @@ workflow reference {
 
 // default entry point to run main workflow 
 workflow annotation {
-  take:
-  sample_ids
-  run_all
 
-  main:
+  sample_ids = params.sample_ids?.tokenize(';, ') ?: []
+  run_all = sample_ids[0] == "All"
+
   // create a channel of [unique_id, sample id, path to processed SCE file]
   library_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed.rds", type: 'file')
     .map{ file -> 
@@ -115,13 +114,13 @@ workflow annotation {
 // workflow for generating metaprograms using NMF across all samples 
 workflow nmf_metaprograms {
 
-  // create a channel of [unique_id, sample id, path to processed H5 file]
+  // create a channel of [sample id, unique_id, path to processed H5 file]
   sample_ch = Channel.fromPath("${params.scpca_nf_dir}/**/**_processed_rna.h5ad", type: 'file')
     .map{ file -> 
       def (unique_id, sample_id, h5_file, num_processed_cells) = parseProcessedFile(file, "_processed_rna.h5ad")
       
       // note that here we will use sample id first for easier joining with subset ids in this workflow
-      [sample_id, unique_id, h5_file, num_processed_cells] // emit tuple of sample id, unique id, file path, and number of processed cells
+      [sample_id, unique_id, h5_file, num_processed_cells]
     }
     .branch{ _sample_id, _unique_id, h5_file, num_processed_cells -> 
       run_workflow: (h5_file.size() > 0 && num_processed_cells >= 200) || h5_file.name.startsWith("STUB")
@@ -142,7 +141,7 @@ workflow nmf_metaprograms {
     subset_ids = params.subset_ids?.tokenize(';, ') ?: []
     run_all_subsets = subset_ids[0] == "All"
 
-    // set group ids to run 
+    // set subset ids to run 
     sample_group_ch = Channel.fromPath(params.subset_tsv, type: 'file')
       .splitCsv(header: true, sep: '\t')
       .map{ row -> 
@@ -150,12 +149,12 @@ workflow nmf_metaprograms {
         def subset_id = row['subset_id']
         [sample_id, subset_id]
       }
-      // keep all subsets or filter to specified subset ids
+      // keep all subsets or filter to specified subset ids to run 
       .filter{ it -> run_all_subsets || it[1] in subset_ids }
 
   } else {
-    // if using the full mode and not subset mode then grab all samples identified 
-    // provide a subset id of "full_cohort"
+    // if using the full mode and not subset mode then grab all samples with a processed h5 file 
+    // provide a subset id of "full_cohort" to be used to label the publishDir
     sample_group_ch = sample_ch.run_workflow
       .map{ sample_id, unique_id, h5_file, num_processed_cells -> 
         [sample_id, "full_cohort"] 
@@ -163,6 +162,7 @@ workflow nmf_metaprograms {
 
   }
 
+  // collect sample ids to filter which samples will be run through cNMF
   sample_ids = sample_group_ch.collect{ sample_id, subset_id -> sample_id }
 
   nmf_run_ch = sample_ch.run_workflow
@@ -181,6 +181,7 @@ workflow nmf_metaprograms {
   // channel of sce files and annotations to use as input for scoring metaprograms
   sce_ch = nmf_run_ch.map{ sample_id, unique_id, h5_file, annotations_file ->
     def sce_file = file(h5_file.toUriString().replaceAll(/_processed_rna\.h5ad$/, "_processed.rds"), checkIfExists: true)
+    // switch to setting unique ID first since when we join this with the metaprograms we want to use unique id and not just sample id
     [unique_id, sample_id, sce_file, annotations_file]
   }
 
@@ -192,15 +193,12 @@ workflow nmf_metaprograms {
 
 // entry workflow
 workflow {
-  sample_ids = params.sample_ids?.tokenize(';, ') ?: []
-  run_all = sample_ids[0] == "All"
-
   if (params.workflow == "reference") {
     reference()
   } else if (params.workflow == "nmf_metaprograms") {
     nmf_metaprograms()
   } else {
-    annotation(sample_ids, run_all)
+    annotation()
   }
 
 }

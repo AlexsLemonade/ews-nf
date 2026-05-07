@@ -287,9 +287,10 @@ workflow metaprograms {
     cnmf_k_range_str = params.cnmf_k_range.replaceAll(",", "-")
     filter_str = params.filter_spectra ? "filtered" : "unfiltered"
 
-    // channel of n_metaprograms and publish directory for each version of metaprograms
+    // channel of n_metaprograms
     n_metaprograms_ch = channel.fromList(params.n_metaprograms.toString().tokenize(","))
 
+    // channel with all combinations of subset Id and n_metaprograms 
     metaprograms_ch = cnmf_ch
       .groupTuple(by: 3) // group by subset id
        // add in n_metaprograms for each subset id
@@ -316,6 +317,7 @@ workflow metaprograms {
         ]
       }
       // if all the outputs exist for a given n_metaprogram and subset id, let's skip it 
+      // because the publishing steps only happen for the full cohort mode, this will only skip for the full cohort 
       .branch { subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
         cached_metaprograms: 
           !params.repeat_creating_metaprograms &&
@@ -325,6 +327,10 @@ workflow metaprograms {
           metrics_file.exists()
         create_metaprograms: true
       }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    //           Metaprogram creation, scoring, and metrics calculation          //
+    ///////////////////////////////////////////////////////////////////////////////
 
     // input for creating metaprograms 
     create_metaprograms_ch = metaprograms_ch.create_metaprograms
@@ -344,6 +350,7 @@ workflow metaprograms {
         [unique_id, subset_id, n_metaprograms, metaprograms_publish_dir, mp_file]
       }
       // combine with sce channel to get sce file and annotation file information for each unique id in each subset
+      // this is why we had to set unique id first in the sce channel
       .combine(sce_ch, by: 0) // combine on unique id
 
     score_metaprograms(score_input_ch)
@@ -367,10 +374,10 @@ workflow metaprograms {
       file(params.gene_set_category_file)
     )
 
-    // render report
-    // define path to template reports
-    individual_report_template_file = "${projectDir}/templates/individual-metaprogram-evaluation.Rmd" 
-    combined_report_template_file = "${projectDir}/templates/combined-metaprogram-metrics.Rmd"
+    /////////////////////////////////////////////////////
+    //               Mix with cached outputs          //
+    /////////////////////////////////////////////////////
+
     
     // construct channels for skipped processes and mix with output from actual processes
     all_metaprograms_ch = metaprograms_ch.cached_metaprograms
@@ -393,6 +400,16 @@ workflow metaprograms {
       }
       .mix(metaprogram_metrics.out)
 
+
+    /////////////////////////////////////////////////////
+    //               Combined metrics report           //
+    /////////////////////////////////////////////////////
+
+    // define path to template reports
+    individual_report_template_file = "${projectDir}/templates/individual-metaprogram-evaluation.Rmd" 
+    combined_report_template_file = "${projectDir}/templates/combined-metaprogram-metrics.Rmd"
+
+    // use the grouped channel as input for the combined and indivudal reports
     grouped_metrics_ch = all_metrics_ch
       // group by subset id to get list of metrics files for each
       .groupTuple(by: 0)
@@ -412,6 +429,10 @@ workflow metaprograms {
       metrics_report_ch,
       file(combined_report_template_file)
     )
+
+    /////////////////////////////////////////////////////
+    //               Identify optimal k               //
+    /////////////////////////////////////////////////////
 
     // make a channel of sce file, annotation file and score file 
     // only for the optimal k value 
