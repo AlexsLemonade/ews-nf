@@ -160,4 +160,5 @@ nextflow run "$ews_dir/main.nf" \
   $score_sces_flag \
   $subset_mode_flag \
   $subset_id_flag
+
   
