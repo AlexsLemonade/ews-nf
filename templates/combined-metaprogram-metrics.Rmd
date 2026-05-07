@@ -422,6 +422,8 @@ mp_metrics_df |>
   DT::formatPercentage("min_proportion_patients_per_mp")
 ```
 
+<!--
+TODO: Update this section to handle the new disease timing options 
 ### Representation across sample types 
 
 Here we will look at the contribution of different sample types to each of the metaprograms. 
@@ -462,7 +464,7 @@ ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_typ
     axis.text.x        = element_text(angle = 90, hjust = 1, size = 10)
   )
 ```
-
+-->
 
 ### Normalized effective sample size 
 
@@ -889,6 +891,8 @@ cv_sig_df |>
   DT::formatPercentage("proportion_significant_cv", 2)
 ```
 
+<!--
+TODO: Update this section to use the new disease timning or tumore type column
 
 ### Comparison of scores across sample types 
 
@@ -970,7 +974,7 @@ ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = dis
     legend.text = element_text(size = 14)
   )
 ```
-
+--> 
 
 ## Combining metrics to identify an optimal value of k
 

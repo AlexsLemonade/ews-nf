@@ -480,6 +480,7 @@ ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
   )
 ```
 
+<!-- TODO: update this section to account for new disease timing options
 We can also look at the proportion of each sample type represented in each metaprogram. 
 
 ```{r}
@@ -514,6 +515,7 @@ ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_typ
     axis.text.x        = element_text(angle = 90, hjust = 1, size = 10)
   )
 ```
+-->
 
 ## Biological interpretability 
 
@@ -756,8 +758,8 @@ ggplot(score_df,
   )
 ```
 
-### Comparison of scores across sample types 
-<!--Code and text are adapted from the Comparison of scores across sample types section in the combined metrics report-->
+<!--TODO: Update this to account for new disease timing
+### Comparison of scores across sample types
 
 Here we look at the distribution of cell scores across varying sample types (primary, metastatic, and recurrent tumors). 
 First, we calculate the mean score for each metaprogram for each sample. 
@@ -822,6 +824,7 @@ ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = dis
     y = "Z-score computed from \nmean metaprogram score per sample"
   )
 ```
+-->
 
 ## Session info
 
