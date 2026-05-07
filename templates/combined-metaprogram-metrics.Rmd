@@ -428,8 +428,10 @@ TODO: Update this section to handle the new disease timing options
 
 Here we will look at the contribution of different sample types to each of the metaprograms. 
 Particularly, we will see how many of the samples are from primary, metastatic, or recurrent samples within each metaprogram. 
+-->
 
 ```{r}
+#| eval: FALSE
 disease_timing_df <- mp_metrics_df |> 
   tidyr::pivot_longer(
     cols = c("num_primary_samples", "num_mets_samples", "num_recurrence_samples"),
@@ -447,6 +449,7 @@ disease_timing_df <- mp_metrics_df |>
 ```{r}
 #| fig.height: !r dynamic_fig_height
 #| fig.width: 15
+#| eval: FALSE
 
 ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
   geom_col(width = 0.7) +
@@ -464,7 +467,6 @@ ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_typ
     axis.text.x        = element_text(angle = 90, hjust = 1, size = 10)
   )
 ```
--->
 
 ### Normalized effective sample size 
 
@@ -893,7 +895,7 @@ cv_sig_df |>
 
 <!--
 TODO: Update this section to use the new disease timning or tumore type column
-
+Remove eval:FALSE statements
 ### Comparison of scores across sample types 
 
 Here we look at the distribution of cell scores across varying sample types (primary, metastatic, and recurrent tumors). 
@@ -908,8 +910,10 @@ The significance of the comparison among the three sample types is shown above t
 **Caution:** This information will not be used to decide on the value of k, but can be helpul to determine if any of the identified metaprograms may be biologically relevant. 
 Because we summarize scores for all cells in a sample, this does not tell us anything about the heterogeneity of scores within a sample. 
 Further analysis is needed to look at individual cell populations that is outside the scope of the analysis done here.
+--> 
 
 ```{r}
+#| eval: FALSE
 mean_scores_df <- scores_df |> 
   dplyr::summarize(
     mean_mp_score = mean(mp_score),
@@ -938,6 +942,7 @@ mean_scores_df <- scores_df |>
 
 ```{r}
 #| message: FALSE 
+#| eval: FALSE
 # calculate anova with random effect
 random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value, random_effect = "participant_id")
 ```
@@ -945,6 +950,7 @@ random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value, random_eff
 ```{r}
 #| fig.height: !r dynamic_fig_height
 #| fig.width: 15
+#| eval: FALSE
 
 # plot the scores fore ach sample type and indicate the significance
 ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = disease_timing)) +
@@ -974,7 +980,6 @@ ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = dis
     legend.text = element_text(size = 14)
   )
 ```
---> 
 
 ## Combining metrics to identify an optimal value of k
 
