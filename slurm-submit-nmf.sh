@@ -82,7 +82,7 @@ score_sces=${score_sces:-0}
 
 # turn on subset mode to run individual subsets instead of the full cohort
 subset_mode=${subset_mode:-0}
-subset_ids=""
+subset_ids=${subset_ids:-""}
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
