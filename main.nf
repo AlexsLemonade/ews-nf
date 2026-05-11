@@ -177,6 +177,7 @@ workflow nmf_metaprograms {
 
   metaprograms_input_ch = cnmf.out
     .combine(sample_group_ch, by: 0) // combine on sample id to add subset id information to cnmf output
+    .unique() // make sure we only have one entry per sample/unique id combination
 
   // channel of sce files and annotations to use as input for scoring metaprograms
   sce_ch = nmf_run_ch.map{ sample_id, unique_id, h5_file, annotations_file ->
