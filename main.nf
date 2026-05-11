@@ -193,6 +193,14 @@ workflow nmf_metaprograms {
 
 // entry workflow
 workflow {
+
+  // check that the workflow is valid
+  // if not provided, then default to running the annotation workflow
+  def valid_workflows = ["reference", "nmf_metaprograms", "annotation"]
+  if (params.workflow != null && !valid_workflows.contains(params.workflow)) {
+    error "Invalid workflow '${params.workflow}'. Must be one of: reference, nmf_metaprograms, or annotation."
+  }
+
   if (params.workflow == "reference") {
     reference()
   } else if (params.workflow == "nmf_metaprograms") {
