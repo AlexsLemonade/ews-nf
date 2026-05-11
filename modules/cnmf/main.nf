@@ -92,5 +92,5 @@ workflow cnmf {
 
 
   emit:
-    output_ch // [subset_id, unique_id, sample_id, cnmf output]
+    output_ch // [sample_id, unique_id, cnmf output]
 }

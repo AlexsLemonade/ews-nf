@@ -73,7 +73,7 @@ nextflow run main.nf --workflow reference
 
 ### Running the main annotation workflow
 
-After creating the reference files with the `reference` workflow, the following command can be run from within the cloned repository and will run the workflow locally with all default parameters (see more below):
+After creating the reference files with the `reference` workflow, the following command can be run from within the cloned repository and will run the annotation workflow locally with all default parameters (see more below):
 
 ```sh
 nextflow run main.nf
