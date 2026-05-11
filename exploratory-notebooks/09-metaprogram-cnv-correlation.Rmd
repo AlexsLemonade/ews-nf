@@ -5,6 +5,124 @@ date: "`r Sys.Date()`"
 output: html_notebook
 ---
 
+In this notebook we briefly look at the correlation of metaprogram scores to CNV estimates for the full cohort. 
+The purpose of this analysis is to identify any metaprograms that may contain cells that are non-malignant cells and less likely to be tumor cells. 
+
+In addition to looking at total CNV, we also look at the expression of the key EWS::FLI1 activated and repressed gene sets. 
+Metaprograms with low CNVs and low expression may in fact be normal cells that are getting mis classified as tumor since we are using a lenient threshold for tumor cell classification for metaprogram generation. 
+
+## Set up 
+
+```{r}
+# for a given column, bin values, get the mean metaprogram score
+# and calculate the spearman correlation of the mean metaprogram score and the bin rank 
+# outputs a plot faceted by metaprogram showing the bin vs. mean score
+
+plot_mp_by_bin <- function(df, bin_col, n_bins = 10) {
+  
+  # first bin by the specified column and calculate mean mp score for each bin
+  bin_summary_df <- df |>
+    dplyr::mutate(
+      .bin = cut(.data[[bin_col]], breaks = n_bins, include.lowest = TRUE)
+    ) |>
+    dplyr::summarize(
+      mean_mp_score = mean(mp_score),
+      bin_rank = as.integer(unique(.bin)),
+      num_cells = dplyr::n_distinct(cell_id),
+      .by = c(".bin", "metaprogram")
+    )
+  
+  # now calculate spearman correlation and extract rho for the mean mp score vs. the bin rank
+  cor_df <- bin_summary_df |>
+    dplyr::summarize(
+      rho = cor.test(mean_mp_score, bin_rank, method = "spearman")$estimate,
+      p_value = cor.test(mean_mp_score, bin_rank, method = "spearman")$p.value,
+      sig_label = dplyr::if_else(p_value <= 0.05, "*", "ns"),
+      plot_label = glue::glue("rho=='{round(rho, 3)} {sig_label}'"),
+      .by = "metaprogram"
+    )
+  
+  # plot the bins vs mean mp score and facet by metaprogram 
+  ggplot(bin_summary_df, aes(x = bin_rank, y = mean_mp_score)) +
+    geom_line(linewidth = 0.8, color = "steelblue") +
+    geom_point(aes(size = num_cells), color = "steelblue", alpha = 0.8) +
+    geom_text(
+      data = cor_df,
+      aes(label = plot_label),
+      x = Inf, y = Inf, hjust = 1.1, vjust = 1.5,
+      size = 3, inherit.aes = FALSE, parse = TRUE
+    ) +
+    scale_x_continuous(breaks = 1:n_bins) +
+    labs(
+      title = glue::glue("Mean metaprogram score by {bin_col} bin"),
+      x     = glue::glue("{bin_col} bin (1 = lowest, {n_bins} = highest)"),
+      y     = "Mean metaprogram score"
+    ) +
+    theme(
+      legend.position  = "right",
+      panel.grid.minor = element_blank()
+    ) +
+    facet_wrap(vars(metaprogram), scales = "free_y", ncol = 3)
+}
+
+
+# plot the proportion of cells assigned to a specific MP 
+# that pass a z score threshold for a set of columns (e.g., cnv columns)
+# rows are metaprograms, columns are the zscore columns from the df 
+# color is the proportion of z score > threshold
+proportion_heatmap <- function(df, columns, column_labels, zscore_threshold = 2){
+  
+  # get proportions of cells for each metaprogram and each column
+  heatmap_mtx <- all_info_wide_df |> 
+    # make one column with the type and zscore
+    tidyr::pivot_longer(
+      cols = columns,
+      names_to = "type",
+      values_to = "zscore"
+    ) |>
+    dplyr::mutate(
+      # classify as passing or not based on the threshold
+      is_passing = zscore > zscore_threshold
+    ) |> 
+    # get the passing proportion for each top mp and type
+    dplyr::summarize(
+      proportion_passing = sum(is_passing, na.rm = TRUE)/length(unique(cell_id)),
+      .by = c("top_mp", "type")
+    ) |>
+    # one column per type
+    tidyr::pivot_wider(
+      names_from = type,
+      values_from = proportion_passing
+    ) |>
+    # remove top mp and convert to matrix for plotting
+    tibble::column_to_rownames("top_mp") |>
+    as.matrix()
+  
+  ComplexHeatmap::Heatmap(
+    heatmap_mtx,
+    name = glue::glue("Proportion of cells \n z-score > {zscore_threshold}"),
+    col = circlize::colorRamp2(c(0, 0.25, 0.5, 0.75, 1), c("#F7FBFF", "#9ECAE1", "#3182BD", "#08519C", "#08306B")),
+    row_names_side = "left",
+    cluster_rows = TRUE,
+    cluster_columns = FALSE,
+    column_labels = column_labels,
+    # add proportion text to heatmap
+    cell_fun = function(j, i, x, y, width, height, fill) {
+      grid::grid.text(
+        sprintf("%.2f", heatmap_mtx[i, j]),
+        x, y,
+        # account for dark vs light background depending on the value
+        gp = grid::gpar(fontsize = 9, col = ifelse(mat[i, j] > 0.6, "white", "black"))
+      )
+    },
+    row_names_gp = grid::gpar(fontsize = 10),
+    column_names_gp = grid::gpar(fontsize = 10)
+  )
+  
+}
+```
+
+
 ```{r}
 library(ggplot2)
 
@@ -32,11 +150,11 @@ annotations_file_list <- list.files(
 ```
 
 ```{r}
+# read in metaprograms object, scores, and annotations information 
 metaprograms_object <- readr::read_rds(metaprograms_file)
 scores_df <- readr::read_tsv(scores_file, col_types = list(.default = "c", mp_score = "d"))
 
 annotations_df <- annotations_file_list |> 
-  # TODO specify columns
   purrr::map(readr::read_tsv,
              col_types = list(
                .default = "c",
@@ -59,15 +177,21 @@ annotations_df <- annotations_file_list |>
 ```
 
 
-Faceted plot showing correlation of scores for each metaprogram with total CNV 
 ```{r}
-
+# combine into one dataframe 
 all_info_df <- annotations_df |>
   dplyr::left_join(scores_df, by = c("unique_id", "barcodes"))
 ```
 
 
+## Correlation of total CNV with cell scores 
+
+Here we will just look directly at the correlation of metaprogram scores and total CNV for each metaprogram across all cells. 
+
+
 ```{r}
+#| warnings: FALSE 
+
 cnv_score_df <- all_info_df |>
   dplyr::group_by(metaprogram) |>
   dplyr::summarize(
@@ -81,14 +205,13 @@ cnv_score_df <- all_info_df |>
 ggplot(all_info_df, aes(x = cnv_zscore, y = log1p(mp_score))) +
   geom_point(size = 0.1, alpha = 0.1) +
   facet_wrap(vars(metaprogram)) +
-  geom_smooth(method = "lm", se = TRUE) +
   geom_text(
     data = cnv_score_df,
     aes(label = plot_label),
     x = -Inf, y = Inf,
     hjust = -0.1, vjust = 1.5,
     inherit.aes = FALSE,
-    parse = TRUE, # to let us show R2 properly
+    parse = TRUE, # to let us show rho properly
     size = 3
   ) +
   labs(
@@ -98,16 +221,56 @@ ggplot(all_info_df, aes(x = cnv_zscore, y = log1p(mp_score))) +
   theme(axis.text.x = element_text(angle = 0))
 ```
 
+Since we are working with > 400k cells it is not surprising to see that the correlations are all considered "significant". 
+This is likely due to the large sample size since the correlations themselves are not very impresive. 
+Outside of a potential positive correlation in MP01 and MP06, there are no obvious trends. 
 
+Note that when we classify potential tumor cells to use for metaprogram analysis, we consider cells that have either total CNV zscore > 0 or a zscore for a Ewing-specific CNV > 0 (chr1 gain, chr8 gain, chr12 gain, or chr16 loss).
+Because of this it is possible for a cell to have a total CNV zscore < 0 but still be considered a potential tumor cell.
+
+## Correlation of CNV with metaprogram scores (with binning)
+
+To better account for the large sample size, here we will bin the total CNV and calculate the correlation between the bin rank and the mean metaprogram score for all cells assigned to the given bin. 
+
+We will show this for the total CNV and then each of the Ewing-specific CNVs. 
+Note that we do not expect every patient to have each of these CNVs or for all of them to be present, but looking at this will help reveal if any metaprograms are specifically associated with one of these CNVs. 
+
+
+```{r}
+#| fig.height: 7
+#| fig.width: 10
+
+cnv_columns <- c("cnv_zscore", "chr1_gain_zscore", "chr8_gain_zscore", "chr12_gain_zscore", "chr16_loss_zscore")
+
+cnv_columns |> 
+  purrr::walk(\(column) print(plot_mp_by_bin(all_info_df, column)))
+```
+
+- MP04 
+
+## Correlation of Ewing gene set expression with metaprogram scores (with binning)
+
+```{r}
+#| fig.height: 7
+#| fig.width: 10
+
+ef_gene_sets <- c("EF-activated", "EF-repressed", "EMT-ECM", "STAG2-loss")
+
+ef_gene_sets |> 
+  purrr::walk(\(column) print(plot_mp_by_bin(all_info_df, column)))
+```
+
+Although MP04 has a negative correlation with total CNV, there doesn't seem to be a clear relationship between scores and EWS::FLI1 activated gene expression. 
+Also, cells with higher expression of EWS::FLI1 activated gene sets have scores that are somewhat in the middle of the range for MP04, so these may just be cells that have low levels of CNVs but are still showing Ewing gene expression patterns. 
+
+
+## Assigning top metaprograms to each cell
 
 ```{r}
 mp_cols <- unique(scores_df$metaprogram)
 
 wide_scores_df <- scores_df |> 
-  tidyr::pivot_wider(names_from = "metaprogram", values_from = "mp_score") |> 
-  dplyr::mutate(
-    cell_id = glue::glue("unique_id_{barcodes}")
-  )
+  tidyr::pivot_wider(names_from = "metaprogram", values_from = "mp_score")
 
 all_info_wide_df <- annotations_df |>
   dplyr::left_join(wide_scores_df, by = c("unique_id", "barcodes")) |> 
@@ -120,36 +283,64 @@ all_info_wide_df <- annotations_df |>
 table(all_info_wide_df$top_mp)
 ```
 
+### Proportion CNV z-score 
 
 ```{r}
-all_info_wide_df |>
-  ggplot(aes(x = top_mp, y = cnv_zscore)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(size = 0.1,alpha = 0.1)  # alpha low given 400k cells
+column_labels <-c("Total CNV", "Chr1 gain", "Chr8 gain", "Chr12 gain", "Chr16 loss")
+proportion_heatmap(all_info_wide_df, cnv_columns, column_labels)
+```
+
+### Proportion of EWS::FLI1 gene set
+
+```{r}
+# provide gene sets as columns to use and column labels since we don't need to reformat here
+proportion_heatmap(all_info_wide_df, ef_gene_sets, ef_gene_sets)
+```
+
+MP02 an MP07 are consistently looking like they don't show any "tumor" characteristics. 
+MP02 is the metaprogram that's mostly noise (low coherence) and has gene sets associated with ambient RNA and low-quality cells. 
+MP07 is the metaprogram that only returned 1 significant gene set. 
+
+Let's see what the consensus cell types of cells with high scores in MP02 and MP07 to see if there's any specific cell type we are accidentally grouping in with tumor. 
+
+```{r}
+all_info_wide_df |> 
+  dplyr::filter(top_mp %in% c("MP02")) |> 
+  dplyr::count(consensus_celltype_annotation) |> 
+  dplyr::arrange(desc(n))
+
+all_info_wide_df |> 
+  dplyr::filter(top_mp %in% c("MP02", "MP07")) |> 
+  dplyr::mutate(
+    low_cnv = cnv_zscore <= 0
+  ) |> 
+  dplyr::count(low_cnv)
+
+all_info_wide_df |> 
+  dplyr::mutate(
+    low_cnv = cnv_zscore <= 0
+  ) |> 
+  dplyr::count(low_cnv)
+
+all_info_wide_df |> 
+  dplyr::mutate(
+    low_cnv = cnv_zscore <= 0
+  ) |> 
+  dplyr::count(consensus_celltype_annotation, low_cnv) |> 
+  dplyr::arrange(desc(n))
+```
+
+```{r}
+epithelial_only <- all_info_wide_df |> 
+  dplyr::filter(stringr::str_detect(consensus_celltype_annotation, "epithelial")) 
 ```
 
 
-```{r}
-all_info_wide_df |>
-  ggplot(aes(x = top_mp, y = `EF-activated`)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(size = 0.1,alpha = 0.1)  # alpha low given 400k cells
-```
+## Conclusions 
+
+## Session info
 
 ```{r}
-all_info_wide_df |>
-  ggplot(aes(x = top_mp, y = `EF-repressed`)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(size = 0.1,alpha = 0.1)  # alpha low given 400k cells
-```
-
-
-Now do the same thing for each of the Ewing specific CNVs
-
-```{r}
-all_info_wide_df |>
-  ggplot(aes(x = top_mp, y = `chemo-resistance`)) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_jitter(size = 0.1,alpha = 0.1)  # alpha low given 400k cells
+sessionInfo()
 ```
 
