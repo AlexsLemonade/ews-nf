@@ -64,7 +64,7 @@ home_dir="/vast/acillo/$USER"
 # set defaults for all arguments
 sample_ids=""
 scpca_nf_dir="$home_dir/scpca-nf-out"
-outdir="$home_dir/ews-nf-out"
+outdir="$home_dir/ews-nf-out_zscore-2"
 workdir="$home_dir/work"
 
 # cnmf parameters

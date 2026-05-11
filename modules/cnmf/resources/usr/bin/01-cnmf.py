@@ -122,14 +122,14 @@ def main():
     # read in annotations tsv
     annotations_df = pandas.read_csv(args.annotations_file, sep= "\t")
     # make sure the tumor cell annotation column is provided
-    if not "annotation_tier0" in annotations_df.columns:
+    if not "annotation_tier2" in annotations_df.columns:
         raise KeyError(
-            "Provided annotations file does not contain the required column, `annotation_tier0`"
+            "Provided annotations file does not contain the required column, `annotation_tier2`"
         )
     
     # get vector of tumor cells to keep 
     tumor_barcodes = annotations_df.loc[
-        annotations_df["annotation_tier0"] == "tumor", "barcodes"
+        annotations_df["annotation_tier2"] == "tumor", "barcodes"
     ].tolist()
 
     # create a new anndata object with just tumor cells 
