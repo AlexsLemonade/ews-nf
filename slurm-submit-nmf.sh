@@ -111,7 +111,7 @@ fi
 if [ -n "$subset_ids" ]; then
     subset_id_flag="--subset_ids $subset_ids"
 else
-    subset_flag=""
+    subset_id_flag=""
 fi
 
 # flag for cnmf
