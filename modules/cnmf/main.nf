@@ -47,7 +47,7 @@ process run_cnmf {
 
 workflow cnmf {
   take:
-    sample_ch  // [unique_id, sample_id, path to processed H5 file, annotations file, subset id]
+    sample_ch  // [sample_id, unique_id, path to processed H5 file, annotations file]
   main:
 
     cnmf_ch = sample_ch
