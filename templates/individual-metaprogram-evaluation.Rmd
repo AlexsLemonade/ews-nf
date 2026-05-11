@@ -551,39 +551,51 @@ if(missing_mps != "") {
 To evaluate if the MPs are easily interpretable, we will make a heatmap that shows the significance of each gene set across all MPs. 
 Ideal MPs will show gene sets that are uniquely enriched in that MP instead of enriched across multiple MPs. 
 The rows represent the all significant gene sets, the columns indicate the MP, and the heatmap color indicates the -log10(pvalue) for that gene set in that MP.
-Only the top 10 gene sets for each metaprogram are shown to save space.
+Only the top 5 gene sets for each metaprogram are shown to save space.
 
 Only MPs with identified gene sets will be included. 
 
 ```{r}
-#| fig.height: 20
-#| fig.width: 10
+#| fig.height: 10
+#| fig.width: 22
 
 
 # convert ora results into a heatmap of pvalues
 heatmap_mtx <- ora_results_df |> 
   dplyr::mutate(logp = -log10(p.adjust)) |> 
-  # only keep the top 10 gene sets
-  dplyr::slice_max(logp, n = 10, by = metaprogram) |>
+  # only keep the top 5 gene sets
+  dplyr::slice_max(logp, n = 5, by = metaprogram) |>
   dplyr::select(metaprogram, ID, logp) |> 
   tidyr::pivot_wider(
     names_from = metaprogram,
     values_from = logp,
     values_fill = 0  # set missing gene sets to 0                         
   ) |> 
+  # remove _ and wrap gene set names
+  dplyr::mutate(
+    ID = stringr::str_replace_all(ID, "_", " ") |> 
+      stringr::str_wrap(width = 33)
+  ) |> 
   tibble::column_to_rownames("ID") |> 
-  as.matrix()
+  as.matrix() |> 
+  t()
 
 ComplexHeatmap::Heatmap(
   heatmap_mtx,
-  name = "-log10(pvalue)",
+  name = "-log10(pvalue)\n",
   row_names_side = "left",
   row_dend_side = "right",
+  cluster_rows = FALSE,
   col = circlize::colorRamp2(c(0, max(heatmap_mtx)), colors = c("white", "darkslateblue")),
-  row_names_gp = grid::gpar(fontsize = 10)
+  row_names_gp = grid::gpar(fontsize = 20),
+  column_names_gp = grid::gpar(fontsize = 16),
+  heatmap_legend_param = list(
+    title_gp = grid::gpar(fontsize = 20),
+    labels_gp = grid::gpar(fontsize = 20)
+  )
 ) |> 
   # don't cut off super long gene set names
-  ComplexHeatmap::draw(padding = unit(c(2, 6, 2, 2), "cm"))
+  ComplexHeatmap::draw(padding = unit(c(6, 2, 2, 2), "cm"))
 ```
 
 Alternatively, we can use the Jaccard similarity to index to measure how similar the list of gene sets for each MP is to all other MPs. 
