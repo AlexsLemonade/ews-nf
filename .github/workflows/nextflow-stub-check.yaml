@@ -33,13 +33,16 @@ jobs:
           version: '25.10.4'
 
       - name: Check Nextflow workflow with reference building
-        run: nextflow -log stub-run.log run main.nf -entry reference -stub -profile stub -ansi-log false
+        run: nextflow -log stub-run.log run main.nf --workflow reference -stub -profile stub -ansi-log false
 
       - name: Check Nextflow workflow for main annotation
         run: nextflow -log stub-run.log run main.nf -stub -profile stub -ansi-log false
 
       - name: Check Nextflow workflow for nmf metaprograms
-        run: nextflow -log stub-run.log run main.nf -entry nmf_metaprograms -stub -profile stub -ansi-log false
+        run: nextflow -log stub-run.log run main.nf --workflow nmf_metaprograms -stub -profile stub -ansi-log false
+
+      - name: Check Nextflow workflow for nmf metaprograms with subset mode 
+        run: nextflow -log stub-run.log run main.nf --workflow nmf_metaprograms -stub -profile stub -ansi-log false --subset_mode
 
       - name: Upload nextflow log
         if: ${{ !cancelled() }}

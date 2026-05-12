@@ -11,6 +11,11 @@
       "description": "",
       "default": "",
       "properties": {
+        "workflow": {
+          "type": "string",
+          "default": "annotation",
+          "description": "String indicating which workflow to run, either reference, annotation, or nmf_metaprograms"
+        },
         "outdir": {
           "type": "string",
           "format": "directory-path",
@@ -185,6 +190,24 @@
           "type": "string",
           "default": "all",
           "description": "Set of k values used with cNMF to keep when clustering spectra into metaprograms, comma separated. Use 'all' to use all available k."
+        },
+        "subset_tsv": {
+          "type": "string",
+          "default": "${projectDir}/sample-info/sample-subsets.tsv",
+          "pattern": "\\.tsv$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Path to TSV file containing sample subsets to use for determining optimal number of metaprograms. Must contain columns 'subset_id' and 'scpca_sample_id'"
+        },
+        "subset_mode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Boolean indicating whether to run in subset mode, which uses specified subsets of samples to determine optimal number of metaprograms instead of using all samples"
+        },
+        "subset_ids": {
+          "type": "string",
+          "default": "All",
+          "description": "Comma separated string of subset ids to use for determining optimal number of metaprograms; only used if subset_mode is true. Use 'All' to use all subsets defined in subset_tsv."
         },
         "n_metaprograms": {
           "type": "string",

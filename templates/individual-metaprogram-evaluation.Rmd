@@ -480,9 +480,12 @@ ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
   )
 ```
 
+<!-- TODO: update this section to account for new disease timing options
 We can also look at the proportion of each sample type represented in each metaprogram. 
+-->
 
 ```{r}
+#| eval: FALSE
 # copied from https://github.com/AlexsLemonade/ews-nf/blob/main/templates/combined-metaprogram-metrics.Rmd
 disease_timing_df <- mp_metrics_df |> 
   tidyr::pivot_longer(
@@ -499,6 +502,7 @@ disease_timing_df <- mp_metrics_df |>
 ```
 
 ```{r}
+#| eval: FALSE
 ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
   geom_col(width = 0.7) +
   scale_fill_manual(values = disease_timing_palette) +
@@ -756,8 +760,8 @@ ggplot(score_df,
   )
 ```
 
-### Comparison of scores across sample types 
-<!--Code and text are adapted from the Comparison of scores across sample types section in the combined metrics report-->
+<!--TODO: Update this to account for new disease timing
+### Comparison of scores across sample types
 
 Here we look at the distribution of cell scores across varying sample types (primary, metastatic, and recurrent tumors). 
 First, we calculate the mean score for each metaprogram for each sample. 
@@ -767,8 +771,10 @@ For the statistical test, we use a linear mixed model with patient as the random
 
 For visualization purposes, we calculate a z-score for all `log(mean(scores))` within each metaprogram and display that in the box plot below.
 The significance of the comparison among the three sample types is shown above the distributions for that metaprogram with `*` indicating that the distributions are significantly different from each other and `ns` indicating the distributions are not significantly different from each other. 
+--> 
 
 ```{r}
+#| eval: FALSE 
 # copied from https://github.com/AlexsLemonade/ews-nf/blob/main/templates/combined-metaprogram-metrics.Rmd
 # adapted to not consider n_metaprograms since here we just have one value of k 
 
@@ -800,11 +806,13 @@ mean_scores_df <- score_df |>
 
 ```{r}
 #| message: FALSE 
+#| eval: FALSE
 # calculate anova with random effect
 random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value = 0.05, random_effect = "participant_id")
 ```
 
 ```{r}
+#| eval: FALSE 
 # plot the scores fore ach sample type and indicate the significance
 ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = disease_timing)) +
   geom_boxplot(outlier.size = 0.1) +
