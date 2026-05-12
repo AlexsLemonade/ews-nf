@@ -9,7 +9,17 @@ In this notebook we briefly look at the correlation of metaprogram scores to CNV
 The purpose of this analysis is to identify any metaprograms that may contain cells that are non-malignant cells and less likely to be tumor cells. 
 
 In addition to looking at total CNV, we also look at the expression of the key EWS::FLI1 activated and repressed gene sets. 
-Metaprograms with low CNVs and low expression may in fact be normal cells that are getting mis classified as tumor since we are using a lenient threshold for tumor cell classification for metaprogram generation. 
+Cells with high scores for metaprograms with low CNVs and low expression may in fact be normal cells that are getting mis classified as tumor since we are using a lenient threshold for tumor cell classification for metaprogram generation (CNV z-score > 0). 
+
+For reference throughout this notebook, here are the general descriptions of each metaprogram: 
+
+- MP01: EWS::FLI1 high or classic Ewing tumor cells
+- MP02: Low-quality, ambient RNA, this metaprogram has low coherence
+- MP03: EMT-like, EWS::FLI1 low
+- MP04: Inflammatory signaling 
+- MP05: Myogenesis/ muscle phenotype
+- MP06: Profileration/ chemoresistant
+- MP07: Only 1 gene set, translational modifications of tubulin 
 
 ## Set up 
 
@@ -112,7 +122,7 @@ proportion_heatmap <- function(df, columns, column_labels, zscore_threshold = 2)
         sprintf("%.2f", heatmap_mtx[i, j]),
         x, y,
         # account for dark vs light background depending on the value
-        gp = grid::gpar(fontsize = 9, col = ifelse(mat[i, j] > 0.6, "white", "black"))
+        gp = grid::gpar(fontsize = 9, col = ifelse(heatmap_mtx[i, j] > 0.6, "white", "black"))
       )
     },
     row_names_gp = grid::gpar(fontsize = 10),
@@ -133,7 +143,7 @@ theme_set(
 ```
 
 ```{r}
-# metaprograms file for k=11
+# metaprograms file for k=7
 k_7_dir <- here::here("ews-nf-out", "metaprograms", "metaprograms-7_cnmf-5-10-15_filtered") 
 
 metaprograms_file <- file.path(k_7_dir, "metaprograms.rds")
@@ -158,13 +168,16 @@ annotations_df <- annotations_file_list |>
   purrr::map(readr::read_tsv,
              col_types = list(
                .default = "c",
+               # summary zscores from AUCell on gene sets in these categories
                'EF-activated' = "d",
                'EF-repressed' = "d",
                'EMT-ECM' = "d",
                'STAG2-loss' = "d",
-               'chemo-resistance' = "d",
+               # this column groups both up and down resistance so we won't use this in any analysis
+               'chemo-resistance' = "d", 
                'ews-multiome' = "d",
-               cnv_zscore = "d",
+               cnv_zscore = "d", # total cnv
+               # ewing-specific cnvs
                chr1_gain_zscore = "d",
                chr8_gain_zscore = "d",
                chr12_gain_zscore = "d",
@@ -222,10 +235,10 @@ ggplot(all_info_df, aes(x = cnv_zscore, y = log1p(mp_score))) +
 ```
 
 Since we are working with > 400k cells it is not surprising to see that the correlations are all considered "significant". 
-This is likely due to the large sample size since the correlations themselves are not very impresive. 
+This is likely due to the large sample size since the correlations themselves are not very impressive. 
 Outside of a potential positive correlation in MP01 and MP06, there are no obvious trends. 
 
-Note that when we classify potential tumor cells to use for metaprogram analysis, we consider cells that have either total CNV zscore > 0 or a zscore for a Ewing-specific CNV > 0 (chr1 gain, chr8 gain, chr12 gain, or chr16 loss).
+**Note** that when we classify potential tumor cells to use for metaprogram analysis, we consider cells that have either total CNV zscore > 0 or a zscore for a Ewing-specific CNV > 0 (chr1 gain, chr8 gain, chr12 gain, or chr16 loss).
 Because of this it is possible for a cell to have a total CNV zscore < 0 but still be considered a potential tumor cell.
 
 ## Correlation of CNV with metaprogram scores (with binning)
@@ -234,6 +247,7 @@ To better account for the large sample size, here we will bin the total CNV and 
 
 We will show this for the total CNV and then each of the Ewing-specific CNVs. 
 Note that we do not expect every patient to have each of these CNVs or for all of them to be present, but looking at this will help reveal if any metaprograms are specifically associated with one of these CNVs. 
+The chr8 gain is the most prevalent CNV, presenting in around 40-50% of patients. 
 
 
 ```{r}
@@ -246,25 +260,47 @@ cnv_columns |>
   purrr::walk(\(column) print(plot_mp_by_bin(all_info_df, column)))
 ```
 
-- MP04 
+Looking at just total CNV first, we see significant negative correlations of metaprogram scores with total CNV in MP02 and MP04. 
+MP02 is the noisey/bad quality metaprogram so this isn't surprising. 
+MP04 is the inflammatory metaprogram, so it's a little more surprising but we also see large grops of cells with higher scores, so we have to look into this more. 
+
+Interestingly everything but MP01, MP05, and MP06 have a negative correlation even though it's not specific. 
+
+If you look at chr8 gain you see all metaprograms trend in the positive correlation, with MP01, MP05, and MP06 being statistically significant. 
+This could be influenced by cell numbers though as there are much fewer cells with high scores for each of the specific CNVs. 
+Note that not even in the samples that have one of the Ewing-specific CNVs, only subsets of both high and low tumor cells show a z-score > 0 for that CNV. 
 
 ## Correlation of Ewing gene set expression with metaprogram scores (with binning)
+
+Another way that we confirm the presence of tumor cells is by looking at expression of EWS::FLI1 target genes. 
+As we have all the information already present in our data frame, let's make the same plots but look at expression of some key gene sets: EWS::FLI1 activated, EWS::FLI1 repressed, EMT-like genes, STAG2 loss signature (common mutation in EwS), and the gene modules from the EwS multi-ome paper. 
+
+**Note** that for the EwS multi-ome signature, this includes all three modules that were found in that dataset and does not separate the three modules. 
+If we want to look for specific enrichment of one of the modules with the metaprograms, we would need to do a separate analysis. 
 
 ```{r}
 #| fig.height: 7
 #| fig.width: 10
 
-ef_gene_sets <- c("EF-activated", "EF-repressed", "EMT-ECM", "STAG2-loss")
+ef_gene_sets <- c("EF-activated", "EF-repressed", "EMT-ECM", "STAG2-loss", "ews-multiome")
 
 ef_gene_sets |> 
   purrr::walk(\(column) print(plot_mp_by_bin(all_info_df, column)))
 ```
 
-Although MP04 has a negative correlation with total CNV, there doesn't seem to be a clear relationship between scores and EWS::FLI1 activated gene expression. 
-Also, cells with higher expression of EWS::FLI1 activated gene sets have scores that are somewhat in the middle of the range for MP04, so these may just be cells that have low levels of CNVs but are still showing Ewing gene expression patterns. 
+It looks like most metaprograms except MP02 and MP03 have a positive correlation with EF-activated genes. 
+MP03 shows a positive correlation with the EF-repressed genes, which is consistent with expectations. 
 
+Although MP04 has a negative correlation with total CNV, we do see a somewhat positive correlation with EF-activated gene expression. 
+These may just be cells that have low levels of CNVs but are still showing Ewing gene expression patterns. 
+These cells also have some increase in the EMT signature, so I expect they are aggressive tumor cells. 
+
+In the multi-ome results we see MP01, MP03, and MP06 have strong positive correlations. 
+This tells me that these metaprograms might be consistent with the modules found in the multi-ome paper. 
 
 ## Assigning top metaprograms to each cell
+
+Let's do a quick analysis where we "assign" each cell a top metaprogram based on the highest score. 
 
 ```{r}
 mp_cols <- unique(scores_df$metaprogram)
@@ -279,64 +315,91 @@ all_info_wide_df <- annotations_df |>
   )
 ```
 
+Let's compare the number of cells within each metaprogram with the most lenient threshold (z-score > 0) and the most stringent threshold of z-score > 2. 
+I'm curious to see which metaprograms lose the most amount of cells and are more likely to reflect non-malignant cells. 
+
 ```{r}
-table(all_info_wide_df$top_mp)
+confident_tumor_cells_df <- all_info_wide_df |> 
+  dplyr::filter(stringr::str_detect(annotation_tier2, "tumor"))
 ```
 
+```{r}
+dplyr::full_join(
+  as.data.frame(table(all_info_wide_df$top_mp)),
+  as.data.frame(table(confident_tumor_cells_df$top_mp)),
+  by = "Var1"
+) |>
+  dplyr::rename(top_mp = Var1, annotation_tier0 = Freq.x, annotation_tier2 = Freq.y) |>
+  dplyr::mutate(pct_change = ((annotation_tier2 - annotation_tier0) / annotation_tier0) * 100)
+```
+
+Not surprisingly, MP01 and MP06 don't lose very many cells as those are the very classic Ewing signatures. 
+MP07 loses the most amount of cells at almost 70%, with MP02 losing the second most of 50%. 
+
+MP03, MP04, and MP05 lose between 30-40%. 
+These metaprograms have characteristics that are the most similar to non-malignant cells so it is possible that we are capturing some normal cells here. 
+
+However, I was curious how the metaprograms might change if I only included the most confident tumor cells to begin with so I re-ran the workflow and filtered to tumor cells with z-score > 2. 
+Here the optimal value of k is 6 and these 6 metaprograms have the exact same gene sets as MP01-MP06 here. 
+This tells me that MP07 probably isn't reflective of true tumor cells and although some of these have similar characteristics to non-malignant cells they capture biology that is also present in the true tumor cell population.
+
+**Note** that a strong caveat here is that cells may have high scores for multiple metaprograms and we are not considering the distance between the top scoring and next scoring metaprogram. 
+It's likely that some metaprograms are showing up together.
+This is merely just an exploratory analysis to see if any metaprograms should be thrown out from future analysis. 
+
 ### Proportion CNV z-score 
+
+Let's look at the proportion of cells with a CNV z-score > 2 in each group of cells based on their top metaprogram. 
+In the below heatmap, each cell is assigned to a top metaprogram (shown in the rows) and the color indicates the proportion of cells assigned to that metaprogram that have a z score > 2 for the category indicated in the column.
+
+Metaprograms that are consistent with tumor cells should show high proportions of cells with high CNVs.
 
 ```{r}
 column_labels <-c("Total CNV", "Chr1 gain", "Chr8 gain", "Chr12 gain", "Chr16 loss")
 proportion_heatmap(all_info_wide_df, cnv_columns, column_labels)
 ```
 
+As expected, MP01 and MP06 have very high proportions of cells with high CNV and MP02 and MP07 have very low proportions. 
+
 ### Proportion of EWS::FLI1 gene set
+
+We can make the same plot but look at the proportion of cells that show expression of each of the gene set categories using a z-score > 2.
 
 ```{r}
 # provide gene sets as columns to use and column labels since we don't need to reformat here
 proportion_heatmap(all_info_wide_df, ef_gene_sets, ef_gene_sets)
 ```
+As expected, MP01 and MP06 shows the highest proportions of EF-activated cells. 
+MP03 shows the highest proportion of EF-repressed and EMT like signatures. 
 
 MP02 an MP07 are consistently looking like they don't show any "tumor" characteristics. 
-MP02 is the metaprogram that's mostly noise (low coherence) and has gene sets associated with ambient RNA and low-quality cells. 
-MP07 is the metaprogram that only returned 1 significant gene set. 
 
 Let's see what the consensus cell types of cells with high scores in MP02 and MP07 to see if there's any specific cell type we are accidentally grouping in with tumor. 
 
 ```{r}
 all_info_wide_df |> 
-  dplyr::filter(top_mp %in% c("MP02")) |> 
-  dplyr::count(consensus_celltype_annotation) |> 
-  dplyr::arrange(desc(n))
-
-all_info_wide_df |> 
   dplyr::filter(top_mp %in% c("MP02", "MP07")) |> 
-  dplyr::mutate(
-    low_cnv = cnv_zscore <= 0
-  ) |> 
-  dplyr::count(low_cnv)
-
-all_info_wide_df |> 
-  dplyr::mutate(
-    low_cnv = cnv_zscore <= 0
-  ) |> 
-  dplyr::count(low_cnv)
-
-all_info_wide_df |> 
-  dplyr::mutate(
-    low_cnv = cnv_zscore <= 0
-  ) |> 
-  dplyr::count(consensus_celltype_annotation, low_cnv) |> 
-  dplyr::arrange(desc(n))
+  dplyr::count(consensus_celltype_annotation, top_mp) |> 
+  dplyr::arrange(top_mp)
 ```
 
-```{r}
-epithelial_only <- all_info_wide_df |> 
-  dplyr::filter(stringr::str_detect(consensus_celltype_annotation, "epithelial")) 
-```
-
+It looks like the majority of these cells are actually unknown with around ~2.5k cells coming from epithelial cell types which is interesting. 
+Since I don't see a single cell type (other than Unknown) that seems to be dominating the cells assigned to these metaprograms, there's probably not much to do here.
 
 ## Conclusions 
+
+- MP02 has a significantly negative correlation of metaprogram scores and total CNV. 
+- MP02 is consistently negatively correlated with expression of Ewing specific gene signatures.
+- Cells with the top metaprogram score from either MP02 or MP07 do not have high CNV or expression of gene signatures. 
+- MP04 has negative correlation with CNVs but positive correlation with EWs::FLI1 gene expression, suggesting these are in fact reflective of tumor cells.
+
+From this, I would not consider MP02 moving forward. 
+MP02 seems to be capturing low quality cells and/or cells with high ambient RNA. 
+I also might consider dropping MP07 because of the low proportion of cells with CNV and the fact that this metaprogram disappears when running the full cohort using `annotation_tier2`. 
+
+Additionally, I do think we want to be using `annotation_tier2` for our final classifications. 
+Many of the signatures that we see (MP03, MP04, and MP05) seem to be true tumor cell programs but also mirror many normal cell programs. 
+To be confident that we are labeling and scoring tumor cells, we should be stringent with our CNV threshold. 
 
 ## Session info
 
