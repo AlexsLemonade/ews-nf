@@ -36,7 +36,7 @@ plot_mp_by_bin <- function(df, bin_col, n_bins = 10) {
       .bin = cut(.data[[bin_col]], breaks = n_bins, include.lowest = TRUE)
     ) |>
     dplyr::summarize(
-      mean_mp_score = mean(mp_score),
+      median_mp_score = median(mp_score),
       bin_rank = as.integer(unique(.bin)),
       num_cells = dplyr::n_distinct(cell_id),
       .by = c(".bin", "metaprogram")
@@ -45,16 +45,16 @@ plot_mp_by_bin <- function(df, bin_col, n_bins = 10) {
   # now calculate spearman correlation and extract rho for the mean mp score vs. the bin rank
   cor_df <- bin_summary_df |>
     dplyr::summarize(
-      rho = cor.test(mean_mp_score, bin_rank, method = "spearman")$estimate,
-      p_value = cor.test(mean_mp_score, bin_rank, method = "spearman")$p.value,
+      rho = cor.test(median_mp_score, bin_rank, method = "spearman")$estimate,
+      p_value = cor.test(median_mp_score, bin_rank, method = "spearman")$p.value,
       sig_label = dplyr::if_else(p_value <= 0.05, "*", "ns"),
       plot_label = glue::glue("rho=='{round(rho, 3)} {sig_label}'"),
       .by = "metaprogram"
     )
   
   # plot the bins vs mean mp score and facet by metaprogram 
-  ggplot(bin_summary_df, aes(x = bin_rank, y = mean_mp_score)) +
-    geom_line(linewidth = 0.8, color = "steelblue") +
+  ggplot(bin_summary_df, aes(x = bin_rank, y = median_mp_score)) +
+    geom_smooth(method = "lm") +
     geom_point(aes(size = num_cells), color = "steelblue", alpha = 0.8) +
     geom_text(
       data = cor_df,
@@ -64,9 +64,9 @@ plot_mp_by_bin <- function(df, bin_col, n_bins = 10) {
     ) +
     scale_x_continuous(breaks = 1:n_bins) +
     labs(
-      title = glue::glue("Mean metaprogram score by {bin_col} bin"),
+      title = glue::glue("Median metaprogram score by {bin_col} bin"),
       x     = glue::glue("{bin_col} bin (1 = lowest, {n_bins} = highest)"),
-      y     = "Mean metaprogram score"
+      y     = "Median metaprogram score"
     ) +
     theme(
       legend.position  = "right",
@@ -172,9 +172,11 @@ annotations_df <- annotations_file_list |>
                'EF-activated' = "d",
                'EF-repressed' = "d",
                'EMT-ECM' = "d",
+               # don't use this because we combine up and down
                'STAG2-loss' = "d",
                # this column groups both up and down resistance so we won't use this in any analysis
                'chemo-resistance' = "d", 
+               # don't use this since its the average of all 3 columns
                'ews-multiome' = "d",
                cnv_zscore = "d", # total cnv
                # ewing-specific cnvs
@@ -260,43 +262,36 @@ cnv_columns |>
   purrr::walk(\(column) print(plot_mp_by_bin(all_info_df, column)))
 ```
 
-Looking at just total CNV first, we see significant negative correlations of metaprogram scores with total CNV in MP02 and MP04. 
+Looking at just total CNV first, we see that MP02, MP04, and MP05 have negative relationships between metaprogram scores and total CNV. 
 MP02 is the noisey/bad quality metaprogram so this isn't surprising. 
 MP04 is the inflammatory metaprogram, so it's a little more surprising but we also see large grops of cells with higher scores, so we have to look into this more. 
+MP05 has a negative correlation but it looks like there's a group of cells with middle ground CNV that do have high scores and the line is almost flat, so I think this is in reality not showing much of a relationship.
 
-Interestingly everything but MP01, MP05, and MP06 have a negative correlation even though it's not specific. 
-
-If you look at chr8 gain you see all metaprograms trend in the positive correlation, with MP01, MP05, and MP06 being statistically significant. 
+If you look at chr1 and chr8 gain you see all metaprograms trend in the positive correlation, with MP01, MP05, and MP06 being statistically significant for chr8.
 This could be influenced by cell numbers though as there are much fewer cells with high scores for each of the specific CNVs. 
 Note that not even in the samples that have one of the Ewing-specific CNVs, only subsets of both high and low tumor cells show a z-score > 0 for that CNV. 
 
 ## Correlation of Ewing gene set expression with metaprogram scores (with binning)
 
 Another way that we confirm the presence of tumor cells is by looking at expression of EWS::FLI1 target genes. 
-As we have all the information already present in our data frame, let's make the same plots but look at expression of some key gene sets: EWS::FLI1 activated, EWS::FLI1 repressed, EMT-like genes, STAG2 loss signature (common mutation in EwS), and the gene modules from the EwS multi-ome paper. 
-
-**Note** that for the EwS multi-ome signature, this includes all three modules that were found in that dataset and does not separate the three modules. 
-If we want to look for specific enrichment of one of the modules with the metaprograms, we would need to do a separate analysis. 
+As we have all the information already present in our data frame, let's make the same plots but look at expression of some key gene sets: EWS::FLI1 activated, EWS::FLI1 repressed, and EMT-like genes.
 
 ```{r}
 #| fig.height: 7
 #| fig.width: 10
 
-ef_gene_sets <- c("EF-activated", "EF-repressed", "EMT-ECM", "STAG2-loss", "ews-multiome")
+ef_gene_sets <- c("EF-activated", "EF-repressed", "EMT-ECM")
 
 ef_gene_sets |> 
   purrr::walk(\(column) print(plot_mp_by_bin(all_info_df, column)))
 ```
 
-It looks like most metaprograms except MP02 and MP03 have a positive correlation with EF-activated genes. 
-MP03 shows a positive correlation with the EF-repressed genes, which is consistent with expectations. 
+It looks like all metaprograms have a positive correlation with EF-activated genes, although less so in MP03 and MP06.
+MP03 shows a strong positive correlation with the EF-repressed genes, which is consistent with expectations. 
 
-Although MP04 has a negative correlation with total CNV, we do see a somewhat positive correlation with EF-activated gene expression. 
+Although MP04 and MP05 have negative correlations with total CNV, we do see a positive correlation with EF-activated gene expression. 
 These may just be cells that have low levels of CNVs but are still showing Ewing gene expression patterns. 
 These cells also have some increase in the EMT signature, so I expect they are aggressive tumor cells. 
-
-In the multi-ome results we see MP01, MP03, and MP06 have strong positive correlations. 
-This tells me that these metaprograms might be consistent with the modules found in the multi-ome paper. 
 
 ## Assigning top metaprograms to each cell
 
@@ -311,7 +306,7 @@ wide_scores_df <- scores_df |>
 all_info_wide_df <- annotations_df |>
   dplyr::left_join(wide_scores_df, by = c("unique_id", "barcodes")) |> 
   dplyr::mutate(
-    top_mp = mp_cols[max.col(pick(all_of(mp_cols)), ties.method = "first")]
+    top_mp = mp_cols[max.col(pick(all_of(mp_cols)))]
   )
 ```
 
@@ -388,14 +383,23 @@ Since I don't see a single cell type (other than Unknown) that seems to be domin
 
 ## Conclusions 
 
-- MP02 has a significantly negative correlation of metaprogram scores and total CNV. 
-- MP02 is consistently negatively correlated with expression of Ewing specific gene signatures.
-- Cells with the top metaprogram score from either MP02 or MP07 do not have high CNV or expression of gene signatures. 
-- MP04 has negative correlation with CNVs but positive correlation with EWs::FLI1 gene expression, suggesting these are in fact reflective of tumor cells.
+When looking at the correlation of total CNV with metaprogram score across all cells without any binning, all metaprograms have a positive correlation, although many have rho values close to 0. 
 
-From this, I would not consider MP02 moving forward. 
-MP02 seems to be capturing low quality cells and/or cells with high ambient RNA. 
-I also might consider dropping MP07 because of the low proportion of cells with CNV and the fact that this metaprogram disappears when running the full cohort using `annotation_tier2`. 
+When looking at the binned correlations: 
+
+- MP02, MP04, and MP05 have negative correlations with total CNV, with only MP02 and MP04 having statistically significant negative relationships. 
+- All metaprograms have positive relationships with chr1 and chr8 gain, although cell numbers with higher levels of these CNVs are rare. 
+- All metaprograms have positive relationships with EWS::FLI1 activated gene sets, although MP03 and MP06 to a lesser degree than others.
+- MP04 and MP05 have negative correlation with CNVs but positive correlation with EWs::FLI1 gene expression, suggesting these are in fact reflective of tumor cells.
+- Cells with the top metaprogram score from either MP02 or MP07 do not have high CNV or expression of gene signatures. 
+
+From this analysis, there are no obvious programs that might be driven by normal cells. 
+MP02 and MP07 both show low proportions of cells with high CNV, suggesting that these might be normal cells, but there's no definitive evidence.
+
+I think the strongest piece of evidence showing that at least MP01-MP06 are tumor-specific is the fact that they consistently show up as metaprograms when running the workflow with only tumor cells with a z-score > 2. 
+Because of this and the fact that MP07 only has one significant gene set, I might generally consider dropping MP07. 
+
+MP02 seems to be capturing low quality cells and/or cells with high ambient RNA independent of this analysis so the fact that we see a negative correlation with CNV reinforces the fact that we may also want to remove MP02. 
 
 Additionally, I do think we want to be using `annotation_tier2` for our final classifications. 
 Many of the signatures that we see (MP03, MP04, and MP05) seem to be true tumor cell programs but also mirror many normal cell programs. 
