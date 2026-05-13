@@ -9,7 +9,7 @@ In this notebook we briefly look at the correlation of metaprogram scores to CNV
 The purpose of this analysis is to identify any metaprograms that may contain cells that are non-malignant cells and less likely to be tumor cells. 
 
 In addition to looking at total CNV, we also look at the expression of the key EWS::FLI1 activated and repressed gene sets. 
-Cells with high scores for metaprograms with low CNVs and low expression may in fact be normal cells that are getting mis classified as tumor since we are using a lenient threshold for tumor cell classification for metaprogram generation (CNV z-score > 0). 
+Cells with high scores for metaprograms with low CNVs and low expression may in fact be normal cells that are getting misclassified as tumor since we are using a lenient threshold for tumor cell classification for metaprogram generation (CNV z-score > 0). 
 
 For reference throughout this notebook, here are the general descriptions of each metaprogram: 
 
@@ -214,7 +214,7 @@ cnv_score_df <- all_info_df |>
     plot_label = glue::glue("rho=='{round(rho, 3)} {sig_label}'")
   )
 
-# plot the coherence x number of patients
+# plot the log mp scores across cnv z scores
 ggplot(all_info_df, aes(x = cnv_zscore, y = log1p(mp_score))) +
   geom_point(size = 0.1, alpha = 0.1) +
   facet_wrap(vars(metaprogram)) +
