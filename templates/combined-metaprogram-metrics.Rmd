@@ -14,6 +14,7 @@ params:
   background_scores_file_list: NULL
   sample_metadata_file: "../sample-info/sample-metadata.tsv"
   output_k_file: NULL
+  output_heatmap_file: NULL
   seed: 2026
 ---
 
@@ -271,6 +272,7 @@ stopifnot(
   "Some or all cell score files do not exist" = all(file.exists(scores_files)),
   "Some or all background cell score files do not exist" = all(file.exists(background_files)),
   "Sample metadata file is missing" = file.exists(params$sample_metadata_file),
+  "Output heatmap file must be provided" = !is.null(params$output_heatmap_file),
   "Output k file must be provided" = !is.null(params$output_k_file)
 )
 ```
@@ -1064,7 +1066,8 @@ rank_mtx <- combined_metrics_df |>
 
 
 ```{r}
-#| fig.width: 10
+# first export the heatmap
+png(params$output_heatmap_file, width = 10, height = 7)
 
 # define a color scale
 col_fun <- circlize::colorRamp2(
@@ -1112,7 +1115,17 @@ ht <- ComplexHeatmap::Heatmap(
 )
 
 ComplexHeatmap::draw(ht, heatmap_legend_side = "right")
+
+dev.off()
 ```
+
+```{r}
+#| fig.width: 10 
+
+# now render the heatmap for the report
+ComplexHeatmap::draw(ht, heatmap_legend_side = "right")
+```
+
 
 ```{r}
 # turn the mean back into a dataframe to get the optimal k
