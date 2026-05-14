@@ -604,14 +604,14 @@ This is also consistent with how we measure correlation of metaprograms within a
 
 For Jaccard, the values tend to be lower and closer to 0. 
 If we follow the same logic as correlation and pick something right around where the tail of the distribution starts, we might want to use something like 0.2. 
-Although, I feel like if we really want to be stringent we could increase that up to 0.5. 
+For the 200 genes, a Jaccard index of ~0.3 indicates that 50% of the genes are shared and 0.6 indicates that 75% of the genes are shared, so I think we want to be somewhere in that range? 
 
-Let's see how many metaprograms are shared if we use a correlation cutoff of 0.5 and Jaccard cutoff of 0.2.
+Let's see how many metaprograms are shared if we use a correlation cutoff of 0.5 and Jaccard cutoff of 0.3.
 
 ```{r}
 all_results_df |> 
   dplyr::mutate(
-    is_shared = cor_is_significant & jaccard_is_significant & correlation >= 0.5 & jaccard >= 0.2
+    is_shared = cor_is_significant & jaccard_is_significant & correlation >= 0.5 & jaccard >= 0.3
   ) |> 
   dplyr::summarize(
     is_shared = any(is_shared),
@@ -623,7 +623,7 @@ all_results_df |>
   )
 ```
 
-Now we see that `subset_007` only shares 6 metaprograms instead of all 7. 
+Now we see that for each of these subsets, only 5 of the metaprograms are shared. 
 Note that moving the cutoff up to 0.5 for Jaccard results in 3-4 shared metaprograms per subset. 
 
 ## Session info
