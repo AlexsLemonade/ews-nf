@@ -262,10 +262,7 @@ cnv_columns |>
   purrr::walk(\(column) print(plot_mp_by_bin(all_info_df, column)))
 ```
 
-Looking at just total CNV first, we see that MP02, MP04, and MP05 have negative relationships between metaprogram scores and total CNV. 
-MP02 is the noisey/bad quality metaprogram so this isn't surprising. 
-MP04 is the inflammatory metaprogram, so it's a little more surprising but we also see large grops of cells with higher scores, so we have to look into this more. 
-MP05 has a negative correlation but it looks like there's a group of cells with middle ground CNV that do have high scores and the line is almost flat, so I think this is in reality not showing much of a relationship.
+Looking at just total CNV first, we see that MP02, MP04, and MP05 have negative relationships between metaprogram scores and total CNV but none of the relationships are significant. 
 
 If you look at chr1 and chr8 gain you see all metaprograms trend in the positive correlation, with MP01, MP05, and MP06 being statistically significant for chr8.
 This could be influenced by cell numbers though as there are much fewer cells with high scores for each of the specific CNVs. 
@@ -387,7 +384,7 @@ When looking at the correlation of total CNV with metaprogram score across all c
 
 When looking at the binned correlations: 
 
-- MP02, MP04, and MP05 have negative correlations with total CNV, with only MP02 and MP04 having statistically significant negative relationships. 
+- MP02, MP04, and MP05 have negative correlations with total CNV, but none of these are statistically significant.
 - All metaprograms have positive relationships with chr1 and chr8 gain, although cell numbers with higher levels of these CNVs are rare and only some are significant.
 - All metaprograms have positive relationships with EWS::FLI1 activated gene sets, although MP03 and MP06 are not significant. 
 - MP04 and MP05 have negative correlation with CNVs but positive correlation with EWS::FLI1 gene expression, suggesting these are in fact reflective of tumor cells.
