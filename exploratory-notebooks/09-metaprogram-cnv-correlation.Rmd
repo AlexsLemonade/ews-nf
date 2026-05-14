@@ -286,7 +286,7 @@ ef_gene_sets |>
   purrr::walk(\(column) print(plot_mp_by_bin(all_info_df, column)))
 ```
 
-It looks like all metaprograms have a positive correlation with EF-activated genes, although less so in MP03 and MP06.
+It looks like all metaprograms have a positive correlation with EF-activated genes, although the relationship is not significant for MP03 and MP06.
 MP03 shows a strong positive correlation with the EF-repressed genes, which is consistent with expectations. 
 
 Although MP04 and MP05 have negative correlations with total CNV, we do see a positive correlation with EF-activated gene expression. 
@@ -388,9 +388,9 @@ When looking at the correlation of total CNV with metaprogram score across all c
 When looking at the binned correlations: 
 
 - MP02, MP04, and MP05 have negative correlations with total CNV, with only MP02 and MP04 having statistically significant negative relationships. 
-- All metaprograms have positive relationships with chr1 and chr8 gain, although cell numbers with higher levels of these CNVs are rare. 
-- All metaprograms have positive relationships with EWS::FLI1 activated gene sets, although MP03 and MP06 to a lesser degree than others.
-- MP04 and MP05 have negative correlation with CNVs but positive correlation with EWs::FLI1 gene expression, suggesting these are in fact reflective of tumor cells.
+- All metaprograms have positive relationships with chr1 and chr8 gain, although cell numbers with higher levels of these CNVs are rare and only some are significant.
+- All metaprograms have positive relationships with EWS::FLI1 activated gene sets, although MP03 and MP06 are not significant. 
+- MP04 and MP05 have negative correlation with CNVs but positive correlation with EWS::FLI1 gene expression, suggesting these are in fact reflective of tumor cells.
 - Cells with the top metaprogram score from either MP02 or MP07 do not have high CNV or expression of gene signatures. 
 
 From this analysis, there are no obvious programs that might be driven by normal cells. 
