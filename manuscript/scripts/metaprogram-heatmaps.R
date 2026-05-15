@@ -86,7 +86,7 @@ heatmap_mtx <- ora_results_df |>
   # remove _ and wrap gene set names
   dplyr::mutate(
     ID = stringr::str_replace_all(ID, "_", " ") |> 
-      stringr::str_wrap(width = 35)
+      stringr::str_wrap(width = 45)
   ) |> 
   tibble::column_to_rownames("ID") |> 
   as.matrix()
@@ -100,7 +100,7 @@ ora_ht <- ComplexHeatmap::Heatmap(
   cluster_columns = FALSE,
   col = circlize::colorRamp2(c(0, max(heatmap_mtx)), colors = c("white", "darkslateblue")),
   row_names_gp = grid::gpar(fontsize = 16),
-  column_names_gp = grid::gpar(fontsize = 16),
+  column_names_gp = grid::gpar(fontsize = 20),
   border = TRUE,
   heatmap_legend_param = list(
     title_gp = grid::gpar(fontsize = 16),
@@ -108,10 +108,10 @@ ora_ht <- ComplexHeatmap::Heatmap(
   )
 ) 
 
-png(ora_heatmap_png_file, width = 900, height = 1400)
+png(ora_heatmap_png_file, width = 1000, height = 1000)
 
 ora_ht |> 
   # don't cut off super long gene set names
-  ComplexHeatmap::draw(padding = unit(c(2, 8, 2, 2), "cm"))
+  ComplexHeatmap::draw(padding = unit(c(2, 10, 2, 2), "cm"))
 
 dev.off()
