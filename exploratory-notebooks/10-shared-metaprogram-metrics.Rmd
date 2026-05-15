@@ -1,0 +1,635 @@
+---
+title: "Metrics for identifying shared metaprograms"
+author: "Ally Hawkins"
+date: "`r Sys.Date()`"
+output: html_notebook
+---
+
+In this notebook we look at two metrics for determining whether or not two metaprograms generated from different sample groups are shared. 
+The overall goal is to identify a strategy for counting how many metaprograms in the full cohort of SKC samples are found in a specific subset. 
+
+Here we look at 4 different subsets: 
+
+- `subset_001`: 10 samples
+- `subset_002`: 10 samples
+- `subset_006`: 20 samples
+- `subset_007`: 20 samples 
+
+For each metaprogram in a given subset we compare it to all metaprograms in the full cohort and calculate: 
+
+- The correlation of gene weights
+- The Jaccard index between the top 200 genes 
+
+
+```{r}
+library(ggplot2)
+
+# Set default ggplot theme
+theme_set(
+  theme_bw()
+)
+```
+
+```{r}
+# subsets that we'll use 
+subset_ids <- c("subset_001", "subset_002", "subset_006", "subset_007")
+
+# path to the data directory and associated subset results
+data_dir <- here::here("ews-nf-out", "metaprograms")
+subset_dirs <- file.path(data_dir, subset_ids)
+
+# get the full metaprogram from the object files
+mp_object_files <- list.files(
+  subset_dirs,
+  pattern = "*_metaprograms.rds", 
+  recursive = TRUE, 
+  full.names = TRUE
+) |> 
+  purrr::set_names(subset_ids)
+
+# get the list of top 200 genes from the metrics files
+metrics_files <- list.files(
+  subset_dirs,
+  pattern = "*_metaprograms-metrics.rds", 
+  recursive = TRUE, 
+  full.names = TRUE
+)|> 
+  purrr::set_names(subset_ids)
+```
+
+```{r}
+# we also need the full cohort 
+k_7_dir <- here::here("ews-nf-out", "metaprograms", "metaprograms-7_cnmf-5-10-15_filtered") 
+
+full_cohort_mp_file <- file.path(k_7_dir, "metaprograms.rds")
+full_cohort_metrics_file <- file.path(k_7_dir, "k-7_metaprograms-metrics.rds")
+```
+
+
+```{r}
+# read in the subset information and full cohort info
+subset_mp_list <- mp_object_files |> 
+  purrr::map(readr::read_rds)
+
+subset_metrics_list <- metrics_files |> 
+  purrr::map(readr::read_rds)
+
+full_cohort_mp_list <- readr::read_rds(full_cohort_mp_file)
+full_cohort_metrics_list <- readr::read_rds(full_cohort_metrics_file)
+```
+
+## Define functions 
+
+```{r shared-functions}
+# helper function to get all possible pairs for two lists
+# uses the names of each list to get the pairs 
+# expects a list of metaprograms where names are the names of the metaprograms
+get_pairs <- function(list1, list2){
+  
+  # get all possible mp pairs
+  pairs_df <- expand.grid(
+    subset_mp = names(list1),
+    full_mp = names(list2),
+    stringsAsFactors = FALSE
+  )
+  
+}
+
+# calculate significance for permutation testing
+# reports a pvalue for a specified statistic 
+calculate_permutation_significance <- function(
+    stat, 
+    observed_df, 
+    background_df, 
+    join_columns, 
+    nreps
+){
+  
+  # combine the observed values with the background
+  combined_df <- observed_df |> 
+    dplyr::select(
+      subset_mp,
+      full_mp,
+      obs_value = {{ stat }}
+    ) |> 
+    dplyr::left_join(background_df, by = join_columns) |> 
+    dplyr::select(-replicate)
+  
+  # calculate the pvalue for num genesets 
+  pvalue_df <- combined_df |> 
+    dplyr::mutate(
+      # indicate which rows have background > obs
+      greater_than_obs = {{ stat }} >= obs_value
+    ) |> 
+    dplyr::summarize(
+      # calculate p values and retain a column with the observed value
+      obs_value = unique(obs_value),
+      pvalue = (sum(greater_than_obs) +1)/(nreps + 1),
+      .by = c("subset_mp", "full_mp")
+    ) |> 
+    # add adjusted pvalue 
+    dplyr::mutate(
+      adj_pvalue = p.adjust(pvalue, method = "BH"),
+      is_significant = adj_pvalue <= 0.05
+    )
+  
+  return(pvalue_df)
+  
+}
+```
+
+
+```{r correlation-functions}
+
+# function to shuffle mp1 and calculate the correlation with mp2
+# each vector is a vector of gene weights and named with gene ids
+permute_metaprogram_correlation <- function(mp1, mp2, nreps = 1000) {
+  
+  # only consider genes that are in both
+  genes <- union(names(mp1), names(mp2))
+  
+  # make sure the order is the same
+  mp1 <- mp1[genes]
+  mp2 <- mp2[genes]
+  
+  replicate(
+    nreps,
+    # shuffle the gene weights and calculate the correlation
+    cor(sample(mp1), mp2, method = "pearson", use = "pairwise.complete.obs")
+  )
+}
+
+# for each subset, compare each metaprogram to every metaprogram in the full cohort
+# to get the observed calculation 
+# for all metaprograms in the subset, shuffle the gene weights and recalculate 
+# correlation to get a background distribution
+# calculate p value for each comparison
+metaprogram_correlation_test <- function(mps_subset, mps_full, nreps = 1000){
+  
+  # get all possible paris of subset and full cohort mps
+  pairs_df <- get_pairs(mps_subset, mps_full)
+  
+  # calculate the correlation for all possible pairs of metaprograms
+  obs_df <- pairs_df |>
+    dplyr::mutate(
+      correlation = purrr::map2_dbl(
+        subset_mp, full_mp,
+        \(x, y) {
+          
+          # get the actual metaprograms from the names stored in pairs_df
+          subset <- mps_subset[[x]]
+          full <- mps_full[[y]]
+          
+          # make sure metaprograms are in the right order and then calculate correlation
+          genes <- union(names(subset), names(full))
+          subset <- subset[genes]
+          full <- full[genes]
+          cor(subset, full, method = "pearson", use = "pairwise.complete.obs")
+          
+        }
+      )
+    )
+  
+  # get a background distribution for each combination of metaprograms 
+  background_df <- pairs_df |>
+    dplyr::mutate(
+      background_correlation = purrr::map2(
+        subset_mp, full_mp,
+        # shufle the subset mp and calculate correlation with full mp
+        \(x, y) permute_metaprogram_correlation(
+          mps_subset[[x]], 
+          mps_full[[y]],
+          nreps = nreps
+        )
+      )
+    ) |>
+    # get one row per replicate
+    tidyr::unnest_longer(background_correlation, values_to = "correlation", indices_to = "replicate")
+  
+  # calculate the pvalue for each combination
+  pvalue_df <- calculate_permutation_significance(
+    correlation, 
+    obs_df, 
+    background_df, 
+    join_columns = c("subset_mp", "full_mp"),
+    nreps
+    ) |>
+    dplyr::rename(correlation = obs_value) 
+  
+  return(list("pvalue" = pvalue_df, "background" = background_df))
+  
+}
+```
+
+```{r jaccard-functions}
+# helper function for getting the jaccard index between two vectors
+calc_jaccard <- function(vec1, vec2){
+  jaccard <- length(intersect(vec1, vec2)) / length(union(vec1, vec2))
+  return(jaccard)
+}
+
+# create a background distribution for jaccard index
+# grab random subsets of genes from the gene universe and calculate the overlap 
+# with the top 200 genes from each of the full mps 
+permute_jaccard <- function(subset_gene_universe, full_top_genes, nreps){
+  
+  background <- replicate(
+    nreps, {
+      
+      # get 200 genes randomly from the subset gene universe
+      subset_genes <- sample(subset_gene_universe, 200)
+      
+      # for each full mp calculate the jaccard between the random gene set
+      # and the top 200 genes for the full mp
+      full_top_genes |> 
+        purrr::imap(\(full_genes, mp){
+          
+          data.frame(
+            full_mp = mp,
+            jaccard = calc_jaccard(subset_genes, full_genes)
+          )
+        }) |> 
+        dplyr::bind_rows()
+    },
+    simplify = FALSE
+  ) |> 
+    dplyr::bind_rows(.id = "replicate")
+  
+  return(background)
+  
+}
+
+# here we calculate the overlap in the top 200 genes from the subset mp and the full mp 
+# to get a background distribution we randomly select 200 genes from the subset gene universe
+# and get the Jaccard between that random gene set and the observed full metaprogram 
+# we then calculate the empirical pvalue for each subset metaprogram compared to each full metaprogram
+top_genes_test <- function(subset_top_genes, subset_gene_universe, full_top_genes, nreps = 1000){
+  
+  # get all possible pairs of subset and full cohort mps
+  pairs_df <- get_pairs(subset_top_genes, full_top_genes)
+  
+  # get the obersved jaccard index for overlap of all possible combinations
+  obs_df <- pairs_df |>
+    dplyr::mutate(
+      jaccard = purrr::map2_dbl(
+        subset_mp, full_mp,
+        \(x, y) {
+          
+          subset <- subset_top_genes[[x]]
+          full <- full_top_genes[[y]]
+          
+          calc_jaccard(subset, full)
+          
+        }
+      )
+    )
+  
+  # generate a background distribution 
+  # only one per subset being tested
+  background_df <- permute_jaccard(subset_gene_universe, full_top_genes, nreps)
+  
+  # get the pvalue for each combination of subset and full mp
+  pvalue_df <- calculate_permutation_significance(
+    jaccard, 
+    obs_df, 
+    background_df, 
+    "full_mp", 
+    nreps
+  ) |>
+    dplyr::rename(jaccard = obs_value) 
+  
+  return(list("pvalue" = pvalue_df, "background" = background_df))
+  
+}
+```
+
+```{r plotting-functions}
+# helper function for plotting permutation results
+# plots background points with observed values in color on top as sina plot
+
+# for each subset make a faceted plot where the facets are the metaprograms in the full cohort 
+# the x axis is the metaprogram in the subset
+# the y axis is the correlation where both background and observed are shown 
+# color by significant or not significant 
+plot_permutation_results <- function(pvalue_df, background_df, x_axis, stat, subset_id){
+  
+  ggplot(background_df, aes(x = {{ x_axis }}, y = {{ stat }})) +
+    ggforce::geom_sina(
+      color = "gray",
+      alpha = 0.1
+    ) +
+    geom_point(
+      data = pvalue_df,
+      aes(
+        x = {{ x_axis }},
+        y = {{ stat }},
+        color = is_significant
+      ),
+      size  = 3,
+      shape = 18  # diamond
+    ) +
+    scale_color_manual(values = c(`TRUE` = "red", `FALSE` = "blue")) +
+    theme(
+      axis.text.x = element_text(angle = 90)
+    ) +
+    labs(
+      title = subset_id
+    )
+  
+}
+
+# make a heatmap with metaprograms from the full cohort on the x axis
+# metaprograms from the subset as rows and colored by a statistic (either correlation or jaccard)
+# significant observations are showmn with *
+plot_stat_heatmap <- function(pvalue_df, subset_id, stat){
+  
+  # create the matrix with the values for the specified stat
+  stat_mat <- pvalue_df |>
+    dplyr::select(full_mp, subset_mp, all_of(stat)) |>
+    tidyr::pivot_wider(names_from = full_mp, values_from = all_of(stat)) |>
+    tibble::column_to_rownames("subset_mp") |>
+    as.matrix()
+  
+  # get a matrix with significant text to overlap 
+  sig_mat <- pvalue_df |>
+    dplyr::mutate(label = dplyr::if_else(adj_pvalue <= 0.05, "*", "")) |>
+    dplyr::select(full_mp, subset_mp, label) |>
+    tidyr::pivot_wider(names_from = full_mp, values_from = label) |>
+    tibble::column_to_rownames("subset_mp") |>
+    as.matrix()
+  
+  # make sure the significance levels are in the right order
+  sig_mat <- sig_mat[rownames(stat_mat), colnames(stat_mat)]
+  
+  # build the heatmap
+  heatmap <- ComplexHeatmap::Heatmap(
+    stat_mat,
+    name = stat,
+    col  = circlize::colorRamp2(
+      c(0, max(stat_mat, na.rm = TRUE)),
+      c("white", "#B2182B")
+    ),
+    cell_fun = function(j, i, x, y, width, height, fill) {
+      if (sig_mat[i, j] == "*")
+        grid::grid.text("*", x, y, gp = grid::gpar(fontsize = 14, col = "black"))
+    },
+    column_title = "Full cohort metaprogram",
+    row_title  = "Subset metaprogram",
+    column_title_side = "bottom",
+    cluster_rows  = FALSE,
+    cluster_columns = FALSE,
+    row_names_gp = grid::gpar(fontsize = 10),
+    column_names_gp = grid::gpar(fontsize = 10),
+    border = TRUE
+  )
+  
+  # add an overall title with the subset id
+  ComplexHeatmap::draw(
+    heatmap,
+    column_title    = subset_id,
+    column_title_gp = grid::gpar(fontsize = 14, fontface = "bold")
+  )
+}
+
+```
+
+
+
+## Correlation of gene weights
+
+First we will calculate the correlation of all gene weights using Pearson correlation with pairwise complete observations. 
+To determine if the correlation is significantly greater than random chance, we will shuffle the gene weights for the subset metaprogram and re-calculate the correlation to each full metaprogram to create a null distribution. 
+This will be used to calculate an empirical pvalue. 
+
+
+```{r}
+# extract the metaprogram list from each object
+# this is a list of all metaprograms with a vector of gene weights
+all_subset_mps <- subset_mp_list |> 
+  purrr::map("metaprogram_list")
+
+# extract the full metaprogram list
+full_mps <- full_cohort_mp_list$metaprogram_list
+
+# calculate the correlation and test significance
+# returns a list of pvalue_df, background_df for each subset id
+all_correlation_list <- all_subset_mps |> 
+  purrr::map(\(subset_mps) metaprogram_correlation_test(subset_mps, full_mps))
+```
+
+The below plot shows the correlation of each subset metaprogram with each full metaprogram. 
+Each facet is a full metaprogram and the x axis of each plot is a subset metaprogram. 
+The grey dots indicate the background distribution and colored diamonds indicate the observed values. 
+
+```{r}
+#| fig.height: 7
+#| fig.width: 7
+
+# plot the background and observed values for each metaprogram combination 
+# facets are the metaprograms in the full cohort and then each metaprogram in the subset 
+# is shown on the x axis 
+all_correlation_list |> 
+  purrr::iwalk(\(results_list, id){
+    plot <- plot_permutation_results(
+      results_list$pvalue,
+      results_list$background,
+      subset_mp,
+      correlation,
+      id
+    ) + facet_wrap(vars(full_mp)) 
+    
+    print(plot)
+  })
+```
+
+This heatmap shows the observed correlation between the full metaprograms (columns) and the subset metaprogram (rows).
+The presence of * indicates the correlation is statistically significantly greater than random chance. 
+
+```{r}
+# make a heatmap where we color by correlation and label significant mps
+all_correlation_list |> 
+  purrr::map("pvalue") |> 
+  purrr::iwalk(\(df, id) plot_stat_heatmap(df, id, "correlation"))
+```
+
+In looking at this we see that pretty much all correlations > 0 are considered significant based on the background distribution. 
+This seems like we might be over estimating the amount of shared metaprograms, as I don't think we want to consider metaprograms with a correlation of 0.1 as shared. 
+We might want to think about using a cutoff instead of permutation testing here, like 0.5. 
+
+## Overlap of top 200 genes 
+
+Here we look at the overlap of the top 200 genes for each metaprogram using the Jaccard similarity index. 
+We calculate the observed Jaccard similarity index between each pair of subset and full metaprograms and compare that to a background distribution to see if the overlap is greater than random chance. 
+For each subset, we take the full gene set universe and grab random sets of 200 genes. 
+We then calculate the Jaccard index of that random set of genes with every metaprogram in the full cohort to get our background distribution.
+
+
+```{r}
+# extract the top 200 genes for each of the full cohort mps
+full_top_genes <- full_cohort_metrics_list$top_genes
+
+# get a list of gene universe for each subset
+subset_gene_universe_list <- subset_mp_list |> 
+  purrr::map("gene_universe")
+
+# top genes for each metaprogram for each subset
+all_subset_top_genes <- subset_metrics_list |> 
+  purrr::map("top_genes")
+```
+
+
+```{r}
+#| warning: FALSE 
+
+# note this causes a warning because each full mp has multiple matches for every pair with subset mp
+# test for jaccard index significance for each metaprogram within each subset
+jaccard_pvalue_df_list <- purrr::map2(
+  all_subset_top_genes,
+  subset_gene_universe_list,
+  \(top_genes, universe){
+    top_genes_test(top_genes, universe, full_top_genes)
+  }
+)
+```
+
+Since we are using the full gene set universe for each subset to construct the background, we will only have one background per full metaprogram for each subset ID rather than for each combination of subset metaprograms and full metaprograms. 
+We only show the full metaprogram on the x axis below and then each diamond indicates the observed value for a single metaprogram in the subset. 
+
+```{r}
+jaccard_pvalue_df_list |> 
+  purrr::iwalk(\(results_list, id){
+    plot <- plot_permutation_results(
+      results_list$pvalue,
+      results_list$background,
+      full_mp,
+      jaccard,
+      id
+    ) |> 
+      print()
+  })
+```
+
+The heatmap below shows only the observed values with the full metaprograms in columns and subset metaprograms in rows. 
+The * indicates the Jaccard index is significantly greater than random chance. 
+
+
+```{r}
+# heatmap looking at jaccard between every metaprogram in subset and full 
+# text indicates significant overlaps 
+jaccard_pvalue_df_list |> 
+  purrr::map("pvalue") |> 
+  purrr::iwalk(\(df, id) plot_stat_heatmap(df, id, "jaccard"))
+```
+
+Overall we see fewer significant overlaps than with correlation and we see values that are more consistent with what 
+I would expect to be a "significant" overlap. 
+But we do still see occasional significance for Jaccard indices less than 0.1, which seems like very minimal overlap. 
+I'm not sure I would want to call that "shared" so perhaps we also need a cutoff here? 
+
+
+## Combine metrics
+
+Ultimately we only want to keep metaprograms that are significant in both correlation and overlap. 
+For each subset, we want to count how many of the full metaprograms are recapitulated based on passing these criteria. 
+
+### Significance
+
+First we will count how many of the full metaprograms have at least one metaprogram in each subset that is significant for both correlation and Jaccard. 
+
+```{r}
+# combine all pvalue dfs from all subsets for correlation
+all_cor_df <- all_correlation_list |> 
+  purrr::map("pvalue") |> 
+  dplyr::bind_rows(.id = "subset_id") |> 
+  dplyr::rename(
+    cor_pvalue = pvalue,
+    cor_adj_pvalue = adj_pvalue,
+    cor_is_significant = is_significant
+  )
+
+# combine all pvalue dfs from all subsets for jaccard
+all_jaccard_df <- jaccard_pvalue_df_list |> 
+  purrr::map("pvalue") |> 
+  dplyr::bind_rows(.id = "subset_id") |> 
+  dplyr::rename(
+    jaccard_pvalue = pvalue,
+    jaccard_adj_pvalue = adj_pvalue,
+    jaccard_is_significant = is_significant
+  )
+
+# put everything together for filtering and counting
+all_results_df <- all_cor_df |> 
+  dplyr::left_join(all_jaccard_df, by = c("subset_id", "subset_mp", "full_mp"))
+```
+
+```{r}
+all_results_df |> 
+  # for each mp combo, is it shared? 
+  dplyr::mutate(
+    is_shared = cor_is_significant & jaccard_is_significant
+  ) |> 
+  # for each full mp in each subset is at least 1 mp shared? 
+  dplyr::summarize(
+    is_shared = any(is_shared),
+    .by = c("full_mp", "subset_id")
+  ) |> 
+  # count the total shared metaprograms for each subset
+  dplyr::summarize(
+    total_shared = sum(is_shared),
+    .by = c("subset_id")
+  )
+```
+
+Using this approach, we return all 7 metaprograms for 3 out of 4 subsets. 
+Although this may be real, I don't love allowing such low correlations and low Jaccard indices to be considered as "shared". 
+
+### Cutoff 
+
+As an alternative approach, we could define a minimum cutoff for each metric. 
+Here we could set a minimum and combine it with permutation testing, requiring metaprograms to be significant and meet a minimum threshold. 
+
+First, let's just look at the distribution of the observed correlation and Jaccard value for all possible pairs. 
+We can use this to define a cutoff for each value. 
+
+```{r}
+ggplot(all_cor_df, aes(x = subset_id, y = correlation)) + 
+  geom_boxplot()
+
+ggplot(all_jaccard_df, aes(x = subset_id, y = jaccard)) + 
+  geom_boxplot()
+```
+
+For correlation, I think saying anything above 0.5 is reasonable. 
+This is also consistent with how we measure correlation of metaprograms within a cohort in our original metrics. 
+
+For Jaccard, the values tend to be lower and closer to 0. 
+If we follow the same logic as correlation and pick something right around where the tail of the distribution starts, we might want to use something like 0.2. 
+For the 200 genes, a Jaccard index of ~0.3 indicates that 50% of the genes are shared and 0.6 indicates that 75% of the genes are shared, so I think we want to be somewhere in that range? 
+
+Let's see how many metaprograms are shared if we use a correlation cutoff of 0.5 and Jaccard cutoff of 0.3.
+
+```{r}
+all_results_df |> 
+  dplyr::mutate(
+    is_shared = cor_is_significant & jaccard_is_significant & correlation >= 0.5 & jaccard >= 0.3
+  ) |> 
+  dplyr::summarize(
+    is_shared = any(is_shared),
+    .by = c("full_mp", "subset_id")
+  ) |> 
+  dplyr::summarize(
+    total_shared = sum(is_shared),
+    .by = c("subset_id")
+  )
+```
+
+Now we see that for each of these subsets, only 5 of the metaprograms are shared. 
+Note that moving the cutoff up to 0.5 for Jaccard results in 3-4 shared metaprograms per subset. 
+
+## Session info
+
+```{r}
+sessionInfo()
+```
+
+
