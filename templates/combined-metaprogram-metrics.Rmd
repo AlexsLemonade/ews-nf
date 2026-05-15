@@ -1067,7 +1067,7 @@ rank_mtx <- combined_metrics_df |>
 
 ```{r}
 # first export the heatmap
-png(params$output_heatmap_file, width = 10, height = 7)
+png(params$output_heatmap_file, width = 1000, height = 700)
 
 # define a color scale
 col_fun <- circlize::colorRamp2(
