@@ -205,6 +205,7 @@ process combined_metaprogram_report {
   stub:
     """
     touch "combined-metaprograms-metrics.html"
+    touch "metrics-heatmap.png"
     OPTIMAL_K_VALUE=10
     """
 }
