@@ -17,14 +17,12 @@
 # num_spectra_per_mp: Number of spectra found in that metapgram
 # num_samples: Number of samples represented in the metaprogram
 # num_patients: Number of patients represented in the metaprogram
-# num_primary_samples: Number of samples with primary as disease_timing in the metaprogram
-# num_mets_samples: Number of samples with Metastasis as disease_timing in the metaprogram
-# num_recurrence_sample: Number of samples with Recurrence as disease_timing in the metaprogram
+# num_primary_samples: Number of samples with primary as tumor_type in the metaprogram
+# num_mets_samples: Number of samples with met as tumor_type in the metaprogram
 # proportion_of_samples: Proportion of the total samples represented in the metaprogram
 # proportion_of_patients: Proportion of the total patients represented in the metaprogram 
 # primary_sample_proportion: Proportion of all primary samples represented
 # mets_sample_proportion: Proportion of all metastatic samples represented
-# recurrence_sample_proportion: Proportion of all recurrence samples represented
 # shannon_entropy: shannon's entropy measuring relative abundance of samples in the metaprogram 
 # shannon_entropy_norm: Normalized shannon's entropy 
 # eff_number: Effective sample size 
@@ -58,7 +56,7 @@ calculate_sample_stats <- function(mp_clusters_df, total_samples, sample_df){
   total_patients <- length(unique(sample_df$participant_id))
   
   # how many of each disease timing
-  disease_timing_totals_df <- table(sample_df$disease_timing) |> 
+  tumor_type_totals_df <- table(sample_df$tumor_type) |> 
     as.data.frame() |> 
     tidyr::pivot_wider(
       names_from = c("Var1"),
@@ -75,24 +73,22 @@ calculate_sample_stats <- function(mp_clusters_df, total_samples, sample_df){
       num_spectra_per_sample = dplyr::n(), 
       # keep the participant and disease timing information for each sample
       participant_id = dplyr::first(participant_id),
-      disease_timing = dplyr::first(disease_timing),
+      tumor_type = dplyr::first(tumor_type),
       .groups = "drop_last") |>  
     # now calculate stats for each metaprogram, drop sample grouping 
-    dplyr::bind_cols(disease_timing_totals_df) |> 
+    dplyr::bind_cols(tumor_type_totals_df) |> 
     dplyr::summarize(
       # totals for each group (spectra, sample, patient, disease timing)
       num_spectra_per_mp = sum(num_spectra_per_sample),
       num_samples = length(sample_id),
       num_patients = length(unique(participant_id)),
-      num_primary_samples = sum(disease_timing == "Primary"),
-      num_mets_samples = sum(disease_timing == "Metastasis"),
-      num_recurrence_samples = sum(disease_timing == "Recurrence"),
+      num_primary_samples = sum(tumor_type == "primary"),
+      num_mets_samples = sum(tumor_type == "met"),
       # proportions of total for each category
       proportion_of_samples = num_samples / total_samples,
       proportion_of_patients = num_patients / total_patients,
-      primary_sample_proportion = num_primary_samples / unique(Primary),
-      mets_sample_proportion = num_mets_samples / unique(Metastasis), 
-      recurrence_sample_proportion = num_recurrence_samples / unique(Recurrence), 
+      primary_sample_proportion = num_primary_samples / unique(primary),
+      mets_sample_proportion = num_mets_samples / unique(met),
       # entropy and neff
       shannon_entropy = entropy(num_spectra_per_sample), # entropy
       shannon_entropy_norm = shannon_entropy / log(num_samples),# normalize by total possible samples in that mp
