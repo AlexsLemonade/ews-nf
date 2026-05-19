@@ -789,7 +789,7 @@ mean_scores_df <- score_df |>
   dplyr::left_join(
     dplyr::select(
       sample_df, 
-      c("scpca_sample_id", "participant_id", "tumor_type", "treatment_type")
+      c("scpca_sample_id", "participant_id", "tumor_type")
     ), 
     by = c("scpca_sample_id")
   ) |> 
