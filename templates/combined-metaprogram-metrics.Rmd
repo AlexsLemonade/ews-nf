@@ -363,7 +363,6 @@ mp_metrics_df |>
 ```
 
 
-TODO: Update this section to handle the new disease timing options 
 ### Representation across sample types 
 
 Here we will look at the contribution of different sample types to each of the metaprograms. 
