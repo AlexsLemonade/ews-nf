@@ -118,63 +118,6 @@ max_cell_score_correlation <- function(df){
   return(max_cor_df)
 }
 
-# helper function to calculate anova on a dataframe
-# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/08-cell-scoring-metrics.Rmd
-calculate_anova <- function(df, random_effect = NULL){
-  if (!is.null(random_effect)) {
-    # create formula with random effect
-    formula <- as.formula(glue::glue("log_mean_mp_score ~ disease_timing + (1 | {random_effect})"))
-    mod <- lmerTest::lmer(formula, data = df)
-    # Overall p-value for disease_timing (type III ANOVA)
-    anova_res <- anova(mod) |>
-      as.data.frame() |>
-      tibble::rownames_to_column("term")
-  } else {
-    # no random effect so use a regular ANOVA
-    mod <- lm(log_mean_mp_score ~ disease_timing, data = df)
-    anova_res <- anova(mod) |>
-      as.data.frame() |>
-      tibble::rownames_to_column("term") |>
-      dplyr::filter(term != "Residuals")
-  }
-  
-  return(anova_res)
-}
-
-# ANOVA test with/without random effect on log(mean mp score)
-# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/08-cell-scoring-metrics.Rmd
-grouped_anova <- function(data, sig_value, random_effect = NULL) {
-  
-  # for each metaprogram for each value of k, use a linear mixed effect model 
-  # then use ANOVA to calculate pvalues 
-  anova_results <- data |>
-    dplyr::group_by(metaprogram, n_metaprograms) |>
-    # using a lambda function requires two arguments
-    # can use ... to absorb the second one
-    dplyr::group_modify(\(df, ...) {
-      calculate_anova(df, random_effect)
-    }) |>
-    # classify as significant or not
-    dplyr::rename(f_value = `F value`, p_value = `Pr(>F)`) |>
-    dplyr::mutate(
-      p_adj = p.adjust(p_value, method = "BH"),
-      p_adj_signif = dplyr::if_else(p_adj <= sig_value, "*", "ns")
-    ) 
-  
-  full_results <- anova_results |>
-    # join with data/scores for plotting 
-    dplyr::left_join(
-      data |>
-        # we'll plot with zscore so want to use that to determine the y position of the label
-        dplyr::summarize(
-          max_mean_score = max(zscore_mean_mp_score, na.rm = TRUE),
-          .by = c("n_metaprograms", "metaprogram")
-        )
-    )
-  
-  return(full_results)
-}
-
 # calculate significance for permutation testing
 # reports a pvalue for a specified statistic 
 # copied from https://github.com/AlexsLemonade/ews-nf/blob/main/modules/metaprograms/resources/usr/bin/04-metaprogram-metrics.R
@@ -337,9 +280,6 @@ background_df <- background_df_list |>
 # read in sample metadata
 sample_df <- readr::read_tsv(params$sample_metadata_file, col_types = "c")
 
-# define palette for disease timings shown here
-disease_timing_palette <- c(Primary = "#6A9FC0", Metastasis = "#C47A8A", Recurrence = "#5A9E82")
-
 # set figure heights based on if we have the smaller set of ks (5-15) 
 # or the larger set of ks (5-25)
 total_k <- length(n_metaprograms)
@@ -422,26 +362,23 @@ mp_metrics_df |>
   DT::formatPercentage("min_proportion_patients_per_mp")
 ```
 
-<!--
-TODO: Update this section to handle the new disease timing options 
+
 ### Representation across sample types 
 
 Here we will look at the contribution of different sample types to each of the metaprograms. 
-Particularly, we will see how many of the samples are from primary, metastatic, or recurrent samples within each metaprogram. 
--->
+Particularly, we will see how many of the samples are from primary or metastatic sites within each metaprogram. 
 
 ```{r}
-#| eval: FALSE
-disease_timing_df <- mp_metrics_df |> 
+sample_type_df <- mp_metrics_df |> 
   tidyr::pivot_longer(
-    cols = c("num_primary_samples", "num_mets_samples", "num_recurrence_samples"),
+    cols = c("num_primary_samples", "num_mets_samples"),
     names_to = "sample_type", 
     values_to = "count"
   ) |> 
   dplyr::mutate(
     proportion = count/ num_samples,
     sample_type = stringr::word(sample_type, 2, sep = "_") |> 
-      factor(labels = c("Primary", "Metastasis", "Recurrence"))
+      factor(labels = c("Primary", "Metastasis"))
   ) |> 
   dplyr::select(n_metaprograms, metaprogram, proportion, sample_type)
 ```
@@ -449,12 +386,11 @@ disease_timing_df <- mp_metrics_df |>
 ```{r}
 #| fig.height: !r dynamic_fig_height
 #| fig.width: 15
-#| eval: FALSE
 
-ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
+ggplot(sample_type_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
   geom_col(width = 0.7) +
   facet_wrap(vars(n_metaprograms), scales = "free_x", ncol = 4) +
-  scale_fill_manual(values = disease_timing_palette) +
+  scale_fill_manual(values = c(Primary = "#6A9FC0", Metastasis = "#C47A8A")) +
   scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, 0.02))) +
   labs(
     x    = "Metaprogram",
@@ -891,94 +827,6 @@ cv_sig_df <- cv_pvalue_df |>
 cv_sig_df |> 
   DT::datatable(colnames = c("k", "Number of metaprograms with significant CV", "% of metaprograms with significant CV")) |> 
   DT::formatPercentage("proportion_significant_cv", 2)
-```
-
-<!--
-TODO: Update this section to use the new disease timning or tumore type column
-Remove eval:FALSE statements
-### Comparison of scores across sample types 
-
-Here we look at the distribution of cell scores across varying sample types (primary, metastatic, and recurrent tumors). 
-First, we calculate the mean score for each metaprogram for each sample. 
-As the scores are skewed towards zero, we log-transform the scores before calculating any statistics. 
-We then compare scores to determine if any metaprograms show significantly different distributions across sample types. 
-For the statistical test, we use a linear mixed model with patient as the random effect to account for within-patient correlation that is likely observed in samples of different sample types from the same patient. 
-
-For visualization purposes, we calculate a z-score for all `log(mean(scores))` within each metaprogram and display that in the box plot below.
-The significance of the comparison among the three sample types is shown above the distributions for that metaprogram with `*` indicating that the distributions are significantly different from each other and `ns` indicating the distributions are not significantly different from each other. 
-
-**Caution:** This information will not be used to decide on the value of k, but can be helpul to determine if any of the identified metaprograms may be biologically relevant. 
-Because we summarize scores for all cells in a sample, this does not tell us anything about the heterogeneity of scores within a sample. 
-Further analysis is needed to look at individual cell populations that is outside the scope of the analysis done here.
---> 
-
-```{r}
-#| eval: FALSE
-mean_scores_df <- scores_df |> 
-  dplyr::summarize(
-    mean_mp_score = mean(mp_score),
-    .by = c("unique_id", "metaprogram", "n_metaprograms")
-  ) |> 
-  dplyr::mutate(
-    scpca_sample_id = stringr::word(unique_id, -1, sep = "-"),
-    # first log transform
-    log_mean_mp_score = log(mean_mp_score)
-  ) |>
-  # z-score the log scores within each k and metaprogram
-  # use these for plotting
-  dplyr::mutate(
-    zscore_mean_mp_score = scale(log_mean_mp_score), 
-    .by = c("metaprogram", "n_metaprograms")
-  ) |> 
-  # add in the sample metadata including disease timing and patient information 
-  dplyr::left_join(
-    dplyr::select(
-      sample_df, 
-      c("scpca_sample_id", "participant_id", "disease_timing")
-    ), 
-    by = c("scpca_sample_id")
-  )
-```
-
-```{r}
-#| message: FALSE 
-#| eval: FALSE
-# calculate anova with random effect
-random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value, random_effect = "participant_id")
-```
-
-```{r}
-#| fig.height: !r dynamic_fig_height
-#| fig.width: 15
-#| eval: FALSE
-
-# plot the scores fore ach sample type and indicate the significance
-ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = disease_timing)) +
-  geom_boxplot(outlier.size = 0.1) +
-  geom_text(
-    data = random_effect_lmm_results,
-    color = "red",
-    aes(x = metaprogram, y = max_mean_score + 0.3, label = p_adj_signif),
-    inherit.aes = FALSE
-  ) +
-  scale_fill_manual(values = disease_timing_palette) +
-  facet_wrap(
-    vars(n_metaprograms), 
-    scales = "free",
-     ncol = 3
-   ) +
-  labs(
-    title = "ANOVA with patient as random effect",
-    fill = "Sample type",
-    x = "Metaprogram",
-    y = "Z-score computed from mean metaprogram score per sample"
-  ) +
-  theme(
-    axis.title = element_text(size = 14),
-    strip.text = element_text(size = 14),
-    legend.title = element_text(size = 14),
-    legend.text = element_text(size = 14)
-  )
 ```
 
 ## Combining metrics to identify an optimal value of k

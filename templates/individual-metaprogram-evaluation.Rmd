@@ -9,9 +9,9 @@ output:
     number_sections: false
     code_folding: hide
 params:
-  metaprograms_object_file: "../ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/metaprograms.rds"
-  metaprograms_metrics_file: "../ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k-11_metaprograms-metrics.rds"
-  combined_scores_file: "../ews-nf-out/metaprograms/metaprograms-11_cnmf-5-10-15_filtered/k-11_metaprogram_scores.tsv"
+  metaprograms_object_file: "../ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/metaprograms.rds"
+  metaprograms_metrics_file: "../ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k-7_metaprograms-metrics.rds"
+  combined_scores_file: "../ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k-7_metaprogram_scores.tsv.gz"
   category_file: "../genesets/gene-set-categories.tsv"
   sample_metadata_file: "../sample-info/sample-metadata.tsv"
 ---
@@ -119,18 +119,18 @@ dotplot <- function(df, title = NULL) {
 
 # helper function to calculate anova on a dataframe
 # copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/08-cell-scoring-metrics.Rmd
-calculate_anova <- function(df, random_effect = NULL){
+calculate_anova <- function(df, stat_column, random_effect = NULL){
   if (!is.null(random_effect)) {
     # create formula with random effect
-    formula <- as.formula(glue::glue("log_mean_mp_score ~ disease_timing + (1 | {random_effect})"))
+    formula <- as.formula(glue::glue("log_mean_mp_score ~ {stat_column} + (1 | {random_effect})"))
     mod <- lmerTest::lmer(formula, data = df)
-    # Overall p-value for disease_timing (type III ANOVA)
+    # Overall p-value for stat (type III ANOVA)
     anova_res <- anova(mod) |>
       as.data.frame() |>
       tibble::rownames_to_column("term")
   } else {
     # no random effect so use a regular ANOVA
-    mod <- lm(log_mean_mp_score ~ disease_timing, data = df)
+    mod <- lm(log_mean_mp_score ~ stat_column, data = df)
     anova_res <- anova(mod) |>
       as.data.frame() |>
       tibble::rownames_to_column("term") |>
@@ -142,7 +142,7 @@ calculate_anova <- function(df, random_effect = NULL){
 
 # ANOVA test with/without random effect on log(mean mp score)
 # copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/08-cell-scoring-metrics.Rmd
-grouped_anova <- function(data, sig_value, random_effect = NULL) {
+grouped_anova <- function(data, sig_value, stat_column, random_effect = NULL) {
   
   # for each metaprogram for each value of k, use a linear mixed effect model 
   # then use ANOVA to calculate pvalues 
@@ -151,7 +151,7 @@ grouped_anova <- function(data, sig_value, random_effect = NULL) {
     # using a lambda function requires two arguments
     # can use ... to absorb the second one
     dplyr::group_modify(\(df, ...) {
-      calculate_anova(df, random_effect)
+      calculate_anova(df, stat_column, random_effect)
     }) |>
     # classify as significant or not
     dplyr::rename(f_value = `F value`, p_value = `Pr(>F)`) |>
@@ -203,7 +203,7 @@ options(
 set.seed(2026)
 
 # define palette for disease timings shown in the report
-disease_timing_palette <- c(Primary = "#6A9FC0", Metastasis = "#C47A8A", Recurrence = "#5A9E82")
+tumor_type_palette <- c(Primary = "#6A9FC0", Metastasis = "#C47A8A")
 ```
 
 
@@ -480,32 +480,28 @@ ggplot(mp_prop_df, aes(x = p, y = metaprogram, fill = sample_id)) +
   )
 ```
 
-<!-- TODO: update this section to account for new disease timing options
 We can also look at the proportion of each sample type represented in each metaprogram. 
--->
 
 ```{r}
-#| eval: FALSE
 # copied from https://github.com/AlexsLemonade/ews-nf/blob/main/templates/combined-metaprogram-metrics.Rmd
-disease_timing_df <- mp_metrics_df |> 
+sample_type_df <- mp_metrics_df |> 
   tidyr::pivot_longer(
-    cols = c("num_primary_samples", "num_mets_samples", "num_recurrence_samples"),
+    cols = c("num_primary_samples", "num_mets_samples"),
     names_to = "sample_type", 
     values_to = "count"
   ) |> 
   dplyr::mutate(
     proportion = count/ num_samples,
     sample_type = stringr::word(sample_type, 2, sep = "_") |> 
-      factor(labels = c("Primary", "Metastasis", "Recurrence"))
+      factor(labels = c("Primary", "Metastasis"))
   ) |> 
   dplyr::select(metaprogram, proportion, sample_type)
 ```
 
 ```{r}
-#| eval: FALSE
-ggplot(disease_timing_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
+ggplot(sample_type_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
   geom_col(width = 0.7) +
-  scale_fill_manual(values = disease_timing_palette) +
+  scale_fill_manual(values = tumor_type_palette) +
   scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, 0.02))) +
   labs(
     x    = "Metaprogram",
@@ -760,23 +756,18 @@ ggplot(score_df,
   )
 ```
 
-<!--TODO: Update this to account for new disease timing
 ### Comparison of scores across sample types
 
-Here we look at the distribution of cell scores across varying sample types (primary, metastatic, and recurrent tumors). 
+Here we look at the distribution of cell scores across varying sample types (primary or metastatic). 
 First, we calculate the mean score for each metaprogram for each sample. 
 As the scores are skewed towards zero, we log-transform the scores before calculating any statistics. 
 We then compare scores to determine if any metaprograms show significantly different distributions across sample types. 
 For the statistical test, we use a linear mixed model with patient as the random effect to account for within-patient correlation that is likely observed among different sample types from the same patient. 
 
 For visualization purposes, we calculate a z-score for all `log(mean(scores))` within each metaprogram and display that in the box plot below.
-The significance of the comparison among the three sample types is shown above the distributions for that metaprogram with `*` indicating that the distributions are significantly different from each other and `ns` indicating the distributions are not significantly different from each other. 
---> 
+The significance of the comparison among the sample types is shown above the distributions for that metaprogram with `*` indicating that the distributions are significantly different from each other and `ns` indicating the distributions are not significantly different from each other. 
 
 ```{r}
-#| eval: FALSE 
-# copied from https://github.com/AlexsLemonade/ews-nf/blob/main/templates/combined-metaprogram-metrics.Rmd
-# adapted to not consider n_metaprograms since here we just have one value of k 
 
 mean_scores_df <- score_df |> 
   dplyr::summarize(
@@ -798,23 +789,29 @@ mean_scores_df <- score_df |>
   dplyr::left_join(
     dplyr::select(
       sample_df, 
-      c("scpca_sample_id", "participant_id", "disease_timing")
+      c("scpca_sample_id", "participant_id", "tumor_type")
     ), 
     by = c("scpca_sample_id")
+  ) |> 
+  dplyr::mutate(
+    # rename to match palette colors
+    tumor_type = dplyr::case_when(
+      tumor_type == "primary" ~ "Primary",
+      tumor_type == "met" ~ "Metastasis",
+      .default = tumor_type
+    )
   )
 ```
 
 ```{r}
 #| message: FALSE 
-#| eval: FALSE
 # calculate anova with random effect
-random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value = 0.05, random_effect = "participant_id")
+random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value = 0.05, stat_column = "tumor_type", random_effect = "participant_id")
 ```
 
 ```{r}
-#| eval: FALSE 
 # plot the scores fore ach sample type and indicate the significance
-ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = disease_timing)) +
+ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = tumor_type)) +
   geom_boxplot(outlier.size = 0.1) +
   geom_text(
     data = random_effect_lmm_results,
@@ -822,7 +819,7 @@ ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = dis
     aes(x = metaprogram, y = max_mean_score + 0.3, label = p_adj_signif),
     inherit.aes = FALSE
   ) +
-  scale_fill_manual(values = disease_timing_palette) +
+  scale_fill_manual(values = tumor_type_palette) +
   labs(
     title = "ANOVA with patient as random effect",
     fill = "Sample type",
