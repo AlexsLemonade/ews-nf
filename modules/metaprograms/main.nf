@@ -182,7 +182,7 @@ process combined_metaprogram_report {
   output:  
     tuple val(subset_id),
           env("OPTIMAL_K_VALUE"), 
-          path("metrics-heatmap.png"),
+          path("metrics-heatmap.pdf"),
           path("combined-metaprograms-metrics.html")
   script:
     def metrics_file_string = metrics_files.join(',')
@@ -195,7 +195,7 @@ process combined_metaprogram_report {
                     scores_file_list = '${scores_file_string}', \
                     background_scores_file_list = '${background_scores_files_string}', \
                     sample_metadata_file = '${params.sample_metadata_file}', \
-                    output_heatmap_file = 'metrics-heatmap.png', \
+                    output_heatmap_file = 'metrics-heatmap.pdf', \
                     output_k_file = 'optimal_k_value.txt', \
                     seed = '${params.seed}'))"
 
@@ -205,7 +205,7 @@ process combined_metaprogram_report {
   stub:
     """
     touch "combined-metaprograms-metrics.html"
-    touch "metrics-heatmap.png"
+    touch "metrics-heatmap.pdf"
     OPTIMAL_K_VALUE=10
     """
 }
