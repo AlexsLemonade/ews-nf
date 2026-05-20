@@ -21,10 +21,10 @@ mp_metrics_file <- file.path(data_dir, "k-7_metaprograms-metrics.rds")
 mp_palette_file <- file.path(manuscript_dir, "palettes", "metaprogram-palette.tsv")
 
 # output files 
-png_dir <- file.path(manuscript_dir, "figures", "pngs")
-cor_heatmap_png_file <- file.path(png_dir, "metaprogram-cor-heatmap.png")
+pdf_dir <- file.path(manuscript_dir, "figures", "pdfs")
+cor_heatmap_pdf_file <- file.path(pdf_dir, "metaprogram-cor-heatmap.pdf")
 
-ora_heatmap_png_file <- file.path(png_dir, "metaprogram-ora-genesets-heatmap.png")
+ora_heatmap_pdf_file <- file.path(pdf_dir, "metaprogram-ora-genesets-heatmap.pdf")
 
 # Correlation ------------------------------------------------------------------
 
@@ -50,7 +50,7 @@ tree <- hclust(dist_mtx, method = "ward.D2")
 dend <- as.dendrogram(tree)
 
 # export the heatmap
-png(cor_heatmap_png_file, width = 400, height = 400)
+pdf(cor_heatmap_pdf_file, width = 6, height = 6)
 
 ComplexHeatmap::Heatmap(
   cor_mtx, 
@@ -108,7 +108,7 @@ ora_ht <- ComplexHeatmap::Heatmap(
   )
 ) 
 
-png(ora_heatmap_png_file, width = 1000, height = 1000)
+pdf(ora_heatmap_pdf_file, width = 15, height = 13)
 
 ora_ht |> 
   # don't cut off super long gene set names
