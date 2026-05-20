@@ -44,6 +44,9 @@ jobs:
       - name: Check Nextflow workflow for nmf metaprograms with subset mode 
         run: nextflow -log stub-run.log run main.nf --workflow nmf_metaprograms -stub -profile stub -ansi-log false --subset_mode
 
+      - name: Check Nextflow workflow for shared metaprograms
+        run: nextflow -log stub-run.log run main.nf --workflow shared_metaprograms -stub -profile stub -ansi-log false
+        
       - name: Upload nextflow log
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
