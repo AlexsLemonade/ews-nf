@@ -41,6 +41,9 @@
 # score_sces: Boolean indicating whether to score and annotate sces with the optimal value of k, default is 0 (false)
 #  to score and annotate sces, use --score_sces 1
 # ews_dir: Path to the ews-nf repo, default is $HOME/ews-nf
+# skip_metaprogram_generation: Used to skip the nmf_metaprograms workflow, used to run just the shared_metaprograms workflow
+#  This will compare the metaprgams across subsets without regenerating the metaprograms
+
 
 # To submit this script use the following example:
 # sbatch slurm-submit.sh
@@ -142,22 +145,34 @@ else
     score_sces_flag=""
 fi
 
-# run ews-nf workflow with specified parameters
-nextflow run "$ews_dir/main.nf" \
-  -profile "pitt_htc" \
-  --workflow nmf_metaprograms \
-  -work-dir "$workdir" \
-  --scpca_nf_dir "$scpca_nf_dir" \
-  --outdir "$outdir" \
-  --k_components_lower $k_components_lower \
-  --k_components_upper $k_components_upper \
-  --k_step_size $k_step_size \
-  --cnmf_k_range $cnmf_k_range \
-  --n_metaprograms $n_metaprograms \
-  $sample_flag \
-  $cnmf_flag \
-  $filter_spectra_flag \
-  $score_sces_flag \
-  $subset_mode_flag \
-  $subset_id_flag
-  
+if [[ $skip_metaprogram_generation -eq 1 ]]; then 
+    # run ews-nf workflow with specified parameters
+    nextflow run "$ews_dir/main.nf" \
+      -profile "pitt_htc" \
+      --workflow nmf_metaprograms \
+      -work-dir "$workdir" \
+      --scpca_nf_dir "$scpca_nf_dir" \
+      --outdir "$outdir" \
+      --k_components_lower $k_components_lower \
+      --k_components_upper $k_components_upper \
+      --k_step_size $k_step_size \
+      --cnmf_k_range $cnmf_k_range \
+      --n_metaprograms $n_metaprograms \
+      $sample_flag \
+      $cnmf_flag \
+      $filter_spectra_flag \
+      $score_sces_flag \
+      $subset_mode_flag \
+      $subset_id_flag
+fi 
+
+if [[ $subset_mode -eq 1 ]]; then 
+    # run shared metaprograms workflow
+    nextflow run "$ews_dir/main.nf" \
+      -profile "pitt_htc" \
+      --workflow shared_metaprograms \
+      -work-dir "$workdir" \
+      --scpca_nf_dir "$scpca_nf_dir" \
+      --outdir "$outdir" 
+fi
+   
