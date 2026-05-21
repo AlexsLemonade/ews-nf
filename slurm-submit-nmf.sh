@@ -86,6 +86,9 @@ score_sces=${score_sces:-0}
 # turn on subset mode to run individual subsets instead of the full cohort
 subset_mode=${subset_mode:-0}
 subset_ids=${subset_ids:-""}
+# skip metaprogram generation and just calculate shared metrics 
+# only useful if subset_mode is 1
+skip_metaprogram_generation=${skip_metaprogram_generation:-0}
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
