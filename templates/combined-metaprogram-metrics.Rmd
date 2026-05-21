@@ -290,6 +290,34 @@ if (total_k <= 12) {
 }
 ```
 
+```{r}
+# check for any k's that have at least one metaprogram with only one spectra in it
+k_to_remove <- mp_metrics_df |> 
+  dplyr::filter(num_spectra_per_mp == 1) |> 
+  dplyr::pull(n_metaprograms) |> 
+  unique()
+
+knitr::asis_output(
+  glue::glue("The following values of k have at least one metaprogram with only one spectra and will be removed from further analysis:
+             {paste0(k_to_remove, collapse = ', ')}
+             "
+  )
+)
+
+
+
+# now filter all the stats dataframes to remove those k from the rest of the notebook 
+mp_metrics_df <- mp_metrics_df |> 
+  dplyr::filter(!n_metaprograms %in% k_to_remove)
+
+scores_df <- scores_df |> 
+  dplyr::filter(!n_metaprograms %in% k_to_remove)
+
+background_df <- background_df |> 
+  dplyr::filter(!n_metaprograms %in% k_to_remove)
+```
+
+
 
 ## Sample and patient diversity 
 
