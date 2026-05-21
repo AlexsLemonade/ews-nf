@@ -66,7 +66,9 @@ home_dir="/vast/acillo/$USER"
 
 # set defaults for all arguments
 sample_ids=""
-scpca_nf_dir="$home_dir/scpca-nf-out"
+# default project id is SCPCP000026
+# to run other projects that might be present update this at the command line
+scpca_nf_dir="$home_dir/scpca-nf-out/SCPCP000026"
 outdir="$home_dir/ews-nf-out"
 workdir="$home_dir/work"
 
