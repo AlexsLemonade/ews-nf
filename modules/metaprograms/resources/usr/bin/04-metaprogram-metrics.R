@@ -435,9 +435,7 @@ stopifnot(
 mp_object <- readr::read_rds(opt$metaprograms_file)
 
 # read in sample metadata
-sample_df <- readr::read_tsv(opt$sample_metadata_file) |> 
-  # keep sample id and then other columns to look at distribution within metaprograms
-  dplyr::select(scpca_sample_id, participant_id, disease_timing, tumor_type)
+sample_df <- readr::read_tsv(opt$sample_metadata_file)
 
 # read in custom gene lists and EF msigdb gene sets to use for ORA
 ef_msigdb_df <- readr::read_tsv(opt$msigdb_geneset_file)
