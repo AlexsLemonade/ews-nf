@@ -1,0 +1,69 @@
+---
+title: "Enrichment of neural crest lineage in EwS metaprograms"
+author: "Ally Hawkins"
+date: "`r Sys.Date()`"
+output: html_notebook
+---
+
+In this notebook, we'll check to see if there is any enrichment of the neural crest lineage in the metaprograms found in the full cohort. 
+To do this, we'll use the `NCC_like_signature` gene set derived from Dusan in Adam Shlien's lab. 
+Below is the provided description of the gene set: 
+
+> As mentioned, it was derived from differential expression analysis comparing cells before and after neural crest induction across multiple studies (13 in total). I filtered the DEGs and selected the top 250 for the gene set.
+
+```{r}
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+
+ncc_file <- here::here("genesets/NCC_like_signature.gmt")
+
+ncc_sig_symbols <- fgsea::gmtPathways(ncc_file)$NCC_MARKERS_250
+
+sce_file <- here::here("scpca-nf-out/SCPCP000026/SCPCS000841/SCPCL001228-SCPCS000841_processed.rds")
+sce <- readr::read_rds(sce_file)
+
+ncc_sig_ids <- rowData(sce) |>
+  as.data.frame() |> 
+  dplyr::filter(gene_symbol %in% ncc_sig_symbols) |> 
+  dplyr::pull(gene_ids)
+```
+
+```{r}
+mp_dir <- here::here("ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered")
+mp_file <- file.path(mp_dir, "metaprograms.rds")
+mp_obj <- readr::read_rds(mp_file)
+
+mp_metrics_file <- file.path(mp_dir, "k-7_metaprograms-metrics.rds")
+mp_metrics_obj <- readr::read_rds(mp_metrics_file)
+```
+
+```{r}
+term2gene_df <- data.frame(
+  term = "NCC_like_signature",
+  gene = ncc_sig_ids
+)
+
+term2gene_df <- rbind(
+  data.frame(term = "NCC_like_signature", gene = ncc_sig_ids),
+  data.frame(term = "universe", gene = mp_obj$gene_universe)
+)
+
+# run ORA using the top 200 genes
+ora_results <- mp_metrics_obj$top_genes |> 
+  purrr::map(\(genes){
+    clusterProfiler::enricher(
+      gene = genes,
+      universe = mp_obj$gene_universe,
+      TERM2GENE = term2gene_df
+    )
+  })
+
+# combine ora results into a single dataframe
+# only include genesets with pvalue < 0.05, the default by enricher 
+ora_results_df <- ora_results |> 
+  purrr::map(\(ora) ora@result ) |> 
+  purrr::list_rbind(names_to = "metaprogram")
+```
+
+
+
