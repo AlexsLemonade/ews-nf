@@ -320,7 +320,7 @@ background_df <- background_df |>
 ```{r}
 # account for the fact that sample types might not be present
 # use this to skip any chunks that are sample type specific 
-has_sample_types <- c("num_primary_samples", "num_mets_samples") %in% colnames(mp_metrics_df)
+has_sample_types <- all(c("num_primary_samples", "num_mets_samples") %in% colnames(mp_metrics_df))
 ```
 
 

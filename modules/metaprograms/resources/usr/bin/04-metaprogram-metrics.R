@@ -57,7 +57,7 @@ calculate_sample_stats <- function(mp_clusters_df, total_samples, sample_df){
   
   # df with one row per mp 
   # calculates total spectra, entropy, norm entropy, eff species size
-  mp_entropy_df <-  mp_clusters_df <- mp_clusters_df |> 
+  mp_entropy_df <-  mp_clusters_df |> 
     dplyr::left_join(sample_df, by = c("sample_id" = "scpca_sample_id")) |> 
     dplyr::group_by(metaprogram, sample_id) |>
     # first get total spectra per sample
