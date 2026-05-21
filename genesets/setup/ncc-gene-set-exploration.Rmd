@@ -1,0 +1,126 @@
+---
+title: "Enrichment of neural crest lineage in EwS metaprograms"
+author: "Ally Hawkins"
+date: "`r Sys.Date()`"
+output: html_notebook
+---
+
+In this notebook, we'll check to see if there is any enrichment of the neural crest lineage in the metaprograms found in the full cohort. 
+To do this, we'll use the `NCC_like_signature` gene set derived from Dusan in Adam Shlien's lab. 
+Below is the provided description of the gene set: 
+
+> As mentioned, it was derived from differential expression analysis comparing cells before and after neural crest induction across multiple studies (13 in total). I filtered the DEGs and selected the top 250 for the gene set.
+
+```{r}
+# libraries needed for mapping gene symbols
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+```
+
+
+```{r}
+# input files
+ncc_file <- here::here("genesets/NCC_like_signature.gmt")
+
+# full set of metaprograms, need this to grab the gene universe
+mp_dir <- here::here("ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered")
+mp_file <- file.path(mp_dir, "metaprograms.rds")
+
+# metrics file needed to grab the top 200 genes for each mp
+mp_metrics_file <- file.path(mp_dir, "k-7_metaprograms-metrics.rds")
+
+# custom gene set tsv, will append the NCC gene set to this file 
+custom_geneset_file <- here::here("genesets/custom-gene-sets.tsv")
+```
+
+```{r}
+# read in objects
+mp_obj <- readr::read_rds(mp_file)
+mp_metrics_obj <- readr::read_rds(mp_metrics_file)
+```
+
+```{r}
+# read in gene set 
+ncc_sig_symbols <- fgsea::gmtPathways(ncc_file)$NCC_MARKERS_250
+
+# convert to ensembl ids
+ncc_sig_ids <-mapIds(
+  org.Hs.eg.db, 
+  keys = ncc_sig_symbols, 
+  column = "ENSEMBL", 
+  keytype = "SYMBOL", 
+  multiVals = "first"
+)
+```
+
+
+```{r}
+# construct term 2 gene df
+# add in universe because it looks like the "universe" isn't actually respected by clusterProfiler::enricher 
+# see https://github.com/YuLab-SMU/clusterProfiler/issues/283
+# the options solution presented doesn't work for `enricher` only `enrichGO`
+term2gene_df <- dplyr::bind_rows(
+  data.frame(term = "NCC_like_signature", gene = ncc_sig_ids),
+  data.frame(term = "universe", gene = mp_obj$gene_universe)
+)
+
+# run ORA using the top 200 genes
+ora_results <- mp_metrics_obj$top_genes |> 
+  purrr::map(\(genes){
+    clusterProfiler::enricher(
+      gene = genes,
+      universe = mp_obj$gene_universe,
+      TERM2GENE = term2gene_df
+    )
+  }) |> 
+  # get rid of any metaprograms that have 0 genes in the NCC signature
+  purrr::compact()
+```
+
+
+```{r}
+# combine ora results into a single dataframe and print out results
+ora_results |> 
+  purrr::map(\(ora) ora@result ) |> 
+  purrr::list_rbind(names_to = "metaprogram") |> 
+  # filter to only those that are significant
+  dplyr::filter(p.adjust <= 0.05) |> 
+  dplyr::arrange(p.adjust)
+```
+
+
+It looks like there might be some enrichment in 3 out of 7 of our metaprograms. 
+Interestingly, MP03 has the lowest pvalue and that corresponds to the EWS::FLI1 low cells, which have been published to be the drivers of the EMT-like phenotype. 
+
+From Dusan: 
+
+> In terms of what I was hoping to look at in the Sean Karl cohort, the main idea is to see whether this signature is enriched in any of the existing metaprograms, and how it correlates with the fusion-high and -low signatures in the dataset. In our data, it was upregulated in the more aggressive tumour group, so I am also curious about its expression between the paired samples in the dataset.
+
+We should include this gene set in our overall gene set analysis and see if it still pops up as significant in any of these metaprograms. 
+
+```{r}
+# read in custom gene set file
+custom_geneset_df <- readr::read_tsv(custom_geneset_file, col_types = list(.default = "c"))
+
+# make a data frame with the rows for ncc sig to add to custom gene set file
+ncc_sig_df <- data.frame(
+  geneset = "neural_crest_cell_like_signature",
+  gene_symbol = ncc_sig_symbols,
+  ensembl_gene_id = ncc_sig_ids
+)
+
+# only add it if not already present
+# prevents duplication if we rerun this notebook
+if(!"neural_crest_cell_like_signature" %in% unique(custom_geneset_df$geneset)){
+  # combine and export 
+  dplyr::bind_rows(custom_geneset_df, ncc_sig_df) |> 
+    readr::write_tsv(custom_geneset_file) 
+}
+```
+
+## Session info
+
+```{r}
+sessionInfo()
+```
+
