@@ -42,7 +42,7 @@
 #  to score and annotate sces, use --score_sces 1
 # ews_dir: Path to the ews-nf repo, default is $HOME/ews-nf
 # skip_metaprogram_generation: Used to skip the nmf_metaprograms workflow, used to run just the shared_metaprograms workflow
-#  This will compare the metaprgams across subsets without regenerating the metaprograms
+#  This will compare the metaprograms across subsets without regenerating the metaprograms
 
 
 # To submit this script use the following example:
