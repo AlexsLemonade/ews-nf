@@ -532,6 +532,12 @@ all_term_df <- ef_msigdb_geneset_df |>
   dplyr::bind_rows(custom_geneset_df) |> 
   dplyr::bind_rows(hallmarks_msigdb_df) |> 
   dplyr::bind_rows(reactome_msigdb_df) |> 
+  # add in the gene universe to ensure this gets used as a background
+  # enricher does not seem to respect the universe argument 
+  dplyr::bind_rows(data.frame(
+    gs_name = "universe",
+    ensembl_gene = mp_object$gene_universe
+  )) |>
   tidyr::drop_na()
 
 # extract top genes
