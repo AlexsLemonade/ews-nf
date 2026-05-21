@@ -56,9 +56,7 @@ ncc_sig_ids <-mapIds(
 
 ```{r}
 # construct term 2 gene df
-# add in universe because it looks like the "universe" isn't actually respected by clusterProfiler::enricher 
-# see https://github.com/YuLab-SMU/clusterProfiler/issues/283
-# the options solution presented doesn't work for `enricher` only `enrichGO`
+# add in universe because otherwise your "universe" is just the genes in this single gene set
 term2gene_df <- dplyr::bind_rows(
   data.frame(term = "NCC_like_signature", gene = ncc_sig_ids),
   data.frame(term = "universe", gene = mp_obj$gene_universe)
