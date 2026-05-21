@@ -181,4 +181,3 @@ if [[ $subset_mode -eq 1 ]]; then
       --scpca_nf_dir "$scpca_nf_dir" \
       --outdir "$outdir" 
 fi
-   
