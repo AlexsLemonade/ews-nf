@@ -1,5 +1,11 @@
 #!/usr/bin/env Rscript
 
+# This script compares all metaprograms in a subset of samples to all metaprograms in the full cohort 
+# This includes overall correlation (correlation of all gene weights), 
+# correlation of the top 200 gene weights, and the Jaccard index for the top 200 gene ids 
+
+# Much of the metrics calculations were copied from
+# https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/10-shared-metaprogram-metrics.Rmd
 
 # Functions --------------------------------------------------------------------
 
