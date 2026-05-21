@@ -55,14 +55,6 @@ calculate_sample_stats <- function(mp_clusters_df, total_samples, sample_df){
   # how many total patients do we have
   total_patients <- length(unique(sample_df$participant_id))
   
-  # how many of each disease timing
-  tumor_type_totals_df <- table(sample_df$tumor_type) |> 
-    as.data.frame() |> 
-    tidyr::pivot_wider(
-      names_from = c("Var1"),
-      values_from = c("Freq")
-    )
-  
   # df with one row per mp 
   # calculates total spectra, entropy, norm entropy, eff species size
   mp_entropy_df <-  mp_clusters_df <- mp_clusters_df |> 
