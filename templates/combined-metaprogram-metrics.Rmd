@@ -317,6 +317,11 @@ background_df <- background_df |>
   dplyr::filter(!n_metaprograms %in% k_to_remove)
 ```
 
+```{r}
+# account for the fact that sample types might not be present
+# use this to skip any chunks that are sample type specific 
+has_sample_types <- c("num_primary_samples", "num_mets_samples") %in% colnames(mp_metrics_df)
+```
 
 
 ## Sample and patient diversity 
@@ -395,8 +400,11 @@ mp_metrics_df |>
 
 Here we will look at the contribution of different sample types to each of the metaprograms. 
 Particularly, we will see how many of the samples are from primary or metastatic sites within each metaprogram. 
+If this information is not present, no plots or tables will be shown. 
 
 ```{r}
+#| eval: !r has_sample_types
+
 sample_type_df <- mp_metrics_df |> 
   tidyr::pivot_longer(
     cols = c("num_primary_samples", "num_mets_samples"),
@@ -414,6 +422,7 @@ sample_type_df <- mp_metrics_df |>
 ```{r}
 #| fig.height: !r dynamic_fig_height
 #| fig.width: 15
+#| eval: !r has_sample_types
 
 ggplot(sample_type_df, aes(x = metaprogram, y = proportion, fill = sample_type)) +
   geom_col(width = 0.7) +
