@@ -148,7 +148,8 @@ else
     score_sces_flag=""
 fi
 
-if [[ $skip_metaprogram_generation -eq 1 ]]; then 
+# only run nmf_metaprograms if we aren't skipping it 
+if [[ $skip_metaprogram_generation -eq 0 ]]; then 
     # run ews-nf workflow with specified parameters
     nextflow run "$ews_dir/main.nf" \
       -profile "pitt_htc" \
