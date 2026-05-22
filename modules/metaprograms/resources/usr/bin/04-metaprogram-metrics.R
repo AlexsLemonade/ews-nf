@@ -83,31 +83,35 @@ calculate_sample_stats <- function(mp_clusters_df, total_samples, sample_df){
     )
   
   
-  # if tumor type column is present (SKC samples) then calculate some extra stats
+  # first check if the tumor type column is present
   if ("tumor_type" %in% colnames(sample_df)) {
     
-    # get totals for each tumor type
-    tumor_type_totals_df <- table(sample_df$tumor_type) |> 
-      as.data.frame() |> 
-      tidyr::pivot_wider(names_from = "Var1", values_from = "Freq")
+    # if tumor type column is present (SKC samples) and the right contents are there then calculate some extra stats
+    if(c("primary", "met") %in% unique(sample_df$tumor_type)){
+      # get totals for each tumor type
+      tumor_type_totals_df <- table(sample_df$tumor_type) |> 
+        as.data.frame() |> 
+        tidyr::pivot_wider(names_from = "Var1", values_from = "Freq")
+      
+      # calculate tumor stats separately 
+      tumor_type_stats_df <- mp_clusters_df |> 
+        dplyr::left_join(sample_df, by = c("sample_id" = "scpca_sample_id")) |> 
+        dplyr::group_by(metaprogram) |>
+        dplyr::summarize(
+          num_primary_samples = sum(tumor_type == "primary"),
+          num_mets_samples    = sum(tumor_type == "met")
+        ) |> 
+        dplyr::bind_cols(tumor_type_totals_df) |> 
+        dplyr::mutate(
+          primary_sample_proportion = num_primary_samples / unique(primary),
+          mets_sample_proportion    = num_mets_samples    / unique(met)
+        )
+      
+      # combine with overall entropy df 
+      mp_entropy_df <- mp_entropy_df |> 
+        dplyr::left_join(tumor_type_stats_df, by = "metaprogram")  
+    }
     
-    # calculate tumor stats separately 
-    tumor_type_stats_df <- mp_clusters_df |> 
-      dplyr::left_join(sample_df, by = c("sample_id" = "scpca_sample_id")) |> 
-      dplyr::group_by(metaprogram) |>
-      dplyr::summarize(
-        num_primary_samples = sum(tumor_type == "primary"),
-        num_mets_samples    = sum(tumor_type == "met")
-      ) |> 
-      dplyr::bind_cols(tumor_type_totals_df) |> 
-      dplyr::mutate(
-        primary_sample_proportion = num_primary_samples / unique(primary),
-        mets_sample_proportion    = num_mets_samples    / unique(met)
-      )
-    
-    # combine with overall entropy df 
-    mp_entropy_df <- mp_entropy_df |> 
-      dplyr::left_join(tumor_type_stats_df, by = "metaprogram")
   }
   
   return(mp_entropy_df)
