@@ -9,6 +9,7 @@ include { annotate_tumor_cells } from './modules/annotate-tumor-cells'
 include { summary_report } from './modules/summary-report'
 include { cnmf } from './modules/cnmf'
 include { metaprograms } from './modules/metaprograms'
+include { compare_metaprograms } from './modules/compare-metaprograms'
 
 include { parseProcessedFile } from './lib/utils.nf'
 
@@ -191,21 +192,50 @@ workflow nmf_metaprograms {
 
 }
 
+workflow shared_metaprograms {
+
+  // get subset Ids from the subset tsv file and pair with metaprogram output files for each subset
+  subset_ch = Channel.fromPath(params.subset_tsv, type: 'file')
+    .splitCsv(header: true, sep: '\t')
+    .flatMap{ row -> 
+      def subset_id = row['subset_id']
+      // don't check if exists for subset file because we don't want to throw an error
+      def subset_metaprograms_file = file("${params.outdir}/metaprograms/${subset_id}/*_metaprograms.rds", glob: true)
+      def full_metaprograms_file = file("${params.outdir}/metaprograms/full_cohort/*_metaprograms.rds", glob: true, checkIfExists: true)
+      
+      // now if the subset file is empty log it and move on
+      if (subset_metaprograms_file.isEmpty()) {
+        log.error("No metaprogram output files found for subset ${subset_id} in ${params.outdir}/metaprograms/${subset_id}/.")
+        return [] // nothing gets emitted to the channel 
+      } 
+
+      // make sure we get a tuple for each subset id 
+      // only expect one file for subset and one file for full cohort so make sure we don't return a nested tuple 
+      return [[subset_id, subset_metaprograms_file.first(), full_metaprograms_file.first()]]
+    }
+    .unique() // only one file per subset
+
+  compare_metaprograms(subset_ch)
+
+}
+
 
 // entry workflow
 workflow {
 
   // check that the workflow is valid
   // if not provided, then default to running the annotation workflow
-  def valid_workflows = ["reference", "nmf_metaprograms", "annotation"]
+  def valid_workflows = ["reference", "nmf_metaprograms", "annotation", "shared_metaprograms"]
   if (params.workflow != null && !valid_workflows.contains(params.workflow)) {
-    error "Invalid workflow '${params.workflow}'. Must be one of: reference, nmf_metaprograms, or annotation."
+    error "Invalid workflow '${params.workflow}'. Must be one of: reference, nmf_metaprograms, annotation, shared_metaprograms."
   }
 
   if (params.workflow == "reference") {
     reference()
   } else if (params.workflow == "nmf_metaprograms") {
     nmf_metaprograms()
+  } else if (params.workflow == "shared_metaprograms") {
+    shared_metaprograms()
   } else {
     annotation()
   }

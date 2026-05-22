@@ -41,6 +41,9 @@
 # score_sces: Boolean indicating whether to score and annotate sces with the optimal value of k, default is 0 (false)
 #  to score and annotate sces, use --score_sces 1
 # ews_dir: Path to the ews-nf repo, default is $HOME/ews-nf
+# skip_metaprogram_generation: Used to skip the nmf_metaprograms workflow, used to run just the shared_metaprograms workflow
+#  This will compare the metaprograms across subsets without regenerating the metaprograms
+
 
 # To submit this script use the following example:
 # sbatch slurm-submit.sh
@@ -63,7 +66,9 @@ home_dir="/vast/acillo/$USER"
 
 # set defaults for all arguments
 sample_ids=""
-scpca_nf_dir="$home_dir/scpca-nf-out"
+# default project id is SCPCP000026
+# to run other projects that might be present update this at the command line
+scpca_nf_dir="$home_dir/scpca-nf-out/SCPCP000026"
 outdir="$home_dir/ews-nf-out"
 workdir="$home_dir/work"
 
@@ -83,6 +88,9 @@ score_sces=${score_sces:-0}
 # turn on subset mode to run individual subsets instead of the full cohort
 subset_mode=${subset_mode:-0}
 subset_ids=${subset_ids:-""}
+# skip metaprogram generation and just calculate shared metrics 
+# only useful if subset_mode is 1
+skip_metaprogram_generation=${skip_metaprogram_generation:-0}
 
 # grab arguments from command line
 while [ $# -gt 0 ]; do
@@ -142,22 +150,34 @@ else
     score_sces_flag=""
 fi
 
-# run ews-nf workflow with specified parameters
-nextflow run "$ews_dir/main.nf" \
-  -profile "pitt_htc" \
-  --workflow nmf_metaprograms \
-  -work-dir "$workdir" \
-  --scpca_nf_dir "$scpca_nf_dir" \
-  --outdir "$outdir" \
-  --k_components_lower $k_components_lower \
-  --k_components_upper $k_components_upper \
-  --k_step_size $k_step_size \
-  --cnmf_k_range $cnmf_k_range \
-  --n_metaprograms $n_metaprograms \
-  $sample_flag \
-  $cnmf_flag \
-  $filter_spectra_flag \
-  $score_sces_flag \
-  $subset_mode_flag \
-  $subset_id_flag
-  
+# only run nmf_metaprograms if we aren't skipping it 
+if [[ $skip_metaprogram_generation -eq 0 ]]; then 
+    # run ews-nf workflow with specified parameters
+    nextflow run "$ews_dir/main.nf" \
+      -profile "pitt_htc" \
+      --workflow nmf_metaprograms \
+      -work-dir "$workdir" \
+      --scpca_nf_dir "$scpca_nf_dir" \
+      --outdir "$outdir" \
+      --k_components_lower $k_components_lower \
+      --k_components_upper $k_components_upper \
+      --k_step_size $k_step_size \
+      --cnmf_k_range $cnmf_k_range \
+      --n_metaprograms $n_metaprograms \
+      $sample_flag \
+      $cnmf_flag \
+      $filter_spectra_flag \
+      $score_sces_flag \
+      $subset_mode_flag \
+      $subset_id_flag
+fi 
+
+if [[ $subset_mode -eq 1 ]]; then 
+    # run shared metaprograms workflow
+    nextflow run "$ews_dir/main.nf" \
+      -profile "pitt_htc" \
+      --workflow shared_metaprograms \
+      -work-dir "$workdir" \
+      --scpca_nf_dir "$scpca_nf_dir" \
+      --outdir "$outdir" 
+fi
