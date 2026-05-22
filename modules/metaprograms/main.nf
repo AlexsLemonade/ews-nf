@@ -142,6 +142,7 @@ process metaprogram_metrics {
     path custom_genesets_file
     path msigdb_genesets_file
     path gene_set_category_file
+    path sample_metadata_file
   output:
     tuple val(subset_id),
           val(n_metaprograms),
@@ -151,7 +152,7 @@ process metaprogram_metrics {
     """
     04-metaprogram-metrics.R \
       --metaprograms_file ${metaprograms_file} \
-      --sample_metadata_file ${params.sample_metadata_file} \
+      --sample_metadata_file ${sample_metadata_file} \
       --custom_geneset_file ${custom_genesets_file} \
       --msigdb_geneset_file ${msigdb_genesets_file} \
       --category_file ${gene_set_category_file} \
@@ -179,6 +180,7 @@ process combined_metaprogram_report {
           path(scores_files), // list of combined score files for each n_metaprograms
           path(background_scores_files) // list of combined background score files for each n_metaprograms
     path template_file
+    path sample_metadata_file
   output:  
     tuple val(subset_id),
           env("OPTIMAL_K_VALUE"), 
@@ -194,7 +196,7 @@ process combined_metaprogram_report {
       params = list(metrics_file_list = '${metrics_file_string}', \
                     scores_file_list = '${scores_file_string}', \
                     background_scores_file_list = '${background_scores_files_string}', \
-                    sample_metadata_file = '${params.sample_metadata_file}', \
+                    sample_metadata_file = '${sample_metadata_file}', \
                     output_heatmap_file = 'metrics-heatmap.pdf', \
                     output_k_file = 'optimal_k_value.txt', \
                     seed = '${params.seed}'))"
@@ -225,6 +227,7 @@ process individual_metaprogram_report {
           path(combined_score_file)
     path template_file
     path gene_set_category_file
+    path sample_metadata_file
   output:
     tuple val(subset_id),
           val(n_metaprograms), 
@@ -240,7 +243,7 @@ process individual_metaprogram_report {
                     metaprograms_metrics_file = '${metrics_file}', \
                     combined_scores_file = '${combined_score_file}', \
                     category_file = '${gene_set_category_file}', \
-                    sample_metadata_file = '${params.sample_metadata_file}'))"
+                    sample_metadata_file = '${sample_metadata_file}'))"
     """
   stub:
     """
@@ -374,7 +377,8 @@ workflow metaprograms {
       generate_metaprograms.out, 
       file(params.custom_genesets_file),
       file(params.msigdb_genesets_file),
-      file(params.gene_set_category_file)
+      file(params.gene_set_category_file), 
+      file(params.sample_metadata_file)
     )
 
     /////////////////////////////////////////////////////
@@ -430,7 +434,8 @@ workflow metaprograms {
     // render combined report
     combined_metaprogram_report(
       metrics_report_ch,
-      file(combined_report_template_file)
+      file(combined_report_template_file),
+      file(params.sample_metadata_file)
     )
 
     /////////////////////////////////////////////////////
@@ -481,7 +486,8 @@ workflow metaprograms {
     individual_metaprogram_report(
       report_ch,
       file(individual_report_template_file),
-      file(params.gene_set_category_file)
+      file(params.gene_set_category_file), 
+      file(params.sample_metadata_file)
     )
 
   emit:

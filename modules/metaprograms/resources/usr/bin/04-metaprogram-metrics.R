@@ -55,17 +55,9 @@ calculate_sample_stats <- function(mp_clusters_df, total_samples, sample_df){
   # how many total patients do we have
   total_patients <- length(unique(sample_df$participant_id))
   
-  # how many of each disease timing
-  tumor_type_totals_df <- table(sample_df$tumor_type) |> 
-    as.data.frame() |> 
-    tidyr::pivot_wider(
-      names_from = c("Var1"),
-      values_from = c("Freq")
-    )
-  
   # df with one row per mp 
   # calculates total spectra, entropy, norm entropy, eff species size
-  mp_entropy_df <-  mp_clusters_df <- mp_clusters_df |> 
+  mp_entropy_df <-  mp_clusters_df |> 
     dplyr::left_join(sample_df, by = c("sample_id" = "scpca_sample_id")) |> 
     dplyr::group_by(metaprogram, sample_id) |>
     # first get total spectra per sample
@@ -73,28 +65,54 @@ calculate_sample_stats <- function(mp_clusters_df, total_samples, sample_df){
       num_spectra_per_sample = dplyr::n(), 
       # keep the participant and disease timing information for each sample
       participant_id = dplyr::first(participant_id),
-      tumor_type = dplyr::first(tumor_type),
       .groups = "drop_last") |>  
     # now calculate stats for each metaprogram, drop sample grouping 
-    dplyr::bind_cols(tumor_type_totals_df) |> 
     dplyr::summarize(
       # totals for each group (spectra, sample, patient, disease timing)
       num_spectra_per_mp = sum(num_spectra_per_sample),
       num_samples = length(sample_id),
       num_patients = length(unique(participant_id)),
-      num_primary_samples = sum(tumor_type == "primary"),
-      num_mets_samples = sum(tumor_type == "met"),
       # proportions of total for each category
       proportion_of_samples = num_samples / total_samples,
       proportion_of_patients = num_patients / total_patients,
-      primary_sample_proportion = num_primary_samples / unique(primary),
-      mets_sample_proportion = num_mets_samples / unique(met),
       # entropy and neff
       shannon_entropy = entropy(num_spectra_per_sample), # entropy
       shannon_entropy_norm = shannon_entropy / log(num_samples),# normalize by total possible samples in that mp
       eff_number = exp(shannon_entropy), # effective species size or Hill number order of 1
       eff_number_norm = eff_number/num_samples # eff number should be close to the total possible samples in that mp
     )
+  
+  
+  # first check if the tumor type column is present
+  if ("tumor_type" %in% colnames(sample_df)) {
+    
+    # if tumor type column is present (SKC samples) and the right contents are there then calculate some extra stats
+    if(all(c("primary", "met") %in% unique(sample_df$tumor_type))){
+      # get totals for each tumor type
+      tumor_type_totals_df <- table(sample_df$tumor_type) |> 
+        as.data.frame() |> 
+        tidyr::pivot_wider(names_from = "Var1", values_from = "Freq")
+      
+      # calculate tumor stats separately 
+      tumor_type_stats_df <- mp_clusters_df |> 
+        dplyr::left_join(sample_df, by = c("sample_id" = "scpca_sample_id")) |> 
+        dplyr::group_by(metaprogram) |>
+        dplyr::summarize(
+          num_primary_samples = sum(tumor_type == "primary"),
+          num_mets_samples    = sum(tumor_type == "met")
+        ) |> 
+        dplyr::bind_cols(tumor_type_totals_df) |> 
+        dplyr::mutate(
+          primary_sample_proportion = num_primary_samples / unique(primary),
+          mets_sample_proportion    = num_mets_samples    / unique(met)
+        )
+      
+      # combine with overall entropy df 
+      mp_entropy_df <- mp_entropy_df |> 
+        dplyr::left_join(tumor_type_stats_df, by = "metaprogram")  
+    }
+    
+  }
   
   return(mp_entropy_df)
   
@@ -413,9 +431,7 @@ stopifnot(
 mp_object <- readr::read_rds(opt$metaprograms_file)
 
 # read in sample metadata
-sample_df <- readr::read_tsv(opt$sample_metadata_file) |> 
-  # keep sample id and then other columns to look at distribution within metaprograms
-  dplyr::select(scpca_sample_id, participant_id, disease_timing, tumor_type)
+sample_df <- readr::read_tsv(opt$sample_metadata_file)
 
 # read in custom gene lists and EF msigdb gene sets to use for ORA
 ef_msigdb_df <- readr::read_tsv(opt$msigdb_geneset_file)
