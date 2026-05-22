@@ -47,7 +47,7 @@ See [EwS Multiome gene sets](#ews-multiome-gene-sets) for more information on ho
 This gene set was obtained from Dusan Pesic in Adam Shlien's lab and was derived from bulk RNA-seq analysis comparing cell lines before and after neural crest induction. 
 Data from 13 studies were combined and differentially expressed genes were identified and filtered to select the top 250 genes. 
 The original gene set is saved in `NCC_like_signature.gmt`.
-See [`ncc-gene-set-exploration.Rmd`](./setup/ncc-gene-set-exploration.Rmd) for more information.
+See [`ncc-gene-set-exploration.Rmd`](./setup/ncc-gene-set-exploration.Rmd) for more information about why this gene set is included.
 
 ## Gene set categories 
 
