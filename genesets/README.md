@@ -43,6 +43,12 @@ Genes included here were listed in Dataset EV1C.
 * `ews_multiome_module_1`, `ews_multiome_module_2`, and `ews_multiome_module_3`: Genes associated with each module in [Waltner _et al_](https://www.biorxiv.org/content/10.1101/2025.06.18.660457v2). 
 See [EwS Multiome gene sets](#ews-multiome-gene-sets) for more information on how these gene sets were generated.
 
+* `neural_crest_cell_like_signature`: Genes associated with a Neural crest cell-like signature. 
+This gene set was obtained from Dusan Pesic in Adam Shlien's lab and was derived from bulk RNA-seq analysis comparing cell lines before and after neural crest induction. 
+Data from 13 studies were combined and differentially expressed genes were identified and filtered to select the top 250 genes. 
+The original gene set is saved in `NCC_like_signature.gmt`.
+See [`ncc-gene-set-exploration.Rmd`](./setup/ncc-gene-set-exploration.Rmd) for more information about why this gene set is included.
+
 ## Gene set categories 
 
 The `gene-set-categories.tsv` file assigns an overall category to all gene sets (both from `MSigDB` and custom) that are used with `AUCell` and for over representation analysis of metaprograms. 
@@ -54,6 +60,7 @@ The categories are described below:
 * `STAG2-loss`: These gene sets are associated with loss of STAG2 in A673 cells.
 * `chemo-resistance`: These gene sets are associated with resistance to chemotherapy drugs typically included in standard of care Ewing sarcoma treatment.
 * `ews-multiome`: These gene sets are associated with the modules identified in the EwS multiome study. 
+* `lineage:` These gene sets are associated with developmental lineages.
  
 ## EwS multiome gene sets 
 
@@ -65,3 +72,4 @@ Original code for generating this file can be found here: https://github.com/fur
 
 The `multiome-module-genes.tsv` contains all unique genes associated with each module and the associated Ensembl gene id. 
 This file was prepared using `setup/prep-multiome-genesets.R`.
+
