@@ -87,7 +87,7 @@ calculate_sample_stats <- function(mp_clusters_df, total_samples, sample_df){
   if ("tumor_type" %in% colnames(sample_df)) {
     
     # if tumor type column is present (SKC samples) and the right contents are there then calculate some extra stats
-    if(c("primary", "met") %in% unique(sample_df$tumor_type)){
+    if(all(c("primary", "met") %in% unique(sample_df$tumor_type))){
       # get totals for each tumor type
       tumor_type_totals_df <- table(sample_df$tumor_type) |> 
         as.data.frame() |> 
