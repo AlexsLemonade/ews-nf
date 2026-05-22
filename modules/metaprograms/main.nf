@@ -184,6 +184,7 @@ process combined_metaprogram_report {
   output:  
     tuple val(subset_id),
           env("OPTIMAL_K_VALUE"), 
+          path("metrics-heatmap.pdf"),
           path("combined-metaprograms-metrics.html")
   script:
     def metrics_file_string = metrics_files.join(',')
@@ -196,6 +197,7 @@ process combined_metaprogram_report {
                     scores_file_list = '${scores_file_string}', \
                     background_scores_file_list = '${background_scores_files_string}', \
                     sample_metadata_file = '${sample_metadata_file}', \
+                    output_heatmap_file = 'metrics-heatmap.pdf', \
                     output_k_file = 'optimal_k_value.txt', \
                     seed = '${params.seed}'))"
 
@@ -205,6 +207,7 @@ process combined_metaprogram_report {
   stub:
     """
     touch "combined-metaprograms-metrics.html"
+    touch "metrics-heatmap.pdf"
     OPTIMAL_K_VALUE=10
     """
 }
@@ -448,11 +451,11 @@ workflow metaprograms {
       }
       .combine(combined_metaprogram_report.out, by: 0) // combine by subset id to get optimal k for each subset
       // filter to only get score outputs for optimal k value
-      .filter{ subset_id, n_metaprograms, combined_score_file, optimal_k, combined_report -> 
+      .filter{ subset_id, n_metaprograms, combined_score_file, optimal_k, metrics_heatmap, combined_report -> 
         n_metaprograms == optimal_k 
       }
-      // drop extra k and report
-      .map{ subset_id, n_metaprograms, combined_score_file, optimal_k, combined_report -> 
+      // drop extra k, heatmap and report
+      .map{ subset_id, n_metaprograms, combined_score_file, optimal_k, metrics_heatmap, combined_report -> 
         [subset_id, optimal_k, combined_score_file]
       }
 
@@ -470,10 +473,10 @@ workflow metaprograms {
     // need a tuple of [subset_id, n_metaprograms, metaprograms_file, metrics_file, combined_score_files] for the report
     report_ch = all_metaprograms_ch
       .combine(combined_metaprogram_report.out, by: 0 ) // combine by subset id and get optimal k for each subset
-      .filter{ subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file, optimal_k, combined_report -> 
+      .filter{ subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file, optimal_k, metrics_heatmap, combined_report -> 
         n_metaprograms == optimal_k 
       }
-      .map { subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file, optimal_k, combined_report -> 
+      .map { subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file, optimal_k, metrics_heatmap, combined_report -> 
         [subset_id, optimal_k, metaprograms_file]
       }
       .join(grouped_metrics_ch.transpose(by: [1, 2]), by: [0, 1]) // join on subset_id and n_metaprograms to keep only the optimal k metrics file for each subset
