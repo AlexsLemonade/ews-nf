@@ -469,26 +469,29 @@ workflow metaprograms {
       score_and_annotate_sce(sce_ch, combined_scores_file)
     }
 
-    // only render a report for the optimal k value
-    // need a tuple of [subset_id, n_metaprograms, metaprograms_file, metrics_file, combined_score_files] for the report
-    report_ch = all_metaprograms_ch
-      .combine(combined_metaprogram_report.out, by: 0 ) // combine by subset id and get optimal k for each subset
-      .filter{ subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file, optimal_k, metrics_heatmap, combined_report -> 
-        n_metaprograms == optimal_k 
-      }
-      .map { subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file, optimal_k, metrics_heatmap, combined_report -> 
-        [subset_id, optimal_k, metaprograms_file]
-      }
-      .join(grouped_metrics_ch.transpose(by: [1, 2]), by: [0, 1]) // join on subset_id and n_metaprograms to keep only the optimal k metrics file for each subset
-      .join(optimal_k_scores_ch, by: [0,1]) // join on subset_id and optimal_k
+    // only need to create the individual reports if not in subset mode 
+    if (!params.subset_mode) {
+      // only render a report for the optimal k value
+      // need a tuple of [subset_id, n_metaprograms, metaprograms_file, metrics_file, combined_score_files] for the report
+      report_ch = all_metaprograms_ch
+        .combine(combined_metaprogram_report.out, by: 0 ) // combine by subset id and get optimal k for each subset
+        .filter{ subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file, optimal_k, metrics_heatmap, combined_report -> 
+          n_metaprograms == optimal_k 
+        }
+        .map { subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file, optimal_k, metrics_heatmap, combined_report -> 
+          [subset_id, optimal_k, metaprograms_file]
+        }
+        .join(grouped_metrics_ch.transpose(by: [1, 2]), by: [0, 1]) // join on subset_id and n_metaprograms to keep only the optimal k metrics file for each subset
+        .join(optimal_k_scores_ch, by: [0,1]) // join on subset_id and optimal_k
 
 
-    individual_metaprogram_report(
-      report_ch,
-      file(individual_report_template_file),
-      file(params.gene_set_category_file), 
-      file(params.sample_metadata_file)
-    )
+      individual_metaprogram_report(
+        report_ch,
+        file(individual_report_template_file),
+        file(params.gene_set_category_file), 
+        file(params.sample_metadata_file)
+      )
+    }
 
   emit:
     metaprograms = all_metaprograms_ch // [subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, metaprograms_file]
