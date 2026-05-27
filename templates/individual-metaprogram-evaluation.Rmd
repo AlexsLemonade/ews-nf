@@ -144,6 +144,23 @@ calculate_anova <- function(df, stat_column, random_effect = NULL){
 # copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/08-cell-scoring-metrics.Rmd
 grouped_anova <- function(data, sig_value, stat_column, random_effect = NULL) {
   
+  # if a random effect is specified, check if any group across all
+  # metaprograms has only one item in the random effect column - if so, drop random effect entirely
+  if (!is.null(random_effect)) {
+    min_number <- data |>
+      dplyr::summarize(
+        n = dplyr::n_distinct(.data[[random_effect]]),
+        .by = all_of(c("metaprogram", {{ stat_column }}))
+      ) |>
+      dplyr::pull(n) |>
+      min()
+    
+    if (min_number <= 1) {
+      message("Random effect '", random_effect, "' cannot be used: some groups have only one value. Falling back to fixed effects only.")
+      random_effect <- NULL
+    }
+  }
+  
   # for each metaprogram for each value of k, use a linear mixed effect model 
   # then use ANOVA to calculate pvalues 
   anova_results <- data |>
