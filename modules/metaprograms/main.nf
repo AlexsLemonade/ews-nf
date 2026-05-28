@@ -333,7 +333,7 @@ workflow metaprograms {
       // if all the outputs exist for a given n_metaprogram and subset id, let's skip it 
       // because the publishing steps only happen for the full cohort mode, this will only skip for the full cohort 
       .branch { subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file, subset_already_processed ->
-        skip_subset: subset_already_processed
+        skip_subset: !params.repeat_creating_metaprograms && subset_already_processed
         cached_metaprograms: 
           !params.repeat_creating_metaprograms &&
           mp_file.exists() && 
