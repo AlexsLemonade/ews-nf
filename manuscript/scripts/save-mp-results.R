@@ -15,7 +15,6 @@ sce_file <- here::here("scpca-nf-out", "SCPCP000026", "SCPCS000841", "SCPCL00122
 
 # output files 
 output_mp_genes_file <- here::here("manuscript", "full-cohort-metaprograms", "k-7_metaprogram-top-genes.tsv")
-output_ora_results_file <- here::here("manuscript", "full-cohort-metaprograms", "k-7_ora-results.tsv")
 
 # read in files 
 mp_metrics_obj <- readr::read_rds(metrics_file)
@@ -39,4 +38,3 @@ mp_top_df <- mp_metrics_obj$top_genes |>
 
 # export   
 readr::write_tsv(mp_top_df, output_mp_genes_file)
-readr::write_tsv(mp_metrics_obj$ora_results_df, output_ora_results_file)
