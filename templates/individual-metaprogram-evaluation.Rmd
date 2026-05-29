@@ -130,7 +130,8 @@ calculate_anova <- function(df, stat_column, random_effect = NULL){
       tibble::rownames_to_column("term")
   } else {
     # no random effect so use a regular ANOVA
-    mod <- lm(log_mean_mp_score ~ stat_column, data = df)
+    formula <- as.formula(glue::glue("log_mean_mp_score ~ {stat_column}"))
+    mod <- lm(formula, data = df)
     anova_res <- anova(mod) |>
       as.data.frame() |>
       tibble::rownames_to_column("term") |>
@@ -143,23 +144,6 @@ calculate_anova <- function(df, stat_column, random_effect = NULL){
 # ANOVA test with/without random effect on log(mean mp score)
 # copied from https://github.com/AlexsLemonade/ews-nf/blob/main/exploratory-notebooks/08-cell-scoring-metrics.Rmd
 grouped_anova <- function(data, sig_value, stat_column, random_effect = NULL) {
-  
-  # if a random effect is specified, check if any group across all
-  # metaprograms has only one item in the random effect column - if so, drop random effect entirely
-  if (!is.null(random_effect)) {
-    min_number <- data |>
-      dplyr::summarize(
-        n = dplyr::n_distinct(.data[[random_effect]]),
-        .by = all_of(c("metaprogram", {{ stat_column }}))
-      ) |>
-      dplyr::pull(n) |>
-      min()
-    
-    if (min_number <= 1) {
-      message("Random effect '", random_effect, "' cannot be used: some groups have only one value. Falling back to fixed effects only.")
-      random_effect <- NULL
-    }
-  }
   
   # for each metaprogram for each value of k, use a linear mixed effect model 
   # then use ANOVA to calculate pvalues 
@@ -836,8 +820,27 @@ mean_scores_df <- score_df |>
 ```{r}
 #| message: FALSE 
 #| eval: !r has_sample_types
+
+equal_participants_df <- mean_scores_df |>
+  dplyr::summarize(
+    n_obs = dplyr::n(),
+    n_participants = dplyr::n_distinct(participant_id),
+    .by = c("metaprogram", "tumor_type")
+  ) |>
+  dplyr::filter(n_participants == n_obs)
+  
+# if any groups have equal participants to number of observations
+# set random effect to NULL 
+# this means at least one group has only one sample type associated with the participant 
+if (nrow(equal_participants_df) > 0) {
+  message("Random effect of particpant ID cannot be used as at least one metaprogram ")
+  random_effect <- NULL
+} else {
+  random_effect <- "participant_id"
+}
+
 # calculate anova with random effect
-random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value = 0.05, stat_column = "tumor_type", random_effect = "participant_id")
+random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value = 0.05, stat_column = "tumor_type", random_effect)
 ```
 
 ```{r}
