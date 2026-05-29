@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 
 # this script is used to run over representation analysis on a given set of metaprograms 
+# the default output produces the manuscript/full-cohort-metaprograms/k-7_ora-results.tsv file
 
 # functions and code below are copied from 04-metaprogram-metrics.R
 # https://github.com/AlexsLemonade/ews-nf/blob/main/modules/metaprograms/resources/usr/bin/04-metaprogram-metrics.R
