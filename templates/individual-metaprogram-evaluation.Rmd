@@ -821,17 +821,24 @@ mean_scores_df <- score_df |>
 #| message: FALSE 
 #| eval: !r has_sample_types
 
+# data frame of metaprograms and the max number of tumor types 
+# for a given participant in a given metaprogram
+# in order to use participant id as a random effect
+# each metaprogram must have at least 1 participant with both tumor types
 equal_participants_df <- mean_scores_df |>
   dplyr::summarize(
-    n_obs = dplyr::n(),
-    n_participants = dplyr::n_distinct(participant_id),
-    .by = c("metaprogram", "tumor_type")
+    n_tumor_types = dplyr::n_distinct(tumor_type),
+    .by = c("metaprogram", "participant_id")
   ) |>
-  dplyr::filter(n_participants == n_obs)
+  dplyr::summarize(
+    max_tumor_types = max(n_tumor_types),
+    .by = "metaprogram"
+  ) |>
+  # filter to only those that are equal to 1 and don't pass
+  dplyr::filter(max_tumor_types == 1)
   
-# if any groups have equal participants to number of observations
+# if any metaprograms have only one sample type per participant id
 # set random effect to NULL 
-# this means at least one group has only one sample type associated with the participant 
 if (nrow(equal_participants_df) > 0) {
   message("Random effect of particpant ID cannot be used as at least one metaprogram ")
   random_effect <- NULL
