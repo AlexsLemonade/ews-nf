@@ -15,7 +15,7 @@ manuscript_dir <- here::here("manuscript")
 
 data_dir <- file.path(manuscript_dir, "data", "metaprograms")
 mp_object_file <- file.path(data_dir, "k-7_metaprograms.rds")
-mp_metrics_file <- file.path(data_dir, "k-7_metaprograms-metrics.rds")
+mp_ora_file <- file.path(manuscript_dir, "full-cohort-metaprograms", "k-7_ora-results.tsv")
 
 # color palette
 mp_palette_file <- file.path(manuscript_dir, "palettes", "metaprogram-palette.tsv")
@@ -25,6 +25,8 @@ pdf_dir <- file.path(manuscript_dir, "figures", "pdfs")
 cor_heatmap_pdf_file <- file.path(pdf_dir, "metaprogram-cor-heatmap.pdf")
 
 ora_heatmap_pdf_file <- file.path(pdf_dir, "metaprogram-ora-genesets-heatmap.pdf")
+
+set.seed(2026)
 
 # Correlation ------------------------------------------------------------------
 
@@ -68,9 +70,7 @@ dev.off()
 # Gene set Heatmap -------------------------------------------------------------
 
 # read in metrics and grab ora results
-mp_metrics <- readr::read_rds(mp_metrics_file)
-ora_results_df <- mp_metrics$ora_results_df
-
+ora_results_df <- readr::read_tsv(mp_ora_file)
 
 # convert ora results into a heatmap of pvalues
 heatmap_mtx <- ora_results_df |> 
