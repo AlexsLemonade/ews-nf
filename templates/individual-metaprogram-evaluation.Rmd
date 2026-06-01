@@ -130,7 +130,8 @@ calculate_anova <- function(df, stat_column, random_effect = NULL){
       tibble::rownames_to_column("term")
   } else {
     # no random effect so use a regular ANOVA
-    mod <- lm(log_mean_mp_score ~ stat_column, data = df)
+    formula <- as.formula(glue::glue("log_mean_mp_score ~ {stat_column}"))
+    mod <- lm(formula, data = df)
     anova_res <- anova(mod) |>
       as.data.frame() |>
       tibble::rownames_to_column("term") |>
@@ -819,8 +820,30 @@ mean_scores_df <- score_df |>
 ```{r}
 #| message: FALSE 
 #| eval: !r has_sample_types
+
+# for the particpant IDs represented in the subset, determine the max number of tumor types
+# in order to use random effect, at least one participant must have samples from 2 tumor types 
+max_tumor_types <- mean_scores_df |>
+  dplyr::select(participant_id, tumor_type) |> 
+  unique() |> 
+  dplyr::summarize(
+    n_tumor_types = dplyr::n_distinct(tumor_type),
+    .by = "participant_id"
+  ) |>
+  dplyr::pull(n_tumor_types) |> 
+  max()
+  
+# if every participant Id only has one sample type
+# set random effect to NULL 
+if (max_tumor_types < 2) {
+  message("Random effect of particpant ID cannot be used. Must have at least one participant ID with two tumor types.")
+  random_effect <- NULL
+} else {
+  random_effect <- "participant_id"
+}
+
 # calculate anova with random effect
-random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value = 0.05, stat_column = "tumor_type", random_effect = "participant_id")
+random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value = 0.05, stat_column = "tumor_type", random_effect)
 ```
 
 ```{r}

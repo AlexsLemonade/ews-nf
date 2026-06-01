@@ -303,12 +303,19 @@ workflow metaprograms {
       .combine(n_metaprograms_ch)
       .map{ sample_id_tuple, unique_id_tuple, cnmf_output_dirs, subset_id, n_metaprograms -> 
         
-        // define the publish directory and expected output files
-        def metaprograms_publish_dir = "${params.outdir}/metaprograms/${subset_id}/metaprograms-${n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
+        // define the publish directory and expected output files for each subset id and n_metaprogram combination
+        def subset_dir = "${params.outdir}/metaprograms/${subset_id}"
+        def metaprograms_publish_dir = "${subset_dir}/metaprograms-${n_metaprograms}_cnmf-${cnmf_k_range_str}_${filter_str}"
         def mp_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_metaprograms.rds")
         def combined_scores_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_metaprogram_scores.tsv.gz")
         def combined_background_scores_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_background_scores.tsv.gz")
         def metrics_file = file("${metaprograms_publish_dir}/k-${n_metaprograms}_metaprograms-metrics.rds")
+
+        // in subset mode, check if any k-* metrics and metaprogram files exist for this subset
+        // if so, we'll skip processing this subset entirely
+        def subset_already_processed = params.subset_mode &&
+          !file("${subset_dir}").list().findAll { it =~ /k-.*_metaprograms-metrics\.rds/ }.isEmpty() &&
+          !file("${subset_dir}").list().findAll { it =~ /k-.*metaprograms\.rds/ }.isEmpty()
 
         [
           subset_id, 
@@ -319,12 +326,14 @@ workflow metaprograms {
           mp_file, 
           combined_scores_file, 
           combined_background_scores_file, 
-          metrics_file
+          metrics_file,
+          subset_already_processed
         ]
       }
       // if all the outputs exist for a given n_metaprogram and subset id, let's skip it 
       // because the publishing steps only happen for the full cohort mode, this will only skip for the full cohort 
-      .branch { subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+      .branch { subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file, subset_already_processed ->
+        skip_subset: !params.repeat_creating_metaprograms && subset_already_processed
         cached_metaprograms: 
           !params.repeat_creating_metaprograms &&
           mp_file.exists() && 
@@ -340,7 +349,7 @@ workflow metaprograms {
 
     // input for creating metaprograms 
     create_metaprograms_ch = metaprograms_ch.create_metaprograms
-      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file -> 
+      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file, subset_already_processed -> 
         [subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir]
       }
 
@@ -388,13 +397,13 @@ workflow metaprograms {
     
     // construct channels for skipped processes and mix with output from actual processes
     all_metaprograms_ch = metaprograms_ch.cached_metaprograms
-      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file, subset_already_processed ->
         [subset_id, n_metaprograms, unique_id_tuple, metaprograms_publish_dir, mp_file]
       }
       .mix(generate_metaprograms.out)
 
     all_scores_ch = metaprograms_ch.cached_metaprograms
-      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file, subset_already_processed ->
         [subset_id, n_metaprograms, combined_scores_file, combined_background_scores_file]
       }
       .mix(combine_score_files.out)
@@ -402,7 +411,7 @@ workflow metaprograms {
     // collect all metrics files for the combined report
     all_metrics_ch = metaprograms_ch.cached_metaprograms
       // match the output of the metaprograms metrics process so we can combine them 
-      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file ->
+      .map{ subset_id, n_metaprograms, unique_id_tuple, cnmf_output_dirs, metaprograms_publish_dir, mp_file, combined_scores_file, combined_background_scores_file, metrics_file, subset_already_processed ->
         [subset_id, n_metaprograms, metaprograms_publish_dir, metrics_file]
       }
       .mix(metaprogram_metrics.out)
