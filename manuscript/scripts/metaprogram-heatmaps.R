@@ -69,7 +69,7 @@ dev.off()
 
 # Gene set Heatmap -------------------------------------------------------------
 
-# read in metrics and grab ora results
+# read in ora results
 ora_results_df <- readr::read_tsv(mp_ora_file)
 
 # convert ora results into a heatmap of pvalues
