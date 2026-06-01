@@ -822,7 +822,7 @@ mean_scores_df <- score_df |>
 #| eval: !r has_sample_types
 
 # for the particpant IDs represented in the subset, determine the max number of tumor types
-# in order to use random effect, at least one participant must have 2 samples from 2 tumor types 
+# in order to use random effect, at least one participant must have samples from 2 tumor types 
 max_tumor_types <- mean_scores_df |>
   dplyr::select(participant_id, tumor_type) |> 
   unique() |> 
