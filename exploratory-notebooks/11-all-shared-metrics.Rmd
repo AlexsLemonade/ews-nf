@@ -62,7 +62,9 @@ names(metrics_files) <- subset_ids
 ```{r}
 # read in all metrics files and combine into a single df
 metrics_df <- metrics_files |> 
-  purrr::map(\(x) readr::read_tsv(x, col_types = list(.default = "d", subset_id = "c", subset_mp = "c", full_mp = "c"))) |> 
+  purrr::map(\(x) 
+    readr::read_tsv(x, col_types = list(.default = "d", subset_id = "c", subset_mp = "c", full_mp = "c"))
+  ) |> 
   dplyr::bind_rows(.id = "subset_id") |> 
   # add the number of samples per subset
   dplyr::left_join(subset_info_df, by = "subset_id")
@@ -71,7 +73,7 @@ metrics_df <- metrics_files |>
 ## Distribution of metrics 
 
 The first thing we will do is look at the distribution of each of these metrics. 
-This will tell us if any of these metrics change as we increase the sample number, e.g., do we see an increase in the overall correlation and overlap if higher numbers of samples are included. 
+This will tell us if any of these metrics change as we increase the sample number, e.g., do we see an increase in the overall correlation and overlap if more samples are included. 
 
 ```{r}
 # Reshape to long format for faceting
@@ -110,7 +112,7 @@ It probably makes sense to continue with using thresholds for the Jaccard index 
 Below we will look at the number of shared metaprograms per subset as a function of subset size. 
 We expect that as we increase the number of samples, we will recover more metaprograms and eventually reach a point of saturation, where addition of more samples does not recover more metaprograms. 
 
-To do this, we'll consider two different thresholdds for both correlation (0.5 and 0.75) and Jaccard (0.3 and 0.6). 
+To do this, we'll consider two different thresholds for both correlation (0.5 and 0.75) and Jaccard (0.3 and 0.6). 
 For each full metaprogram, we'll identify if the metaprogram is in the subset based on these two criteria. 
 
 ```{r}
@@ -200,8 +202,10 @@ jaccard_threshold <- 0.5
 
 # calculate the percent of each subset with a shared metaprogram for a given full cohort metaprogram
 heatmap_df <- metrics_df |>
-  dplyr::mutate(is_shared = top_correlation >= corr_threshold &
-                  jaccard >= jaccard_threshold) |>
+  dplyr::mutate(
+    is_shared = top_correlation >= corr_threshold,
+    jaccard >= jaccard_threshold
+  ) |>
   dplyr::group_by(full_mp, num_samples, subset_id) |>
   dplyr::summarise(
     subset_shares_mp = any(is_shared),   # TRUE if any subset MP matches this full MP
