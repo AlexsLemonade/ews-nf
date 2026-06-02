@@ -114,6 +114,7 @@ sample_df <- readr::read_tsv(sample_metadata_file, col_types = list(.default = "
   dplyr::filter(!scpca_sample_id %in% blacklist_sample_ids)
 
 # define all the subset sizes we'll create 
+# note we only want to go up to 90, we will later add in "reps" of the full cohort
 subset_sizes <- seq(10, 90, 10)
 
 # Check for existing subsets ---------------------------------------------------
