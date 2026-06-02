@@ -123,19 +123,26 @@ if (!is.null(opt$existing_subsets_file)) {
   existing_subset_df <- readr::read_tsv(opt$existing_subsets_file, 
                                         col_types = list(.default = "c"))
   
+  # get the last subset number from the full file BEFORE filtering
+  # we don't want to overwrite existing IDs which might get confusing with processing
+  last_subset_n <- existing_subset_df |>
+    dplyr::pull(subset_id) |>
+    stringr::str_extract("[0-9]+$") |>
+    as.integer() |>
+    max()
+  
+  # now filter to only the sizes we care about
+  existing_subset_df <- existing_subset_df |>
+    dplyr::mutate(size = dplyr::n_distinct(scpca_sample_id), .by = subset_id) |>
+    dplyr::filter(size %in% subset_sizes) |> 
+    dplyr::select(-size)
+  
   # extract the sets of sample ids already used, for duplicate checking
   existing_subsets_list <- existing_subset_df |>
     dplyr::summarise(samples = list(sort(scpca_sample_id)), .by = "subset_id") |>
     dplyr::mutate(subset_size = purrr::map_int(samples, length)) |>
     dplyr::summarise(subsets = list(samples), .by = "subset_size") |>
     tibble::deframe()
-  
-  # get the last subset number so new IDs continue from there
-  last_subset_n <- existing_subset_df |>
-    dplyr::pull(subset_id) |>
-    stringr::str_extract("[0-9]+$") |>
-    as.integer() |>
-    max()
   
   # count how many subsets already exist per size
   existing_counts <- existing_subset_df |>
