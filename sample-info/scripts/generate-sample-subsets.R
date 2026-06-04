@@ -54,7 +54,7 @@ get_num_replicates <- function(size, existing_counts){
     n_existing <- 0
   }
   
-  n_needed <- opt$n_replicates - n_needed 
+  n_needed <- opt$n_replicates - n_existing 
   
   # skip if we already have enough
   if (n_needed <= 0) {
