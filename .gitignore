@@ -22,10 +22,10 @@ manuscript/data/*
 
 # ignore data directory for analyses 
 analyses/data/*
-# but keep the readme
-! analyses/data/README.md
+# ignore references for analyses
+analyses/references/*
 
 
 
 
-
+.positai

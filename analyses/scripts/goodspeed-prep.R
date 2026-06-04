@@ -10,10 +10,23 @@ cellranger_dir <- file.path(data_dir, "cellranger_outs/GSE277083_raw_feature")
 cell_metadata_file <- file.path(data_dir, "GSE277083_cell_metadata_primary.txt.gz")
 sample_order_file <- file.path(data_dir, "GSE277083_aggregation.csv.gz")
 
+mito_file <- here::here("analyses/references/Homo_sapiens.GRCh38.110.mitogenes.txt")
+mito_genes <- readLines(mito_file)
+
 # read in files 
-sce <- DropletUtils::read10xCounts(data_dir)
-sample_order_df <- readr::read_csv(sample_order_file)
+sce <- DropletUtils::read10xCounts(cellranger_dir)
 cell_metadata_df <- readr::read_tsv(cell_metadata_file)
+# remove any suffixs that are on the sample id
+sample_order_df <- readr::read_csv(sample_order_file, col_types = list(.default = "c")) |> 
+  dplyr::mutate(
+    sample_id = stringr::str_replace(sample_id, "_ReSeqDec2021", "")
+  )
+
+# get the list of all sample ids that are kept for the final analysis in the paper 
+# these are the only ones that we can identify tumor cells for 
+primary_samples <- cell_metadata_df$Sample |>
+  unique()
+sample_idx <- which(sample_order_df$sample_id %in% primary_samples)
 
 # extract the sample order from barcode suffix 
 coldata_df <- colData(sce) |>
@@ -21,25 +34,21 @@ coldata_df <- colData(sce) |>
   dplyr::mutate(
     sample_number = stringr::word(Barcode, -1, sep = "-")
   )
+
 # add to sce 
 sce$sample_number <- coldata_df$sample_number
 
-primary_samples <- c(1, 2, 3, 4, 5, 8, 9, 10, 11, 19)
-
-
-# split into a list of indepenent samples
-sce_list <- primary_samples |>
+# split into a list of independent sce objects
+sce_list <- sample_idx |>
   as.character() |>
-  purrr::set_names() |>
-  purrr::map(\(s) sce[, sce$sample_number == s])
+  purrr::map(\(s) sce[, sce$sample_number == s]) |> 
+  purrr::set_names(primary_samples)
 
 
 filter_sce <- function(sce){
 
   # filter empty droplets
-  droplet_stats <- DropletUtils::emptyDropsCellRanger(
-    counts(sce),
-    BPPARAM = BiocParallel::MulticoreParam(4))
+  droplet_stats <- DropletUtils::emptyDrops(counts(sce))
 
   cells_to_retain <- which(droplet_stats$FDR <= 0.01)
 
@@ -48,6 +57,10 @@ filter_sce <- function(sce){
   return(sce)
 
 }
+
+sce_list <- sce_list |> 
+  purrr::map(filter_sce)
+
 
 # filter low quality cells using miQC
 
