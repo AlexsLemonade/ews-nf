@@ -56,10 +56,9 @@ get_num_replicates <- function(size, existing_counts){
   
   n_needed <- opt$n_replicates - n_existing 
   
-  # skip if we already have enough
+  # print out a message about skipping the subsets if we already have enough 
   if (n_needed <= 0) {
     message(glue::glue("Skipping size {size}: already have {already_have} subsets"))
-    return(NULL)
   }
   
   return(n_needed)
@@ -165,44 +164,49 @@ subset_df <- subset_sizes |>
     # get the number of reps needed 
     n_needed <- get_num_replicates(size, existing_counts)
     
-    # set starting point where duplicates are present
-    # this ensures the first subset is grabbed and checked for duplicates 
-    duplicates_present <- TRUE
-    
-    while(any(duplicates_present)){
-      # get a dataframe with one column per replicate of subsets 
-      subsets <- replicate(
-        n_needed, 
-        get_sample_subset(sample_df, size, opt$max_patient_fraction)
-      )
+    if(n_needed > 0) {
       
-      # pull out new subsets and existing subsets for duplicate checks
-      new_subset_lists <- asplit(subsets, 2) |> 
-        purrr::map(sort)
+      # set starting point where duplicates are present
+      # this ensures the first subset is grabbed and checked for duplicates 
+      duplicates_present <- TRUE
       
-      existing_list <- existing_subsets_list[[as.character(size)]] |>
-        purrr::map(sort)
+      while(any(duplicates_present)){
+        # get a dataframe with one column per replicate of subsets 
+        subsets <- replicate(
+          n_needed, 
+          get_sample_subset(sample_df, size, opt$max_patient_fraction)
+        )
+        
+        # pull out new subsets and existing subsets for duplicate checks
+        new_subset_lists <- asplit(subsets, 2) |> 
+          purrr::map(sort)
+        
+        existing_list <- existing_subsets_list[[as.character(size)]] |>
+          purrr::map(sort)
+        
+        # check that there's no identical subsets that were chosen
+        # if so, try again
+        duplicates_present <- c(
+          new_subset_lists,
+          existing_list
+        ) |> 
+          duplicated()
+        
+      }
       
-      # check that there's no identical subsets that were chosen
-      # if so, try again
-      duplicates_present <- c(
-        new_subset_lists,
-        existing_list
-      ) |> 
-        duplicated()
-
+      # convert to one row per sample id per subset
+      subsets |> 
+        as.data.frame() |> 
+        tidyr::pivot_longer(cols = everything(), 
+                            names_to = "replicate",
+                            values_to = "scpca_sample_id") |> 
+        dplyr::mutate(
+          # assign a temporary subset id
+          subset_id = glue::glue("{size}-{replicate}")
+        )
+    } else {
+      return(NULL)
     }
-    
-    # convert to one row per sample id per subset
-    subsets |> 
-      as.data.frame() |> 
-      tidyr::pivot_longer(cols = everything(), 
-                          names_to = "replicate",
-                          values_to = "scpca_sample_id") |> 
-      dplyr::mutate(
-        # assign a temporary subset id
-        subset_id = glue::glue("{size}-{replicate}")
-      )
   }) |> 
   dplyr::bind_rows()
 
