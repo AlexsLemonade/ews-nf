@@ -58,7 +58,7 @@ get_num_replicates <- function(size, existing_counts){
   
   # print out a message about skipping the subsets if we already have enough 
   if (n_needed <= 0) {
-    message(glue::glue("Skipping size {size}: already have {already_have} subsets"))
+    message(glue::glue("Skipping size {size}: already have {n_existing} subsets"))
   }
   
   return(n_needed)
