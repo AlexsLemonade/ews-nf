@@ -94,7 +94,9 @@ add_annotations <- function(sce, id, annotations_df) {
   # add in the annotations 
   coldata_df <- colData(sce) |> 
     as.data.frame() |> 
-    dplyr::left_join(sample_annotations_df, by = c("Barcode")) |> 
+    # we want all column names to be lowercase
+    dplyr::rename(barcode = Barcode) |> 
+    dplyr::left_join(sample_annotations_df, by = c("barcode")) |> 
     dplyr::mutate(
       celltype_annotation = dplyr::if_else(is.na(celltype_annotation), "Not annotated", celltype_annotation),
       broad_celltype_annotation = dplyr::if_else(is.na(broad_celltype_annotation), "Not annotated", broad_celltype_annotation),
@@ -136,7 +138,7 @@ cell_metadata_df <- readr::read_tsv(cell_metadata_file)
 annotations_df <- cell_metadata_df |> 
   dplyr::select(
     # rename to match the default Barcode column in SCE 
-    Barcode = "Cell",
+    barcode = "Cell",
     # rename the rest of the columns for legibility 
     sample_id = "Sample",
     celltype_annotation = "Cell.Type",
@@ -158,6 +160,18 @@ primary_samples <- cell_metadata_df$Sample |>
 # get the index which corresponds to the suffix for the barcode in the full sce object
 sample_idx <- which(sample_order_df$sample_id %in% primary_samples)
 
+# prep output directories and file names 
+# construct output directories using sample ids 
+sample_dirs <- file.path(results_dir, primary_samples)
+fs::dir_create(sample_dirs)
+
+# define the full paths to the files
+# use sample id for both folder name and file name
+# ews-nf can handle this
+sce_files <- glue::glue("{sample_dirs}/{primary_samples}_processed.rds")
+
+# Process and annotate SCEs ----------------------------------------------------
+
 # extract the sample order from barcode suffix 
 coldata_df <- colData(sce) |>
   as.data.frame() |>
@@ -174,30 +188,22 @@ sce_list <- sample_idx |>
   purrr::map(\(s) sce[, sce$sample_number == s]) |> 
   purrr::set_names(primary_samples)
 
-# Process and annotate SCEs ----------------------------------------------------
-
 filtered_sce_list <- sce_list |> 
-  # remove empty droplets
-  purrr::map(filter_droplets_sce) |>
-  # remove low quality cells (also adds PerCellQC stats)
-  purrr::map(\(sce) filter_low_quality_sce(sce, mito_genes)) |> 
-  # normalize
-  purrr::map(normalize_sce) |> 
-  # add the cell type annotations
-  purrr::imap(\(sce, id) add_annotations(sce, id, annotations_df))
+  purrr::imap(
+    \(sce, id){
+      
+      sce <- filter_droplets_sce(sce) |> # remove empty droplets
+        # remove low quality cells (also adds PerCellQC stats)
+        filter_low_quality_sce(mito_genes) |> 
+        normalize_sce() |>
+        # add the cell type annotations
+        add_annotations(id, annotations_df)
+      
+    }
+  )
 
 # export processed objects -----------------------------------------------------
-
-# construct output directories using sample ids 
-# can't do this without extracting the sample ids from the cell metadata and aggregated file
-# that's why we're doing this at the end of the script instead of the beginning
-sample_dirs <- file.path(results_dir, primary_samples)
-fs::dir_create(sample_dirs)
-
-# define the full paths to the files
-# use sample id for both folder name and file name
-# ews-nf can handle this
-sce_files <- glue::glue("{sample_dirs}/{primary_samples}_processed.rds")
+# add file names to sce list for easier exports
 names(annotated_sce_list) <- sce_files
 
 # export 
