@@ -204,7 +204,7 @@ filtered_sce_list <- sce_list |>
 
 # export processed objects -----------------------------------------------------
 # add file names to sce list for easier exports
-names(annotated_sce_list) <- sce_files
+names(filtered_sce_list) <- sce_files
 
 # export 
 filtered_sce_list |> 
