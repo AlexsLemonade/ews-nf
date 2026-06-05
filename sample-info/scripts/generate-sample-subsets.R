@@ -212,7 +212,8 @@ subset_df <- subset_sizes |>
 
 full_cohort_subsets <- data.frame(
   scpca_sample_id = rep(sample_df$scpca_sample_id, 10),
-  subset_id = rep(paste0("full-V", 1:10), each = nrow(sample_df))
+  subset_id = rep(paste0("full-V", 1:10), each = nrow(sample_df)),
+  subset_size = length(sample_df$scpca_sample_id)
 )
 
 # Export -----------------------------------------------------------------------
@@ -232,7 +233,8 @@ new_subset_df <- dplyr::bind_rows(subset_df, full_cohort_subsets) |>
   dplyr::select(
     subset_id,
     scpca_sample_id, 
-    participant_id
+    participant_id,
+    subset_size
   ) 
 
 
