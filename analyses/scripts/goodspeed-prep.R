@@ -6,7 +6,7 @@
 
 # The raw cellranger output is read in, split by sample and then each sample is processed: 
 
-# empty droplets are filtered using DropletUtils::emtpyDrops 
+# empty droplets are filtered using DropletUtils::emptyDrops() 
 # cells with fewer than 200 genes detected are removed (miQC failed)
 # normalization is performed
 # annotations for tumor cells are added to the objects 
@@ -87,7 +87,7 @@ normalize_sce <- function(sce){
 add_annotations <- function(sce, id, annotations_df) {
   
   # filter the annotations to just have the sample that we are looking at
-  # theoretically barcodes have suffixs so shouldn't overlap, but seems good to be safe here 
+  # theoretically barcodes have suffixes so shouldn't overlap, but seems good to be safe here 
   sample_annotations_df <- annotations_df |>
     dplyr::filter(sample_id == id)
   
