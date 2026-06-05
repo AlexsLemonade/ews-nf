@@ -132,9 +132,8 @@ if (!is.null(opt$existing_subsets_file)) {
   
   # now filter to only the sizes we care about
   existing_subset_df <- existing_subset_df |>
-    dplyr::mutate(size = dplyr::n_distinct(scpca_sample_id), .by = subset_id) |>
-    dplyr::filter(size %in% subset_sizes) |> 
-    dplyr::select(-size)
+    dplyr::mutate(subset_size = dplyr::n_distinct(scpca_sample_id), .by = subset_id) |>
+    dplyr::filter(subset_size %in% subset_sizes)
   
   # extract the sets of sample ids already used, for duplicate checking
   existing_subsets_list <- existing_subset_df |>
@@ -202,7 +201,8 @@ subset_df <- subset_sizes |>
                             values_to = "scpca_sample_id") |> 
         dplyr::mutate(
           # assign a temporary subset id
-          subset_id = glue::glue("{size}-{replicate}")
+          subset_id = glue::glue("{size}-{replicate}"),
+          subset_size = size
         )
     } else {
       return(NULL)
