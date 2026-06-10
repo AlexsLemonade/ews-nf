@@ -23,6 +23,8 @@
 #  This should also be where the results from running the main ews-nf workflow live 
 #  as the annotations from that workflow are used as input here 
 # workdir: Path to the nextflow work directory
+# annotations_column: Column name in the annotations file containing the cell type annotations to use for cNMF, default is "annotation_tier0"
+# celltype_value: Value in the annotations column corresponding to the cell type to use for c
 # k_components_lower: Lower bound for number of components to use with cNMF, default: 5
 # k_components_upper: Upper bound for number of components to use with cNMF, default: 25
 # k_step_size: Step size for creating the range of components to use with cNMF, default: 5
@@ -73,6 +75,8 @@ outdir="$home_dir/ews-nf-out"
 workdir="$home_dir/work"
 
 # cnmf parameters
+annotations_column=${annotations_column:-"annotation_tier0"}
+celltype_value=${celltype_value:-"tumor"}
 skip_cnmf=${skip_cnmf:-0}
 k_components_lower=${k_components_lower:-5}
 k_components_upper=${k_components_upper:-15}
@@ -164,6 +168,8 @@ if [[ $skip_metaprogram_generation -eq 0 ]]; then
       --k_step_size $k_step_size \
       --cnmf_k_range $cnmf_k_range \
       --n_metaprograms $n_metaprograms \
+      --annotations_column $annotations_column \
+      --celltype_value $celltype_value \
       $sample_flag \
       $cnmf_flag \
       $filter_spectra_flag \

@@ -26,6 +26,18 @@ def parse_args() -> argparse.Namespace:
         help="Path to the TSV file containing the tumor cell annotations",
     )
     parser.add_argument(
+        "--annotations_column",
+        type=str,
+        required=True,
+        help="Column name in the annotations file containing the cell type annotations to use for cNMF.",
+    )
+    parser.add_argument(
+        "--celltype_value",
+        type=str,
+        default="tumor",
+        help="Value in the annotations column that corresponds to the cell type to subset for cNMF",
+    )
+    parser.add_argument(
         "--output_dir",
         "-o",
         type=Path,
@@ -121,15 +133,15 @@ def main():
 
     # read in annotations tsv
     annotations_df = pandas.read_csv(args.annotations_file, sep= "\t")
-    # make sure the tumor cell annotation column is provided
-    if not "annotation_tier0" in annotations_df.columns:
+    # make sure the specified annotations column is provided
+    if not args.annotations_column in annotations_df.columns:
         raise KeyError(
-            "Provided annotations file does not contain the required column, `annotation_tier0`"
+            f"Provided annotations file does not contain the required column, `{args.annotations_column}`"
         )
     
     # get vector of tumor cells to keep 
     tumor_barcodes = annotations_df.loc[
-        annotations_df["annotation_tier0"] == "tumor", "barcodes"
+        annotations_df[args.annotations_column] == args.celltype_value, "barcodes"
     ].tolist()
 
     # create a new anndata object with just tumor cells 

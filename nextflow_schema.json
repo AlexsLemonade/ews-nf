@@ -166,6 +166,16 @@
           "mimetype": "text/tab-separated-values",
           "description": "Path to TSV file containing categories for each gene set used with AUCell"
         },
+        "annotations_column": {
+          "type": "string",
+          "default": "annotation_tier0",
+          "description": "Column name in the annotations file containing the cell type annotations to use for cNMF"
+        },
+        "celltype_value": {
+          "type": "string",
+          "default": "tumor",
+          "description": "Value in the annotations column corresponding to the cell type to use for cNMF"
+        },
         "k_components_lower": {
           "type": "number",
           "default": 5,
