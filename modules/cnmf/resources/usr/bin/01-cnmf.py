@@ -145,7 +145,8 @@ def main():
     ].tolist()
 
     # create a new anndata object with just tumor cells 
-    adata.X = adata.raw.X # make sure X has the raw counts for subsetting
+    if adata.raw is not None:
+        adata.X = adata.raw.X # make sure X has the raw counts for subsetting
     subset_adata = adata[tumor_barcodes, ].copy()
 
     # get the mean of each gene across all cells and only keep those with expression > 0
