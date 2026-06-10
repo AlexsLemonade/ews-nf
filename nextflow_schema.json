@@ -90,6 +90,12 @@
           "default": 2,
           "description": "z-score cutoff for classifying cells based on EF-activated (tumor-high) and EF-repressed (tumor-low) gene expression"
         },
+        "annotations_output_dir": {
+          "type": "string",
+          "default": "${params.outdir}/annotations",
+          "format": "directory-path",
+          "description": "Directory where the cell type annotations for each sample will be saved"
+        },
         "ref_celltypes_file": {
           "type": "string",
           "default": "${projectDir}/references/reference-celltypes.tsv",

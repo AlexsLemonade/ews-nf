@@ -7,7 +7,7 @@ process export_annotations {
   tag "${unique_id}"
   label 'mem_8'
   time '2h'
-  publishDir "${params.outdir}/annotations/${sample_id}", mode: 'copy'
+  publishDir "${params.annotations_output_dir}/${sample_id}", mode: 'copy'
   input:
     tuple val(unique_id),
           val(sample_id),
