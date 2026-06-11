@@ -153,7 +153,7 @@ def main():
 
     # check that adata.X has rounded counts and not normalized counts
     x_vals = adata.X.data if scipy.sparse.issparse(adata.X) else adata.X.ravel()
-    if not numpy.all(x_vals == numpy.floor(x_vals)):
+    if numpy.any(x_vals % 1 != 0):
         raise ValueError(f"adata.X does not contain integer counts")
     
     # create a new anndata object with just tumor cells 
