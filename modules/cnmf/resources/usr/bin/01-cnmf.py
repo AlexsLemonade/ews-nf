@@ -9,6 +9,8 @@ import anndata
 import pandas 
 import cnmf
 
+import scipy.sparse
+
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments for cNMF processing."""
@@ -144,9 +146,17 @@ def main():
         annotations_df[args.annotations_column] == args.celltype_value, "barcodes"
     ].tolist()
 
-    # create a new anndata object with just tumor cells 
+    # make sure .X contains the raw counts 
+    # if adata.raw is present, then .X is normalized so need to replace it with the raw counts from adata.raw.X
     if adata.raw is not None:
-        adata.X = adata.raw.X # make sure X has the raw counts for subsetting
+        adata.X = adata.raw.X
+
+    # check that adata.X has rounded counts and not normalized counts
+    x_vals = adata.X.data if scipy.sparse.issparse(adata.X) else adata.X.ravel()
+    if not numpy.all(x_vals == numpy.floor(x_vals)):
+        raise ValueError(f"adata.X does not contain integer counts")
+    
+    # create a new anndata object with just tumor cells 
     subset_adata = adata[tumor_barcodes, ].copy()
 
     # get the mean of each gene across all cells and only keep those with expression > 0
