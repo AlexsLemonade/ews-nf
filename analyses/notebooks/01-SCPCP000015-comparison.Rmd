@@ -1,0 +1,91 @@
+---
+title: "Metrics for identifying shared metaprograms"
+author: "Ally Hawkins"
+date: "`r Sys.Date()`"
+output: html_notebook
+---
+
+
+```{r}
+library(ggplot2)
+
+# Set default ggplot theme
+theme_set(
+  theme_bw()
+)
+```
+
+```{r}
+# metaprogram metrics file
+# contains comparison to metaprograms between the "subset" which is SCPCP000015 
+# and the full cohort which is the full SKC 
+data_dir <- here::here("analyses/data/SCPCP000015/metaprograms")
+metrics_file <- file.path(data_dir, "SKC-metaprogram-comparison-metrics.tsv")
+```
+
+
+```{r}
+metrics_df <- readr::read_tsv(metrics_file, col_types = list(.default = "d", subset_id = "c", subset_mp = "c", full_mp = "c"))
+```
+
+```{r}
+scpca_mp_file <- file.path(data_dir, "full_cohort", "metaprograms-6_cnmf-5-10-15_filtered", "k-6_metaprograms.rds")
+skc_mp_file <- here::here("ews-nf-out", "metaprograms", "metaprograms-7_cnmf-5-10-15_filtered", "metaprograms.rds")
+
+scpca_mps <- readr::read_rds(scpca_mp_file)
+skc_mps <- readr::read_rds(skc_mp_file)
+```
+
+
+## Identifying shared metaprograms
+
+```{r}
+scpca_mp5_top <- scpca_mps$metaprogram_list$MP05 |>
+  sort(decreasing = TRUE) |> 
+  head(n=200)
+
+skc_mp1_top <- skc_mps$metaprogram_list$MP01 |> 
+  sort(decreasing = TRUE) |> 
+  head(n=200)
+```
+
+```{r}
+intersect(names(scpca_mp5_top), names(skc_mp1_top))
+```
+
+This tells me we need to use both the Jaccard and the top correlation and cannot use them independently. 
+
+```{r}
+metrics_df |> 
+  dplyr::filter(
+    jaccard >= 0.6,
+    top_correlation >= 0.75
+  )
+```
+
+What if we use our more lenient thresholds? 
+
+```{r}
+metrics_df |> 
+  dplyr::filter(
+    jaccard >= 0.3, 
+    top_correlation >- 0.5
+  )
+```
+
+Okay, here we see that MP03 in the SCPCP000015 may share some similarities to MP06 (cycling) in the SKC full cohort. 
+
+## Overlap in gene sets from ORA
+
+## Use existing metaprograms to score SCEs 
+
+We could use the scoring here or run the existing scoring script and output the scores as a TSV file? 
+Either way we need to copy the annotations files from Pitt's cluster that are output by ews-nf. 
+
+A fun side activity would be to compare openscpca annotations to ews-nf annotations, but that seems not the goal here. 
+
+```{r}
+
+```
+
+
