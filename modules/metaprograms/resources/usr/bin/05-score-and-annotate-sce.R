@@ -28,6 +28,12 @@ option_list <- list(
     help = "Path to annotations file output from ews-nf with tumor cell annotations"
   ),
   make_option(
+    opt_str = c("--annotations_column"),
+    type = "character",
+    default = "annotation_tier0",
+    help = "Column name in the annotations file containing the cell type annotations that were used for cNMF"
+  ),
+  make_option(
     opt_str = c("--scores_file"),
     type = "character",
     default = "",
@@ -58,8 +64,8 @@ sce <- readr::read_rds(opt$sce_file)
 # read in annotations and filter to only cells from that library 
 annotations_df <- readr::read_tsv(opt$annotations_file) |> 
   dplyr::filter(unique_id == opt$unique_id) |> 
-  # match the column name for final annotations that is currenlty used in shared data
-  dplyr::mutate(ews_nf_celltype_annotation = annotation_tier0) 
+  # match the column name for final annotations that is currently used in shared data
+  dplyr::mutate(ews_nf_celltype_annotation = .data[[opt$annotations_column]]) 
 
 # read in scores file
 scores_df <- readr::read_tsv(opt$scores_file) |> 

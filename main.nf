@@ -168,7 +168,7 @@ workflow nmf_metaprograms {
 
   nmf_run_ch = sample_ch.run_workflow
     .map { sample_id, unique_id, h5_file, num_processed_cells ->
-      def annotations_file = file("${params.outdir}/annotations/${sample_id}/${unique_id}_annotations.tsv", checkIfExists: true)
+      def annotations_file = file("${params.annotations_output_dir}/${sample_id}/${unique_id}_annotations.tsv", checkIfExists: true)
       [sample_id, unique_id, h5_file, annotations_file]
     }
     .filter{ it -> it[0] in sample_ids.getVal() } // filter to only samples included in sample group channel

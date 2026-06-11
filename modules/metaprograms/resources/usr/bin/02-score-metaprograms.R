@@ -55,6 +55,19 @@ option_list <- list(
     help = "Path to annotations file output from ews-nf with tumor cell annotations"
   ),
   make_option(
+    opt_str = c("--annotations_column"),
+    type = "character",
+    default = "annotation_tier0",
+    help = "Column name in the annotations file containing the cell type annotations that were used for cNMF"
+  ),
+  make_option(
+    opt_str = c("--celltype_value"),
+    type = "character",
+    default = "tumor",
+    help = "Value in the annotations column that corresponds to the cell type that was subset for cNMF
+      These are the only cells that should be considered in scoring metaprograms"
+  ),
+  make_option(
     opt_str = c("--unique_id"),
     type = "character",
     default = "",
@@ -114,7 +127,7 @@ unique_id <- opt$unique_id
 
 # get a vector of tumor cells for subsetting
 tumor_cells <- annotations_df |> 
-  dplyr::filter(stringr::str_detect(annotation_tier0, "tumor")) |> 
+  dplyr::filter(stringr::str_detect( .data[[opt$annotations_column]], opt$celltype_value)) |> 
   dplyr::pull(barcodes)
 
 # get expression matrix for tumor cells and mp genes of interest 
