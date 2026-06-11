@@ -112,7 +112,7 @@ add_annotations <- function(sce, id, annotations_df) {
 # File paths -------------------------------------------------------------------
 
 # paths to input data files 
-data_dir <- here::here("data/goodspeed")
+data_dir <- here::here("analyses/data/goodspeed")
 cellranger_dir <- file.path(data_dir, "cellranger_outs/GSE277083_raw_feature")
 cell_metadata_file <- file.path(data_dir, "GSE277083_cell_metadata_primary.txt.gz")
 sample_order_file <- file.path(data_dir, "GSE277083_aggregation.csv.gz")
