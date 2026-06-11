@@ -119,10 +119,11 @@ sample_order_file <- file.path(data_dir, "GSE277083_aggregation.csv.gz")
 
 # list of mito genes that correspond to 10X GRCh38 2020-A reference 
 # grabbed from s3://scpca-nf-references
-mito_file <- here::here("analyses/references/Homo_sapiens.GRCh38.110.mitogenes.txt")
+mito_file <- here::here("references/Homo_sapiens.GRCh38.110.mitogenes.txt")
 
 # output directory 
-results_dir <- file.path(data_dir, "processed_sce_files")
+object_results_dir <- file.path(data_dir, "processed_files")
+annotations_results_dir <- file.path(data_dir, "annotations")
 
 # Prep individual SCE objects --------------------------------------------------
 
@@ -162,13 +163,15 @@ sample_idx <- which(sample_order_df$sample_id %in% primary_samples)
 
 # prep output directories and file names 
 # construct output directories using sample ids 
-sample_dirs <- file.path(results_dir, primary_samples)
+sample_dirs <- file.path(object_results_dir, primary_samples)
 fs::dir_create(sample_dirs)
 
 # define the full paths to the files
 # use sample id for both folder name and file name
 # ews-nf can handle this
 sce_files <- glue::glue("{sample_dirs}/{primary_samples}_processed.rds")
+anndata_files <- glue::glue("{sample_dirs}/{primary_samples}_processed_rna.h5ad")
+annotations_files <- glue::glue("{sample_dirs}/{primary_samples}_annotations.tsv")
 
 # Process and annotate SCEs ----------------------------------------------------
 
@@ -203,9 +206,16 @@ filtered_sce_list <- sce_list |>
   )
 
 # export processed objects -----------------------------------------------------
-# add file names to sce list for easier exports
-names(filtered_sce_list) <- sce_files
+purrr::pwalk(
+  list(filtered_sce_list, sce_files, anndata_files, annotations_files),
+  \(sce, sce_file, h5ad_file, ann_file) {
 
-# export 
-filtered_sce_list |> 
-  purrr::iwalk(\(sce, file) readr::write_rds(sce, file))
+    readr::write_rds(sce, sce_file, compress = "bz2") # export sce
+    zellkonverter::writeH5AD(sce, h5ad_file, X_name = "counts", compression = "gzip") # export anndata
+    
+    colData(sce) |> 
+      as.data.frame() |> 
+      readr::write_tsv(ann_file) # export annotations from coldata
+    
+  }
+)

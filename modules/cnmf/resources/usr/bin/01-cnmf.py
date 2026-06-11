@@ -9,6 +9,8 @@ import anndata
 import pandas 
 import cnmf
 
+import scipy.sparse
+
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments for cNMF processing."""
@@ -24,6 +26,18 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         required=True,
         help="Path to the TSV file containing the tumor cell annotations",
+    )
+    parser.add_argument(
+        "--annotations_column",
+        type=str,
+        required=True,
+        help="Column name in the annotations file containing the cell type annotations to use for cNMF.",
+    )
+    parser.add_argument(
+        "--celltype_value",
+        type=str,
+        default="tumor",
+        help="Value in the annotations column that corresponds to the cell type to subset for cNMF",
     )
     parser.add_argument(
         "--output_dir",
@@ -121,19 +135,28 @@ def main():
 
     # read in annotations tsv
     annotations_df = pandas.read_csv(args.annotations_file, sep= "\t")
-    # make sure the tumor cell annotation column is provided
-    if not "annotation_tier0" in annotations_df.columns:
+    # make sure the specified annotations column is provided
+    if not args.annotations_column in annotations_df.columns:
         raise KeyError(
-            "Provided annotations file does not contain the required column, `annotation_tier0`"
+            f"Provided annotations file does not contain the required column, `{args.annotations_column}`"
         )
     
     # get vector of tumor cells to keep 
     tumor_barcodes = annotations_df.loc[
-        annotations_df["annotation_tier0"] == "tumor", "barcodes"
+        annotations_df[args.annotations_column] == args.celltype_value, "barcodes"
     ].tolist()
 
+    # make sure .X contains the raw counts 
+    # if adata.raw is present, then .X is normalized so need to replace it with the raw counts from adata.raw.X
+    if adata.raw is not None:
+        adata.X = adata.raw.X
+
+    # check that adata.X has rounded counts and not normalized counts
+    x_vals = adata.X.data if scipy.sparse.issparse(adata.X) else adata.X.ravel()
+    if numpy.any(x_vals % 1 != 0):
+        raise ValueError(f"adata.X does not contain integer counts")
+    
     # create a new anndata object with just tumor cells 
-    adata.X = adata.raw.X # make sure X has the raw counts for subsetting
     subset_adata = adata[tumor_barcodes, ].copy()
 
     # get the mean of each gene across all cells and only keep those with expression > 0
