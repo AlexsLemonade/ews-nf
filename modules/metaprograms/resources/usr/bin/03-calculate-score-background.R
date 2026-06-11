@@ -11,7 +11,9 @@ quantile_norm_tumor_cells <- function(sce, annotations_df, gene_universe, annota
   
   # get a vector of tumor cells for subsetting
   tumor_cells <- annotations_df |> 
-    dplyr::filter(stringr::str_detect(.data[[annotations_column]], celltype_value)) |> 
+    dplyr::filter(
+      stringr::str_detect(.data[[annotations_column]], celltype_value)
+    ) |> 
     dplyr::pull(barcodes)
   
   # get expression matrix for tumor cells and mp genes of interest 

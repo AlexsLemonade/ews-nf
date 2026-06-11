@@ -26,7 +26,7 @@
 #  which corresponds to the output directory from ews-nf 
 # workdir: Path to the nextflow work directory
 # annotations_column: Column name in the annotations file containing the cell type annotations to use for cNMF, default is "annotation_tier0"
-# celltype_value: Value in the annotations column corresponding to the cell type to use for c
+# celltype_value: Value in the annotations column corresponding to the cell type to use for cNMF
 # k_components_lower: Lower bound for number of components to use with cNMF, default: 5
 # k_components_upper: Upper bound for number of components to use with cNMF, default: 25
 # k_step_size: Step size for creating the range of components to use with cNMF, default: 5
