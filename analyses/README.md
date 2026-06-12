@@ -9,6 +9,12 @@ Before running this script you must download the data as described below.
 
 * `run-ora.R`: This script can be used to run over-representation analysis on a single set of metaprograms. 
 
+* `SCPCP000015-mp-metrics.sh`: This script produces intermediate files needed to run `notebooks/01-SCPCP000015-comparison.Rmd`, which includes calculating metrics between the ScPCA metaprograms and the Sean Karl cohort metaprograms and scoring all ScPCA samples using the Sean Karl cohort metaprogram. 
+
+## Notebooks 
+
+* `01-SCPCP000015-comparison.Rmd`: This notebook compares metaprograms from ScPCA's project SCPCP000015 to the metaprograms from the full Sean Karl cohort. 
+
 ## Data 
 
 * `goodspeed`: This folder contains files obtained from [`GSE277083`](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE277083)
