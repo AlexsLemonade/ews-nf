@@ -26,7 +26,7 @@ Rscript ../modules/compare-metaprograms/resources/usr/bin/01-compare-metaprogram
  --subset_metaprograms_file $scpca_metaprograms_file \
  --full_metaprograms_file $full_cohort_metaprograms_file \
  --output_file ${scpca_metaprograms_dir}/SKC-metaprogram-comparison-metrics.tsv
- 
+
 # now calculate scores for each library using the metaprograms from the full cohort 
 sample_ids=$(basename -a ${sce_dir}/SCPCS*)
 for sample_id in $sample_ids; do
