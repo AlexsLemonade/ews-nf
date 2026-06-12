@@ -197,8 +197,8 @@ Finally, we will make a heatmap that shows how many of each subset size shares a
 For this, we will use the correlation threshold of 0.7 and Jaccard threshold of 0.6. 
 
 ```{r}
-corr_threshold <- 0.7
-jaccard_threshold <- 0.5
+corr_threshold <- 0.75
+jaccard_threshold <- 0.6
 
 # calculate the percent of each subset with a shared metaprogram for a given full cohort metaprogram
 heatmap_df <- metrics_df |>
