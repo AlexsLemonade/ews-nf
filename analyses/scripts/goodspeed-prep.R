@@ -112,7 +112,7 @@ add_annotations <- function(sce, id, annotations_df) {
 # File paths -------------------------------------------------------------------
 
 # paths to input data files 
-data_dir <- here::here("analyses/data/goodspeed")
+data_dir <- here::here("data/goodspeed")
 cellranger_dir <- file.path(data_dir, "cellranger_outs/GSE277083_raw_feature")
 cell_metadata_file <- file.path(data_dir, "GSE277083_cell_metadata_primary.txt.gz")
 sample_order_file <- file.path(data_dir, "GSE277083_aggregation.csv.gz")
@@ -123,7 +123,6 @@ mito_file <- here::here("references/Homo_sapiens.GRCh38.110.mitogenes.txt")
 
 # output directory 
 object_results_dir <- file.path(data_dir, "processed_files")
-annotations_results_dir <- file.path(data_dir, "annotations")
 
 # Prep individual SCE objects --------------------------------------------------
 
@@ -172,6 +171,7 @@ fs::dir_create(sample_dirs)
 sce_files <- glue::glue("{sample_dirs}/{primary_samples}_processed.rds")
 anndata_files <- glue::glue("{sample_dirs}/{primary_samples}_processed_rna.h5ad")
 annotations_files <- glue::glue("{sample_dirs}/{primary_samples}_annotations.tsv")
+json_files <- glue::glue("{sample_dirs}/{primary_samples}_metadata.json")
 
 # Process and annotate SCEs ----------------------------------------------------
 
@@ -207,15 +207,24 @@ filtered_sce_list <- sce_list |>
 
 # export processed objects -----------------------------------------------------
 purrr::pwalk(
-  list(filtered_sce_list, sce_files, anndata_files, annotations_files),
-  \(sce, sce_file, h5ad_file, ann_file) {
+  list(filtered_sce_list, sce_files, anndata_files, annotations_files, json_files),
+  \(sce, sce_file, h5ad_file, ann_file, json_file) {
 
     readr::write_rds(sce, sce_file, compress = "bz2") # export sce
     zellkonverter::writeH5AD(sce, h5ad_file, X_name = "counts", compression = "gzip") # export anndata
-    
-    colData(sce) |> 
-      as.data.frame() |> 
+
+    colData(sce) |>
+      as.data.frame() |>
       readr::write_tsv(ann_file) # export annotations from coldata
+
+    # export processed cell number to a json file
+    # used by ews-nf to check the number of cells prior to processing
+    list(
+      "processed_cells" = nrow(sce)
+    ) |> 
+      jsonlite::write_json(json_file, 
+                           auto_unbox = TRUE,
+                           pretty = TRUE)
     
   }
 )
