@@ -162,7 +162,9 @@ primary_samples <- cell_metadata_df$Sample |>
 sample_idx <- which(sample_order_df$sample_id %in% primary_samples)
 
 # prep output directories and file names 
-# construct output directories using sample ids 
+# construct output directories using sample ids
+# remove _Primary from each ID since having _ in ids is not ideal for ews-nf
+sample_ids <- stringr::str_remove(primary_samples, "_Primary")
 sample_dirs <- file.path(object_results_dir, primary_samples)
 fs::dir_create(sample_dirs)
 
