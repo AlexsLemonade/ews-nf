@@ -95,7 +95,7 @@ add_annotations <- function(sce, id, annotations_df) {
   coldata_df <- colData(sce) |> 
     as.data.frame() |> 
     # we want all column names to be lowercase
-    # scpca-nf output has barcodes plural in the column names so that's what's expected by ews-nf
+    # ews-nf expects plural barcodes for cnmf
     dplyr::rename(barcodes = Barcode) |> 
     dplyr::left_join(sample_annotations_df, by = "barcodes") |> 
     dplyr::mutate(
