@@ -97,7 +97,7 @@ add_annotations <- function(sce, id, annotations_df) {
     # we want all column names to be lowercase
     # scpca-nf output has barcodes plural in the column names so that's what's expected by ews-nf
     dplyr::rename(barcodes = Barcode) |> 
-    dplyr::left_join(sample_annotations_df, by = c("barcodes", "barcode")) |> 
+    dplyr::left_join(sample_annotations_df, by = "barcodes") |> 
     dplyr::mutate(
       celltype_annotation = dplyr::if_else(is.na(celltype_annotation), "Not annotated", celltype_annotation),
       broad_celltype_annotation = dplyr::if_else(is.na(broad_celltype_annotation), "Not annotated", broad_celltype_annotation),
@@ -120,7 +120,7 @@ sample_order_file <- file.path(data_dir, "GSE277083_aggregation.csv.gz")
 
 # list of mito genes that correspond to 10X GRCh38 2020-A reference 
 # grabbed from s3://scpca-nf-references
-mito_file <- here::here("references/Homo_sapiens.GRCh38.110.mitogenes.txt")
+mito_file <- here::here("analyses/references/Homo_sapiens.GRCh38.110.mitogenes.txt")
 
 # output directory 
 object_results_dir <- file.path(data_dir, "processed_files")
@@ -138,8 +138,8 @@ cell_metadata_df <- readr::read_tsv(cell_metadata_file)
 # pull out just the annotation columns we want to add into the objects
 annotations_df <- cell_metadata_df |> 
   dplyr::select(
-    # rename to match the default Barcode column in SCE 
-    barcode = "Cell",
+    # rename to match the default barcodes column in the SCE 
+    barcodes = "Cell",
     # rename the rest of the columns for legibility 
     sample_id = "Sample",
     celltype_annotation = "Cell.Type",
