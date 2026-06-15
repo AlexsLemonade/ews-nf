@@ -95,8 +95,9 @@ add_annotations <- function(sce, id, annotations_df) {
   coldata_df <- colData(sce) |> 
     as.data.frame() |> 
     # we want all column names to be lowercase
-    dplyr::rename(barcode = Barcode) |> 
-    dplyr::left_join(sample_annotations_df, by = c("barcode")) |> 
+    # scpca-nf output has barcodes plural in the column names so that's what's expected by ews-nf
+    dplyr::rename(barcodes = Barcode) |> 
+    dplyr::left_join(sample_annotations_df, by = c("barcodes", "barcode")) |> 
     dplyr::mutate(
       celltype_annotation = dplyr::if_else(is.na(celltype_annotation), "Not annotated", celltype_annotation),
       broad_celltype_annotation = dplyr::if_else(is.na(broad_celltype_annotation), "Not annotated", broad_celltype_annotation),
@@ -112,7 +113,7 @@ add_annotations <- function(sce, id, annotations_df) {
 # File paths -------------------------------------------------------------------
 
 # paths to input data files 
-data_dir <- here::here("data/goodspeed")
+data_dir <- here::here("analyses/data/goodspeed")
 cellranger_dir <- file.path(data_dir, "cellranger_outs/GSE277083_raw_feature")
 cell_metadata_file <- file.path(data_dir, "GSE277083_cell_metadata_primary.txt.gz")
 sample_order_file <- file.path(data_dir, "GSE277083_aggregation.csv.gz")
