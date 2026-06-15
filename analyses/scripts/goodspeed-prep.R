@@ -171,7 +171,8 @@ fs::dir_create(sample_dirs)
 # ews-nf can handle this
 sce_files <- glue::glue("{sample_dirs}/{primary_samples}_processed.rds")
 anndata_files <- glue::glue("{sample_dirs}/{primary_samples}_processed_rna.h5ad")
-annotations_files <- glue::glue("{sample_dirs}/{primary_samples}_annotations.tsv")
+# ews-nf annotations files should have library_id-sample_id in name
+annotations_files <- glue::glue("{sample_dirs}/{primary_samples}-{primary_samples}_annotations.tsv")
 json_files <- glue::glue("{sample_dirs}/{primary_samples}_metadata.json")
 
 # Process and annotate SCEs ----------------------------------------------------
