@@ -69,7 +69,7 @@ process score_metaprograms {
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
       --annotations_column ${params.annotations_column} \
-      --celltype_value ${params.celltype_value} \
+      --celltype_value "${params.celltype_value}" \
       --unique_id ${unique_id} \
       --metaprograms_file ${metaprograms_file} \
       --output_file "${unique_id}_metaprogram_scores.tsv.gz" \
@@ -79,7 +79,7 @@ process score_metaprograms {
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
       --annotations_column ${params.annotations_column} \
-      --celltype_value ${params.celltype_value} \
+      --celltype_value "${params.celltype_value}" \
       --unique_id ${unique_id} \
       --metaprograms_file ${metaprograms_file} \
       --output_file "${unique_id}_scores_background.tsv.gz" \

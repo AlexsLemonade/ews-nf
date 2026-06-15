@@ -26,7 +26,7 @@ process run_cnmf {
       --h5ad_file ${h5_file} \
       --annotations_file ${annotations_file} \
       --annotations_column ${params.annotations_column} \
-      --celltype_value ${params.celltype_value} \
+      --celltype_value "${params.celltype_value}" \
       --output_dir \$PWD \
       --unique_id ${unique_id} \
       --k_components_lower ${params.k_components_lower} \
