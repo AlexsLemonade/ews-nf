@@ -189,7 +189,7 @@ plot_list <- threshold_combos_df |>
 patchwork::wrap_plots(plot_list)
 ```
 
-In general, we do see that as we increase sample numbers we do recover more shared metaprograms.
+In general, we do see that as we increase sample numbers we recover more shared metaprograms.
 However, changing the cutoffs definitely has an impact on the overall shape. 
 
 The more lenient cutoffs only range from 5-7 in terms of shared metaprograms, suggesting every subset has almost every metaprogram. 
@@ -197,6 +197,35 @@ Increasing either correlation or Jaccard, changes that so that the minimum numbe
 Increasing both, makes the range even wider with the smallest subsets (N=10) only sharing 1 metaprogram on average. 
 
 We would have to do more rigorous analysis to try and identify a true point of saturation here to find the minimum number of samples needed to capture all heterogeneity, but it might actually look like we need the full cohort? 
+
+One of the metaprograms, MP02 is capturing some noise and potentially ambient RNA. 
+Let's remove that metaprogram and then re-create the saturation plot. 
+
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| fig.height: 10
+#| fig.width: 10
+
+# remove the noisy metaprogram
+filtered_metrics_df <- metrics_df |>
+  dplyr::filter(full_mp != "MP02")
+
+# plot the saturation curve
+plot_list <- threshold_combos_df |> 
+  purrr::pmap(\(corr, jaccard) {
+    
+    calculate_shared_mps(filtered_metrics_df, corr, jaccard) |> 
+      plot_saturation(corr, jaccard)
+    
+  }) 
+
+patchwork::wrap_plots(plot_list)
+```
+
+Here we do see the curve flattens out around N=80 or N=90 rather than the positive slope that we see in the previous version. 
+Maybe we are approaching a point of saturation if we don't consider the "noisey" metaprogram? 
+
 
 ## Shared metaprograms heatmap
 
@@ -284,10 +313,12 @@ ComplexHeatmap::Heatmap(
   ComplexHeatmap::draw(heatmap_legend_side = "right")
 ```
 
-It looks like when you get to the N=70/N=80 mark you start to consistently capture every metaprogram. 
-This does include MP02 though, which might just be noise and I don't know that we want to consider "sharing" that metaprogram has a factor in identifying saturation? 
+It looks like when you get to the N=70/N=80 mark you start to consistently capture every metaprogram except for MP02, which isn't consistently captured until all samples are included. 
+I don't know that we want to consider "sharing" that metaprogram has a factor in identifying saturation? 
 
-Another interesting phenomenon here is that the EWS::FLI1 low cells tend to be present in almost every subset once you reach N=30, but this isn't the case for the EWS::FLI1 classic metaprogram. 
+Another interesting phenomenon here is that the EWS::FLI1 low, cycling, and myogenesis programs tend to be present in almost every subset no matter what size and are definitely present in every subset once you reach N=30. 
+We don't see consistent reproducibility of the inflammatory and EWS::FLI1 high programs until around N=60. 
+MP07 is not consistent until N=90. 
 
 ## Session info
 
