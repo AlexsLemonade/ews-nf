@@ -10,6 +10,21 @@ Before running this script you must download the data as described below.
 * `run-ora.R`: This script can be used to run over-representation analysis on a single set of metaprograms. 
 
 * `generate-mp-metrics.sh`: This script produces intermediate files needed to run `notebooks/01-SCPCP000015-comparison.Rmd`, which includes calculating metrics between the ScPCA metaprograms and the Sean Karl cohort metaprograms and scoring all ScPCA samples using the Sean Karl cohort metaprogram. 
+The script was run with default parameters to generate these files. 
+
+This script also produces intermediate files needed to run `notebooks/02-goodspeed-comparison.Rmd`, which includes calculating metrics between the Goodspeed metaprograms and the Sean Karl Cohort metaprograms and scoring all Goodspeed samples using the Sean Karl cohor metaprograms. 
+This command was used to generate these files: 
+
+```sh
+project_id="goodspeed" \
+  sce_dir="data/goodspeed/processed_files" \
+   annotations_dir="data/goodspeed/processed_files" \
+   scpca_metaprograms_dir="data/goodspeed/full_cohort" \
+   scpca_metaprograms_file="data/goodspeed/full_cohort/k-11_metaprograms.rds" \
+   annotations_column="celltype_annotation" \
+   celltype_value="Ewing sarcoma" \
+   ./SCPCP000015-mp-metrics.sh
+```
 
 ## Notebooks 
 
