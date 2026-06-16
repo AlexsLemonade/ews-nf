@@ -30,6 +30,8 @@ project_id="goodspeed" \
 
 * `01-SCPCP000015-comparison.Rmd`: This notebook compares metaprograms from ScPCA's project SCPCP000015 to the metaprograms from the full Sean Karl cohort. 
 
+* `02-goodspeed-comparison.Rmd`: This notebook compares metaprograms from [`GSE277083`](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE277083) to the metaprograms from the full Sean Karl cohort.
+
 ## Data 
 
 * `goodspeed`: This folder contains files obtained from [`GSE277083`](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE277083)
