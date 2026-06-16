@@ -455,7 +455,7 @@ Each box represents a unique sample and the length of the box represent the numb
 # add sample Id column to metaprogram/spectra map
 mp_lookup <- mp_lookup |> 
   dplyr::mutate(
-    sample_id = stringr::str_extract(spectra, "SCPCS[0-9]{6}")
+    sample_id = stringr::word(spectra, 1, sep = "_")
   )
 
 total_samples <- mp_metrics$total_samples
