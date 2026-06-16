@@ -9,7 +9,7 @@ This notebook compares metaprograms generated from the Goodspeed public dataset 
 For reference, the Goodspeed data has k=11 metaprograms and the full SKC has k=7 metaprograms.
 Note that 7 of these metaprograms are patient-specific, so we will only consider 4 metaprograms from the Goodspeed project. 
 
-This notebook requires files created from running `analyses/scripts/generate-mp-metrics.sh`. 
+This notebook requires files created from running `analyses/scripts/generate-mp-metrics.sh` and mirrors the analysis in `01-SCPCP000015-comparison.Rmd`. 
 
 ## Set up 
 
@@ -47,7 +47,7 @@ score_files <- list.files(
   recursive = TRUE
 )
 
-# TODO: Read in SCE files and merge them? 
+# Read in SCE files 
 sce_dir <- here::here("data/goodspeed/processed_files")
 sce_files <- list.files(
   sce_dir, 
@@ -56,15 +56,6 @@ sce_files <- list.files(
   recursive = TRUE
 )
 sample_ids <- stringr::word(basename(sce_files), 1, sep = "_")
-
-# annotations files 
-# use this to subset the merged sce by tumor cells only 
-annotations_files <- list.files(
-  sce_dir, 
-  pattern = "_annotations.tsv",
-  full.names = TRUE, 
-  recursive = TRUE
-)
 ```
 
 
@@ -87,16 +78,6 @@ scores_df <- score_files |>
 sce_list <- sce_files |> 
   purrr::map(readr::read_rds) |> 
   purrr::set_names(sample_ids)
-
-# read in all annotations and combine into a single dataframe
-annotations_df <- annotations_files |> 
-  # there's way too many columns with different types to list the types out here 
-  purrr::map(readr::read_tsv, show_col_types = FALSE) |> 
-  purrr::set_names(sample_ids) |>
-  dplyr::bind_rows(.id = "unique_id") |>
-  dplyr::mutate(cell_id = glue::glue("{unique_id}-{barcodes}")) |>
-  # we only need the annotations
-  dplyr::select(cell_id, celltype_annotation)
 ```
 
 
@@ -106,7 +87,11 @@ First, let's just use the metrics we calculated to determine if any of the metap
 We will use the correlation of the top 200 genes and the Jaccard index of the top 200 genes. 
 We'll use our cutoffs of Jaccard > 0.6 and top correlation > 0.75 that we defined previously. 
 
+As mentioned above, there are a number of patient-specific metaprograms in the Goodspeed data. 
+We will remove those and only consider the other metaprograms.
+
 ```{r}
+
 patient_specific_mps <- c("MP01", "MP02", "MP03", "MP07", "MP09", "MP10", "MP11")
 metrics_df <- metrics_df |> 
   dplyr::filter(!subset_mp %in% patient_specific_mps)
@@ -130,9 +115,8 @@ metrics_df |>
   )
 ```
 
-Okay, here we see that MP03 in the SCPCP000015 may share some similarities to MP06 (cycling) in the SKC full cohort. 
-
-Let's just look at some of the comparisons to see what might be going on.
+Still no shared metaprograms. 
+What's the highest Jaccard we see? 
 
 ```{r}
 metrics_df |> 
@@ -144,9 +128,6 @@ So the Jaccard index is generally low here.
 
 
 ## Overlap in gene sets from ORA
-
-When looking at the reports, I did notice that some of the gene sets we observed in the SKC were also popping up in the goodspeed cohort. 
-For the goodspeed cohort, MP01 had EWS-high gene sets, MP02 had some inflammatory signatures, and MP03 had some cycling signatures. 
 
 Let's look at the intersection of the gene sets identified through ORA for each set of metaprograms. 
 We'll report both the Jaccard and the percentage of each gene sets from one cohort shared with the gene sets in the other cohort.
@@ -191,11 +172,8 @@ ora_overlap_df |>
 
 In this table, the `pct_overlap_skc` tells us what percentage of gene sets in the SKC metaprogram are also found in the goodspeed metaprograms and vice versa for `pct_overlap_goodspeed`. 
 
-It looks like we see a lot of overlap between MP06 in SKC (cycling) and MP03 in goodspeed. 
-We also see that 100% of gene sets from MP01 in SKC (EWS-high) are found in MP01 of goodspeed. 
-There may be some small evidence of overlap between MP04 in SKC (inflammatory) with MP02 of goodspeed, but the percentages of shared gene sets start to drop off around this point in the table. 
-This is interesting because even though we don't see overlap at the individual gene level, we are getting some of the same gene sets back suggesting they are from the same pathways. 
-
+It looks like 96% of genes returned for MP06 in Goodspeed are found in MP06 (cycling) for SKC. 
+Outside of that, there's not much similarity here. 
 
 ## Use existing metaprograms to score SCEs 
 
@@ -207,19 +185,76 @@ ggplot(scores_df, aes(x = log1p(mp_score), y = metaprogram)) +
   ggridges::geom_density_ridges2()
 ```
 
-This plot doesn't really tell me a whole lot. 
-We may have some evidence for MP01 with everything but MP02 showing at least some minor spread in their distribution. 
+I do see some variation in scores for MP01 and MP06. 
 
 What if we look at the scores for individual cells in a UMAP to see if we can find areas that have high scores for specific metaprograms? 
-To do that, we'll actually use the merged object with all samples downloaded from the Portal. 
-To make a nicer UMAP, we'll also integrate the samples using Harmony with `participant_id` as a covariate, because why not.  
+To do that, we first need to merge the SCE objects. 
+To make a nicer UMAP, we'll also integrate the samples using Harmony.
+
+```{r}
+prep_sce <- function(sce) {
+  colnames(sce) <- glue::glue("{sce$sample_id}-{sce$barcodes}")
+  sce$cell_id <- colnames(sce)
+  return(sce)
+}
+
+sce_list <- sce_list |> 
+  purrr::map(prep_sce)
+
+merged_sce <- do.call(cbind, c(unname(sce_list)))
+
+sample_id_df <- colData(merged_sce) |> 
+  as.data.frame() |> 
+  dplyr::select(sample_id, sample_number) |> 
+  unique() |> 
+  tidyr::drop_na() 
+
+coldata_df <- colData(merged_sce) |> 
+  as.data.frame() |> 
+  dplyr::select(-sample_id) |> 
+  dplyr::left_join(sample_id_df, by = c("sample_number"))
+
+colData(merged_sce) <- DataFrame(coldata_df, row.names = coldata_df$cell_id)
+  
+```
+'
+```{r}
+# model gene variance
+gene_var_block <- scran::modelGeneVar(
+  merged_sce,
+  block = merged_sce$sample_id
+)
+# identify subset of variable genes
+hvg_list <- scran::getTopHVGs(
+  gene_var_block,
+  n = 2000
+)
+
+# multi batch PCA on merged object
+multi_pca <- batchelor::multiBatchPCA(
+  merged_sce,
+  subset.row = hvg_list,
+  batch = merged_sce$sample_id,
+  preserve.single = TRUE
+)
+
+# add PCA results to merged SCE object
+reducedDim(merged_sce, "PCA") <- multi_pca[[1]]
+
+# add UMAP
+merged_sce <- scater::runUMAP(
+  merged_sce,
+  dimred = "PCA"
+)
+```
+
 
 ```{r}
 # read in the merged sce and integrate? 
 harmony_pca <- harmony::RunHarmony(
   data_mat = reducedDim(merged_sce, "PCA"),
   meta_data = colData(merged_sce),
-  vars_use = c("participant_id")
+  vars_use = c("sample_id")
 )
 ```
 
@@ -237,7 +272,7 @@ merged_sce <- scater::runUMAP(merged_sce,
 # prep the scores dataframe for joining by adding a cell_id column
 scores_df <- scores_df |> 
   dplyr::mutate(
-    cell_id = glue::glue("{unique_id}-{barcodes}")
+    cell_id = glue::glue("{unique_id}_Primary-{barcodes}")
   )
 
 # combine UMAPs, scores, and annotations all together for plotting
@@ -245,13 +280,12 @@ all_info_df <- scater::makePerCellDF(
   merged_sce,
   use.dimred = "harmony_UMAP"
 ) |> 
-  dplyr::left_join(scores_df, by = c("cell_id", "barcodes")) |> 
-  dplyr::left_join(annotations_df, by = c("cell_id"))
+  dplyr::left_join(scores_df, by = c("cell_id", "barcodes"))
 
 # extract just the tumor cells to plot 
 tumor_plot_df <- all_info_df |> 
   dplyr::filter(
-    stringr::str_detect(annotation_tier0, "tumor")
+    stringr::str_detect(celltype_annotation, "Ewing sarcoma")
   )
 ```
 
@@ -260,47 +294,12 @@ tumor_plot_df <- all_info_df |>
 ggplot(tumor_plot_df, aes(x = harmony_UMAP.1, y = harmony_UMAP.2, color = mp_score)) +
   geom_point(alpha = 0.2, size = 0.1) +
   facet_wrap(vars(metaprogram)) +
-  scale_color_viridis_c()
+  # cap the scores since the majority of them are < 0.25
+  scale_color_viridis_c(limits = c(0, 0.25), oob = scales::squish)
 ```
 
-Hmmm... I do see a group of cells on the left that might have some presence of MP06 (cycling), but I don't see a ton of other spots with scores. 
-This is not overly impressive to me and I think could be related to the genes from these metaprograms just not being very highly expressed in this cohort? 
-We did have a lot of trouble calling tumor cells originally because of the low expression of EWS::FLI1 targets, so I worry about making too many conclusions here. 
-
-Out of curiosity, let's also look at how consistent the annotations from ews-nf are with the annotations from Opengoodspeed for this cohort. 
-Here, we'll just make a table of tumor/normal and compare. 
-
-```{r}
-category_df <- all_info_df |> 
-  dplyr::mutate(
-    opengoodspeed_tumor_category = dplyr::if_else(
-      stringr::str_detect(opengoodspeed_celltype_annotation, "tumor"),
-      "tumor",
-      "normal"
-    ),
-    ewsnf_tumor_category = dplyr::if_else(
-      stringr::str_detect(annotation_tier0, "tumor"),
-      "tumor",
-      "normal"
-    )
-  ) |> 
-  dplyr::select(
-    unique_id, 
-    barcodes, 
-    opengoodspeed_tumor_category, 
-    ewsnf_tumor_category
-  ) |> 
-  dplyr::distinct()
-```
-
-
-```{r}
-table(category_df$opengoodspeed_tumor_category, category_df$ewsnf_tumor_category)
-```
-
-It looks like about 8k cells are being called differently between the two methods. 
-One thing I noticed when looking at the reports from ews-nf is that using the CNV cutoff of z > 2 left almost no tumor cells, whereas in the SKC we get plenty of tumor cells. 
-Again, the low expression in this dataset and low CNV calls could indicate overall lower quality here. 
+I actually do see a group of cells with MP01 and MP06 scores. 
+I also see some evidence of MP04 I think? 
 
 ### Using AUCell to score metaprograms 
 
@@ -331,17 +330,13 @@ ggplot(auc_df, aes(x = auc)) +
   theme_bw()
 ```
 
-So we do see some presence of genes from MP01, which is the EWS-high gene set, so that makes me feel a little better. 
-We also see that almost all cells have this gene set and maybe a small bump at the beginning of cells that don't. 
-
-We also see maybe a little bit of a tail for MP06 (cycling), which suggests presence of those genes in a subset of cells. 
-Other than that, I don't really see anything that would indicate presence of the metaprograms from the SKC in this cohort. 
+Consistent with the scoring, we see cells with higher AUC values in MP01 and then what looks like a tail of cells with higher MP06 and MP04. 
 
 ## Conclusions 
 
-In general, I don't think we can say anything about these metaprograms being reproduced in the goodspeed cohort. 
-I think a lot of that might be due to quality of the sequencing data. 
-It is at least comforting to see that MP01 (EWS-high) and MP06 (cycling) show some level of activity, since at a minimum I would expect these to be present. 
+Similar to the ScPCA data, I think the only usable thing could be the UMAP where we look at scores for each of the SKC metaprograms. 
+But that is still not overly impressive as we see mostly scores for EWS::FLI1 high and proliferative cells, which are expected given these are Ewing sarcoma cells. 
+
 
 ## Session info 
 
