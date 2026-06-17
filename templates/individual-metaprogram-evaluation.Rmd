@@ -778,7 +778,7 @@ For the statistical test, we use a linear mixed model with patient as the random
 For visualization purposes, we calculate a z-score for all `log(mean(scores))` within each metaprogram and display that in the box plot below.
 The significance of the comparison among the sample types is shown above the distributions for that metaprogram with `*` indicating that the distributions are significantly different from each other and `ns` indicating the distributions are not significantly different from each other. 
 
-If no sample types are provided, no plots will be shown. 
+If no sample types are provided, or all samples are of the same smaple type, no plots will be shown. 
 
 ```{r}
 #| eval: !r has_sample_types
@@ -799,7 +799,7 @@ mean_scores_df <- score_df |>
     zscore_mean_mp_score = scale(log_mean_mp_score), 
     .by = c("metaprogram")
   ) |> 
-  # add in the sample metadata including disease timing and patient information 
+  # add in the sample metadata including tumor type and patient information 
   dplyr::left_join(
     dplyr::select(
       sample_df, 
@@ -815,11 +815,14 @@ mean_scores_df <- score_df |>
       .default = tumor_type
     )
   )
+
+# check to see if multiple tumor types are actually present in the data
+has_multiple_sample_types <- length(unique(mean_scores_df$tumor_type)) > 1
 ```
 
 ```{r}
 #| message: FALSE 
-#| eval: !r has_sample_types
+#| eval: !r has_multiple_sample_types
 
 # for the particpant IDs represented in the subset, determine the max number of tumor types
 # in order to use random effect, at least one participant must have samples from 2 tumor types 
@@ -847,7 +850,7 @@ random_effect_lmm_results <- grouped_anova(mean_scores_df, sig_value = 0.05, sta
 ```
 
 ```{r}
-#| eval: !r has_sample_types
+#| eval: !r has_multiple_sample_types
 # plot the scores fore ach sample type and indicate the significance
 ggplot(mean_scores_df, aes(x = metaprogram, y = zscore_mean_mp_score, fill = tumor_type)) +
   geom_boxplot(outlier.size = 0.1) +
