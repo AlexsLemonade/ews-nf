@@ -9,7 +9,7 @@
 sample_metadata_file <- here::here("sample-info", "sample-metadata.tsv")
 output_file <- here::here("sample-info", "disease-relevant-subsets.tsv")
 
-# read in sample dataframe and remove blacklisted samples
+# read in sample dataframe
 sample_df <- readr::read_tsv(sample_metadata_file, col_types = list(.default = "c")) |> 
   dplyr::select(scpca_sample_id, tumor_type)
 
