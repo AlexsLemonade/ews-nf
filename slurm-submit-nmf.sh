@@ -176,13 +176,13 @@ if [[ $skip_metaprogram_generation -eq 0 ]]; then
       --n_metaprograms $n_metaprograms \
       --annotations_column $annotations_column \
       --celltype_value $celltype_value \
+      --subset_tsv $subset_tsv \
       $sample_flag \
       $cnmf_flag \
       $filter_spectra_flag \
       $score_sces_flag \
       $subset_mode_flag \
-      $subset_id_flag \
-      $subset_tsv
+      $subset_id_flag
 fi 
 
 if [[ $subset_mode -eq 1 ]]; then 
