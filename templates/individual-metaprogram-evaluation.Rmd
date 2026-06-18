@@ -778,7 +778,7 @@ For the statistical test, we use a linear mixed model with patient as the random
 For visualization purposes, we calculate a z-score for all `log(mean(scores))` within each metaprogram and display that in the box plot below.
 The significance of the comparison among the sample types is shown above the distributions for that metaprogram with `*` indicating that the distributions are significantly different from each other and `ns` indicating the distributions are not significantly different from each other. 
 
-If no sample types are provided, or all samples are of the same smaple type, no plots will be shown. 
+If no sample types are provided, or all samples are of the same sample type, no plots will be shown. 
 
 ```{r}
 #| eval: !r has_sample_types
