@@ -1,0 +1,364 @@
+---
+title: "Comparison of ScPCA SCPCP000015 metaprograms to the Sean Karl Cohort metaprograms"
+author: "Ally Hawkins"
+date: "`r Sys.Date()`"
+output: html_notebook
+---
+
+This notebook compares metaprograms generated from ScPCA SCPCP000015 to those from the full Sean Karl Cohort. 
+For reference, SCPCP000015 has k=6 metaprograms and the full SKC has k=7 metaprograms.
+
+This notebook requires files created from running `analyses/scripts/generate-mp-metrics.sh`. 
+
+## Set up 
+
+```{r}
+library(ggplot2)
+library(SingleCellExperiment)
+
+# Set default ggplot theme
+theme_set(
+  theme_bw()
+)
+```
+
+```{r}
+# metaprogram metrics file
+# contains comparison to metaprograms between the "subset" which is SCPCP000015 
+# and the full cohort which is the full SKC 
+data_dir <- here::here("data/SCPCP000015/metaprograms")
+metrics_file <- file.path(data_dir, "SKC-metaprogram-comparison-metrics.tsv")
+
+# paths to original mp objects and metrics objects
+scpca_mp_dir <- file.path(data_dir, "full_cohort", "metaprograms-6_cnmf-5-10-15_filtered")
+scpca_mp_file <- file.path(scpca_mp_dir, "k-6_metaprograms.rds")
+scpca_mp_metrics_file <- file.path(scpca_mp_dir, "k-6_metaprograms-metrics.rds")
+
+skc_mp_dir <- here::here("..", "ews-nf-out", "metaprograms", "metaprograms-7_cnmf-5-10-15_filtered")
+skc_mp_file <-file.path(skc_mp_dir, "metaprograms.rds")
+skc_mp_metrics_file <- file.path(skc_mp_dir, "k-7_metaprograms-metrics.rds")
+
+# paths to score files, use these to look at the scores for the SKC metaprograms in ScPCA data
+scores_dir <- file.path(data_dir, "scores")
+score_files <- list.files(
+  scores_dir, 
+  pattern = "_metaprogram-scores.tsv",
+  full.names = TRUE, 
+  recursive = TRUE
+)
+
+# merged sce 
+merged_sce_file <- here::here("..", "scpca-nf-out", "SCPCP000015", "SCPCP000015_merged.rds")
+
+# annotations files 
+# use this to subset the merged sce by tumor cells only 
+annotations_dir <- here::here("data/SCPCP000015/annotations")
+annotations_files <- list.files(
+  annotations_dir, 
+  pattern = "_annotations.tsv",
+  full.names = TRUE, 
+  recursive = TRUE
+)
+```
+
+
+```{r}
+# read in all the input files
+metrics_df <- readr::read_tsv(metrics_file, col_types = list(.default = "d", subset_id = "c", subset_mp = "c", full_mp = "c"))
+
+scpca_mps <- readr::read_rds(scpca_mp_file)
+skc_mps <- readr::read_rds(skc_mp_file)
+
+scpca_metrics <- readr::read_rds(scpca_mp_metrics_file)
+skc_metrics <- readr::read_rds(skc_mp_metrics_file)
+
+# read in all scores and combine into a single dataframe
+scores_df <- score_files |> 
+  purrr::map(readr::read_tsv, col_types = list(.default = "c", mp_score = "d")) |> 
+  dplyr::bind_rows()
+
+merged_sce <- readr::read_rds(merged_sce_file)
+
+# read in all annotations and combine into a single dataframe
+annotations_df <- annotations_files |> 
+  # there's way too many columns with different types to list the types out here 
+  purrr::map(readr::read_tsv, show_col_types = FALSE) |> 
+  dplyr::bind_rows() |>
+  # remove the sample id from the unique id to match what we have in the score output
+  dplyr::mutate(unique_id = stringr::word(unique_id, 1, sep = "-"),
+                cell_id = glue::glue("{unique_id}-{barcodes}")) |>
+  # we only need the annotations
+  dplyr::select(cell_id, annotation_tier0)
+```
+
+
+## Identifying shared metaprograms
+
+First, let's just use the metrics we calculated to determine if any of the metaprograms are shared across both cohorts. 
+We will use the correlation of the top 200 genes and the Jaccard index of the top 200 genes. 
+We'll use our cutoffs of Jaccard > 0.6 and top correlation > 0.75 that we defined previously. 
+
+```{r}
+metrics_df |> 
+  dplyr::filter(
+    jaccard >= 0.6,
+    top_correlation >= 0.75
+  )
+```
+
+
+It doesn't look like any programs are shared. 
+What if we use our more lenient thresholds? 
+
+```{r}
+metrics_df |> 
+  dplyr::filter(
+    jaccard >= 0.3, 
+    top_correlation >= 0.5
+  )
+```
+
+Okay, here we see that MP03 in the SCPCP000015 may share some similarities to MP06 (cycling) in the SKC full cohort. 
+
+Let's just look at some of the comparisons to see what might be going on.
+
+```{r}
+metrics_df |> 
+  head(n=20)
+```
+
+It looks like generally the Jaccard is fairly low for at least these comparisons. 
+But we do see that some of the top correlations are higher with one even at 1.
+
+```{r}
+summary(metrics_df$jaccard)
+```
+
+So the Jaccard index is generally low here, but how are we getting high correlations? 
+We can only calculate the correlation between shared genes, so my guess is that the actual intersection of genes is quite low leading to inflation of correlation values. 
+Let's investigate the pair that has top correlation = 1 and Jaccard = .005. 
+
+```{r}
+scpca_mp5_top <- scpca_mps$metaprogram_list$MP05 |>
+  sort(decreasing = TRUE) |> 
+  head(n=200)
+
+skc_mp1_top <- skc_mps$metaprogram_list$MP01 |> 
+  sort(decreasing = TRUE) |> 
+  head(n=200)
+```
+
+```{r}
+intersect(names(scpca_mp5_top), names(skc_mp1_top))
+```
+
+As expected, there are only two shared genes that we are calculating correlation from.
+This tells me we need to use both the Jaccard and the top correlation and cannot use them independently. 
+
+## Overlap in gene sets from ORA
+
+When looking at the reports, I did notice that some of the gene sets we observed in the SKC were also popping up in the ScPCA cohort. 
+For the ScPCA cohort, MP01 had EWS-high gene sets, MP02 had some inflammatory signatures, and MP03 had some cycling signatures. 
+
+Let's look at the intersection of the gene sets identified through ORA for each set of metaprograms. 
+We'll report both the Jaccard and the percentage of each gene sets from one cohort shared with the gene sets in the other cohort.
+
+```{r}
+# pull out the ora results 
+skc_ora_df <- skc_metrics$ora_results_df
+scpca_ora_df <- scpca_metrics$ora_results_df
+```
+
+```{r}
+# get all pairwise combinations of metaprograms
+mp_combos <- expand.grid(
+  skc = unique(skc_ora_df$metaprogram),
+  scpca = unique(scpca_ora_df$metaprogram),
+  stringsAsFactors = FALSE
+)
+
+# calculate jaccard and % overlap for each pair
+ora_overlap_df <- mp_combos |>
+  dplyr::mutate(
+    # get a vector of gene sets for each metaprogram
+    skc_genesets = purrr::map(
+      skc, \(x) skc_ora_df$ID[skc_ora_df$metaprogram == x]
+      ),
+    scpca_genesets = purrr::map(
+      scpca, \(x) scpca_ora_df$ID[scpca_ora_df$metaprogram == x]
+      ),
+    # calculate jaccard and % overlap
+    intersection = purrr::map2_int(skc_genesets, scpca_genesets, \(x, y) length(intersect(x, y))),
+    union = purrr::map2_int(skc_genesets, scpca_genesets, \(x, y) length(union(x, y))),
+    jaccard = intersection / union,
+    pct_overlap_skc = intersection / purrr::map_int(skc_genesets, length),
+    pct_overlap_scpca = intersection / purrr::map_int(scpca_genesets, length)
+  ) |> 
+  dplyr::select(-skc_genesets, -scpca_genesets)
+
+ora_overlap_df |> 
+  dplyr::arrange(desc(jaccard))
+```
+
+In this table, the `pct_overlap_skc` tells us what percentage of gene sets in the SKC metaprogram are also found in the ScPCA metaprograms and vice versa for `pct_overlap_scpca`. 
+
+It looks like we see a lot of overlap between MP06 in SKC (cycling) and MP03 in ScPCA. 
+We also see that 100% of gene sets from MP01 in SKC (EWS-high) are found in MP01 of ScPCA. 
+There may be some small evidence of overlap between MP04 in SKC (inflammatory) with MP02 of ScPCA, but the percentages of shared gene sets start to drop off around this point in the table. 
+This is interesting because even though we don't see overlap at the individual gene level, we are getting some of the same gene sets back suggesting they are from the same pathways. 
+
+
+## Use existing metaprograms to score SCEs 
+
+Another thing we can do is use the SKC metaprograms to score all tumor cells in the ScPCA cohort and see if there's a) detectable scores for any metaprograms and b) any variation in the scores across cells. 
+First, we'll just look at the distribution of scores for each metaprogram. 
+
+```{r}
+ggplot(scores_df, aes(x = log1p(mp_score), y = metaprogram)) +
+  ggridges::geom_density_ridges2()
+```
+
+This plot doesn't really tell me a whole lot. 
+We may have some evidence for MP01 with everything but MP02 showing at least some minor spread in their distribution. 
+
+What if we look at the scores for individual cells in a UMAP to see if we can find areas that have high scores for specific metaprograms? 
+To do that, we'll actually use the merged object with all samples downloaded from the Portal. 
+To make a nicer UMAP, we'll also integrate the samples using Harmony with `participant_id` as a covariate, because why not.  
+
+```{r}
+# read in the merged sce and integrate? 
+harmony_pca <- harmony::RunHarmony(
+  data_mat = reducedDim(merged_sce, "PCA"),
+  meta_data = colData(merged_sce),
+  vars_use = c("participant_id")
+)
+```
+
+```{r}
+# Store PCA as `harmony_PCA`
+reducedDim(merged_sce, "harmony_PCA") <- harmony_pca
+
+# calculate UMAP on this PCA matrix with appropriate names
+merged_sce <- scater::runUMAP(merged_sce,
+                              dimred = "harmony_PCA",
+                              name   = "harmony_UMAP")
+```
+
+```{r}
+# prep the scores dataframe for joining by adding a cell_id column
+scores_df <- scores_df |> 
+  dplyr::mutate(
+    cell_id = glue::glue("{unique_id}-{barcodes}")
+  )
+
+# combine UMAPs, scores, and annotations all together for plotting
+all_info_df <- scater::makePerCellDF(
+  merged_sce,
+  use.dimred = "harmony_UMAP"
+) |> 
+  dplyr::left_join(scores_df, by = c("cell_id", "barcodes")) |> 
+  dplyr::left_join(annotations_df, by = c("cell_id"))
+
+# extract just the tumor cells to plot 
+tumor_plot_df <- all_info_df |> 
+  dplyr::filter(
+    stringr::str_detect(annotation_tier0, "tumor")
+  )
+```
+
+
+```{r}
+ggplot(tumor_plot_df, aes(x = harmony_UMAP.1, y = harmony_UMAP.2, color = mp_score)) +
+  geom_point(alpha = 0.2, size = 0.1) +
+  facet_wrap(vars(metaprogram)) +
+  # cap the scores since the majority of them are < 0.25
+  scale_color_viridis_c(limits = c(0, 0.2), oob = scales::squish)
+```
+
+I do see that most cells have moderate levels of MP01 (EWS high), which is consistent with what I would expect. 
+I also see a group of cells on the left that have presence of MP06 (cycling) and even a small group of cells on the top that have MP03. 
+But we don't see MP04 (inflammatory) or MP05 (myogenesis). 
+I'm still not overly impressed here, but potentially it could be worth pointing out that we see some presence of cells with 3 of the metaprograms.
+
+Out of curiosity, let's also look at how consistent the annotations from ews-nf are with the annotations from OpenScPCA for this cohort. 
+Here, we'll just make a table of tumor/normal and compare. 
+
+```{r}
+category_df <- all_info_df |> 
+  dplyr::mutate(
+    openscpca_tumor_category = dplyr::if_else(
+      stringr::str_detect(openscpca_celltype_annotation, "tumor"),
+      "tumor",
+      "normal"
+    ),
+    ewsnf_tumor_category = dplyr::if_else(
+      stringr::str_detect(annotation_tier0, "tumor"),
+      "tumor",
+      "normal"
+    )
+  ) |> 
+  dplyr::select(
+    unique_id, 
+    barcodes, 
+    openscpca_tumor_category, 
+    ewsnf_tumor_category
+  ) |> 
+  dplyr::distinct()
+```
+
+
+```{r}
+table(category_df$openscpca_tumor_category, category_df$ewsnf_tumor_category)
+```
+
+It looks like about 8k cells are being called differently between the two methods. 
+One thing I noticed when looking at the reports from ews-nf is that using the CNV cutoff of z > 2 left almost no tumor cells, whereas in the SKC we get plenty of tumor cells. 
+Again, the low expression in this dataset and low CNV calls could indicate overall lower quality here. 
+
+### Using AUCell to score metaprograms 
+
+As a final ditch effort, let's use `AUCell` with the 200 genes from each metaprogram to assign AUC values to each cell in our merged object. 
+We can then plot the distribution of the AUC values to see if there is any evidence for activity of any of these gene sets. 
+
+
+```{r}
+# build rankings from SCE (only needs to be done once)
+cell_rankings <- AUCell::AUCell_buildRankings(counts(merged_sce))
+
+# calculate AUC for all metaprograms at once
+auc_scores <-AUCell::AUCell_calcAUC(
+  skc_metrics$top_genes, 
+  aucMaxRank = ceiling(0.01 * nrow(cell_rankings)), 
+  cell_rankings
+)
+
+# extract AUC matrix and plot distribution for each metaprogram
+auc_df <- as.data.frame(t(assay(auc_scores))) |>
+  tibble::rownames_to_column("cell_id") |>
+  tidyr::pivot_longer(-cell_id, names_to = "metaprogram", values_to = "auc")
+
+ggplot(auc_df, aes(x = auc)) +
+  geom_histogram(bins = 50) +
+  facet_wrap(vars(metaprogram)) +
+  labs(x = "AUC", y = "Cell count") +
+  theme_bw()
+```
+
+So we do see some presence of genes from MP01, which is the EWS-high gene set, so that makes me feel a little better. 
+We also see that almost all cells have this gene set and maybe a small bump at the beginning of cells that don't. 
+
+We also see maybe a little bit of a tail for MP06 (cycling), which suggests presence of those genes in a subset of cells. 
+Other than that, I don't really see anything that would indicate presence of the metaprograms from the SKC in this cohort. 
+
+## Conclusions 
+
+In general, I don't think we can say anything about these metaprograms being reproduced in the ScPCA cohort. 
+I think a lot of that might be due to quality of the sequencing data. 
+It is at least comforting to see that MP01 (EWS-high) and MP06 (cycling) show some level of activity, since at a minimum I would expect these to be present. 
+
+## Session info 
+
+```{r}
+sessionInfo()
+```
+
