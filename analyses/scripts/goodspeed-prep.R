@@ -95,8 +95,9 @@ add_annotations <- function(sce, id, annotations_df) {
   coldata_df <- colData(sce) |> 
     as.data.frame() |> 
     # we want all column names to be lowercase
-    dplyr::rename(barcode = Barcode) |> 
-    dplyr::left_join(sample_annotations_df, by = c("barcode")) |> 
+    # ews-nf expects plural barcodes for cnmf
+    dplyr::rename(barcodes = Barcode) |> 
+    dplyr::left_join(sample_annotations_df, by = "barcodes") |> 
     dplyr::mutate(
       celltype_annotation = dplyr::if_else(is.na(celltype_annotation), "Not annotated", celltype_annotation),
       broad_celltype_annotation = dplyr::if_else(is.na(broad_celltype_annotation), "Not annotated", broad_celltype_annotation),
@@ -119,11 +120,10 @@ sample_order_file <- file.path(data_dir, "GSE277083_aggregation.csv.gz")
 
 # list of mito genes that correspond to 10X GRCh38 2020-A reference 
 # grabbed from s3://scpca-nf-references
-mito_file <- here::here("references/Homo_sapiens.GRCh38.110.mitogenes.txt")
+mito_file <- here::here("analyses/references/Homo_sapiens.GRCh38.110.mitogenes.txt")
 
 # output directory 
 object_results_dir <- file.path(data_dir, "processed_files")
-annotations_results_dir <- file.path(data_dir, "annotations")
 
 # Prep individual SCE objects --------------------------------------------------
 
@@ -138,8 +138,8 @@ cell_metadata_df <- readr::read_tsv(cell_metadata_file)
 # pull out just the annotation columns we want to add into the objects
 annotations_df <- cell_metadata_df |> 
   dplyr::select(
-    # rename to match the default Barcode column in SCE 
-    barcode = "Cell",
+    # rename to match the default barcodes column in the SCE 
+    barcodes = "Cell",
     # rename the rest of the columns for legibility 
     sample_id = "Sample",
     celltype_annotation = "Cell.Type",
@@ -162,16 +162,20 @@ primary_samples <- cell_metadata_df$Sample |>
 sample_idx <- which(sample_order_df$sample_id %in% primary_samples)
 
 # prep output directories and file names 
-# construct output directories using sample ids 
-sample_dirs <- file.path(object_results_dir, primary_samples)
+# construct output directories using sample ids
+# remove _Primary from each ID since having _ in ids is not ideal for ews-nf
+sample_ids <- stringr::str_remove(primary_samples, "_Primary")
+sample_dirs <- file.path(object_results_dir, sample_ids)
 fs::dir_create(sample_dirs)
 
 # define the full paths to the files
 # use sample id for both folder name and file name
 # ews-nf can handle this
-sce_files <- glue::glue("{sample_dirs}/{primary_samples}_processed.rds")
-anndata_files <- glue::glue("{sample_dirs}/{primary_samples}_processed_rna.h5ad")
-annotations_files <- glue::glue("{sample_dirs}/{primary_samples}_annotations.tsv")
+sce_files <- glue::glue("{sample_dirs}/{sample_ids}_processed.rds")
+anndata_files <- glue::glue("{sample_dirs}/{sample_ids}_processed_rna.h5ad")
+# ews-nf annotations files should have library_id-sample_id in name
+annotations_files <- glue::glue("{sample_dirs}/{sample_ids}-{sample_ids}_annotations.tsv")
+json_files <- glue::glue("{sample_dirs}/{sample_ids}_metadata.json")
 
 # Process and annotate SCEs ----------------------------------------------------
 
@@ -207,15 +211,24 @@ filtered_sce_list <- sce_list |>
 
 # export processed objects -----------------------------------------------------
 purrr::pwalk(
-  list(filtered_sce_list, sce_files, anndata_files, annotations_files),
-  \(sce, sce_file, h5ad_file, ann_file) {
+  list(filtered_sce_list, sce_files, anndata_files, annotations_files, json_files),
+  \(sce, sce_file, h5ad_file, ann_file, json_file) {
 
     readr::write_rds(sce, sce_file, compress = "bz2") # export sce
     zellkonverter::writeH5AD(sce, h5ad_file, X_name = "counts", compression = "gzip") # export anndata
-    
-    colData(sce) |> 
-      as.data.frame() |> 
+
+    colData(sce) |>
+      as.data.frame() |>
       readr::write_tsv(ann_file) # export annotations from coldata
+
+    # export processed cell number to a json file
+    # used by ews-nf to check the number of cells prior to processing
+    list(
+      "processed_cells" = nrow(sce)
+    ) |> 
+      jsonlite::write_json(json_file, 
+                           auto_unbox = TRUE,
+                           pretty = TRUE)
     
   }
 )

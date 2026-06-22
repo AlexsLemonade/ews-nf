@@ -657,17 +657,35 @@ The `*` indicates the slope is significantly different from zero, and the `ns` i
 #| fig.height: 10
 #| message: false
 
+get_lm_stats <- function(y, x) {
+  # return NAs if x has no variance (lm will drop the predictor)
+  if (length(unique(x)) < 2) {
+    return(list(r_squared = NA_real_, p_value = NA_real_))
+  }
+  fit <- summary(lm(y ~ x))
+  list(
+    r_squared = fit$r.squared,
+    p_value   = fit$coefficients["x", "Pr(>|t|)"]
+  )
+}
+
+
 # calculate the r2 and pvalue 
 patient_coherence_df <- mp_metrics_df |>
   dplyr::group_by(n_metaprograms) |>
   dplyr::summarize(
     # run lm each time since we can't store the results directly in the data frame
-    r_squared = summary(lm(median_difference ~ num_patients))$r.squared,
-    p_value = summary(lm(median_difference ~ num_patients))$coefficients["num_patients", "Pr(>|t|)"], 
+    stats     = list(get_lm_stats(median_difference, num_patients)),
+    r_squared = stats[[1]]$r_squared,
+    p_value   = stats[[1]]$p_value,
     # identify any where the slope is significantly different from 0
-    sig_label = dplyr::if_else(p_value <= sig_value, "*", "ns"),
+    sig_label = dplyr::if_else(!is.na(p_value) & p_value <= sig_value, "*", "ns"),
     # make a label for the facets
-    plot_label = glue::glue("R^2=='{round(r_squared, 3)} {sig_label}'")
+    plot_label = dplyr::if_else(
+      is.na(r_squared),
+      "R^2=='NA'",
+      glue::glue("R^2=='{round(r_squared, 3)} {sig_label}'")
+    )
   )
 
 # plot the coherence x number of patients

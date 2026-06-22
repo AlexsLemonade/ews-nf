@@ -496,7 +496,9 @@ total_samples <- length(mp_object$unique_ids)
 
 # add sample column 
 mp_clusters_df <- mp_lookup |>
-  dplyr::mutate(sample_id = stringr::str_extract(spectra, "SCPCS[0-9]{6}")) 
+  # spectra are named with unique id which is <library_id>-<sample_id>_cnmf info
+  dplyr::mutate(sample_id = stringr::word(spectra, 1, sep = "_") |> 
+                  stringr::word(-1, sep = "-")) 
 
 # get observed stats
 # includes proportion samples, proption patients, proportion for each disease timing 

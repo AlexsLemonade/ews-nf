@@ -208,7 +208,8 @@ spectra_files <- fs::dir_ls(
   })
 
 # extract the unique ID for labeling
-unique_ids <- stringr::str_extract(spectra_files, pattern = "SCPCL[0-9]+-SCPCS[0-9]+")
+# everything before the first `.` corresponds to the unique ID
+unique_ids <- stringr::str_extract(basename(spectra_files), pattern = "^[^.]+")
 names(spectra_files) <- unique_ids
 
 # check that there are spectra files found and that they have ids 

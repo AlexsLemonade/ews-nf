@@ -174,8 +174,9 @@ if [[ $skip_metaprogram_generation -eq 0 ]]; then
       --k_step_size $k_step_size \
       --cnmf_k_range $cnmf_k_range \
       --n_metaprograms $n_metaprograms \
-      --annotations_column $annotations_column \
-      --celltype_value $celltype_value \
+      --annotations_output_dir "$annotations_output_dir" \
+      --annotations_column "$annotations_column" \
+      --celltype_value "$celltype_value" \
       --subset_tsv $subset_tsv \
       $sample_flag \
       $cnmf_flag \
