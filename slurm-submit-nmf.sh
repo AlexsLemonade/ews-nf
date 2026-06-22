@@ -42,6 +42,7 @@
 # subset_mode: Boolean indicating whether to run in subset mode, default is 0 (false)
 #  in subset mode, the workflow will run on individual subsets of the data defined by the sample-info/sample-subsets.tsv
 # subset_ids: Comma separated string indicating which subsets to run in subset mode, default is empty string which will run all subsets
+# subset_tsv: Path to a file containing the subset_id and sample_id columns used to define subsets 
 # score_sces: Boolean indicating whether to score and annotate sces with the optimal value of k, default is 0 (false)
 #  to score and annotate sces, use --score_sces 1
 # ews_dir: Path to the ews-nf repo, default is $HOME/ews-nf
@@ -96,6 +97,7 @@ score_sces=${score_sces:-0}
 # turn on subset mode to run individual subsets instead of the full cohort
 subset_mode=${subset_mode:-0}
 subset_ids=${subset_ids:-""}
+subset_tsv="$ews_dir/sample-info/sample-subsets.tsv"
 # skip metaprogram generation and just calculate shared metrics 
 # only useful if subset_mode is 1
 skip_metaprogram_generation=${skip_metaprogram_generation:-0}
@@ -175,6 +177,7 @@ if [[ $skip_metaprogram_generation -eq 0 ]]; then
       --annotations_output_dir "$annotations_output_dir" \
       --annotations_column "$annotations_column" \
       --celltype_value "$celltype_value" \
+      --subset_tsv $subset_tsv \
       $sample_flag \
       $cnmf_flag \
       $filter_spectra_flag \
@@ -190,5 +193,6 @@ if [[ $subset_mode -eq 1 ]]; then
       --workflow shared_metaprograms \
       -work-dir "$workdir" \
       --scpca_nf_dir "$scpca_nf_dir" \
-      --outdir "$outdir" 
+      --outdir "$outdir" \
+      --subset_tsv $subset_tsv 
 fi
