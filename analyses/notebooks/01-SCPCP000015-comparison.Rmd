@@ -8,7 +8,7 @@ output: html_notebook
 This notebook compares metaprograms generated from ScPCA SCPCP000015 to those from the full Sean Karl Cohort. 
 For reference, SCPCP000015 has k=6 metaprograms and the full SKC has k=7 metaprograms.
 
-This notebook requires files created from running `analyses/scripts/SCPCP000015-mp-metrics.sh`. 
+This notebook requires files created from running `analyses/scripts/generate-mp-metrics.sh`. 
 
 ## Set up 
 
@@ -271,12 +271,14 @@ tumor_plot_df <- all_info_df |>
 ggplot(tumor_plot_df, aes(x = harmony_UMAP.1, y = harmony_UMAP.2, color = mp_score)) +
   geom_point(alpha = 0.2, size = 0.1) +
   facet_wrap(vars(metaprogram)) +
-  scale_color_viridis_c()
+  # cap the scores since the majority of them are < 0.25
+  scale_color_viridis_c(limits = c(0, 0.2), oob = scales::squish)
 ```
 
-Hmmm... I do see a group of cells on the left that might have some presence of MP06 (cycling), but I don't see a ton of other spots with scores. 
-This is not overly impressive to me and I think could be related to the genes from these metaprograms just not being very highly expressed in this cohort? 
-We did have a lot of trouble calling tumor cells originally because of the low expression of EWS::FLI1 targets, so I worry about making too many conclusions here. 
+I do see that most cells have moderate levels of MP01 (EWS high), which is consistent with what I would expect. 
+I also see a group of cells on the left that have presence of MP06 (cycling) and even a small group of cells on the top that have MP03. 
+But we don't see MP04 (inflammatory) or MP05 (myogenesis). 
+I'm still not overly impressed here, but potentially it could be worth pointing out that we see some presence of cells with 3 of the metaprograms.
 
 Out of curiosity, let's also look at how consistent the annotations from ews-nf are with the annotations from OpenScPCA for this cohort. 
 Here, we'll just make a table of tumor/normal and compare. 
