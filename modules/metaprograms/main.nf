@@ -68,8 +68,8 @@ process score_metaprograms {
     02-score-metaprograms.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
-      --annotations_column ${params.annotations_column} \
-      --celltype_value ${params.celltype_value} \
+      --annotations_column "${params.annotations_column}" \
+      --celltype_value "${params.celltype_value}" \
       --unique_id ${unique_id} \
       --metaprograms_file ${metaprograms_file} \
       --output_file "${unique_id}_metaprogram_scores.tsv.gz" \
@@ -78,8 +78,8 @@ process score_metaprograms {
     03-calculate-score-background.R \
       --sce_file ${sce_file} \
       --annotations_file ${annotations_file} \
-      --annotations_column ${params.annotations_column} \
-      --celltype_value ${params.celltype_value} \
+      --annotations_column "${params.annotations_column}" \
+      --celltype_value "${params.celltype_value}" \
       --unique_id ${unique_id} \
       --metaprograms_file ${metaprograms_file} \
       --output_file "${unique_id}_scores_background.tsv.gz" \
@@ -276,7 +276,7 @@ process score_and_annotate_sce {
       --sce_file ${sce_file} \
       --unique_id ${unique_id} \
       --annotations_file ${annotations_file} \
-      --annotations_column ${params.annotations_column} \
+      --annotations_column "${params.annotations_column}" \
       --scores_file ${combined_scores_file} \
       --output_file "${unique_id}_annotated.rds"
     """
