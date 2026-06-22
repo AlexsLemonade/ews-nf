@@ -230,7 +230,7 @@ Maybe we are approaching a point of saturation if we don't consider the "noisey"
 ## Shared metaprograms heatmap
 
 Finally, we will make a heatmap that shows how many of each subset size shares a given metaprogram. 
-For this, we will use the correlation threshold of 0.7 and Jaccard threshold of 0.6. 
+For this, we will use the correlation threshold of 0.75 and Jaccard threshold of 0.6. 
 
 ```{r}
 corr_threshold <- 0.75
