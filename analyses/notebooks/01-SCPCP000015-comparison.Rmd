@@ -8,7 +8,7 @@ output: html_notebook
 This notebook compares metaprograms generated from ScPCA SCPCP000015 to those from the full Sean Karl Cohort. 
 For reference, SCPCP000015 has k=6 metaprograms and the full SKC has k=7 metaprograms.
 
-This notebook requires files created from running `analyses/scripts/SCPCP000015-mp-metrics.sh`. 
+This notebook requires files created from running `analyses/scripts/generate-mp-metrics.sh`. 
 
 ## Set up 
 

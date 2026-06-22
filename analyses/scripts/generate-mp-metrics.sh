@@ -59,7 +59,7 @@ for sample_id in $sample_ids; do
               --annotations_file $annotation_file \
               --unique_id $library_id \
               --annotations_column "$annotations_column" \
-                --celltype_value "$celltype_value" \
+              --celltype_value "$celltype_value" \
               --metaprograms_file $full_cohort_metaprograms_file \
               --output_file $scores_output_file
         fi
