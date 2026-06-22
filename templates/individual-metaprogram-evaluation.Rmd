@@ -817,7 +817,7 @@ mean_scores_df <- score_df |>
   )
 
 # check to see if multiple tumor types are actually present in the data
-has_multiple_sample_types <- length(unique(mean_scores_df$tumor_type)) > 1
+has_multiple_sample_types <- dplyr::n_distinct(mean_scores_df$tumor_type) > 1
 ```
 
 ```{r}
