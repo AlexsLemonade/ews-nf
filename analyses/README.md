@@ -19,11 +19,11 @@ This command was used to generate these files:
 project_id="goodspeed" \
   sce_dir="data/goodspeed/processed_files" \
    annotations_dir="data/goodspeed/processed_files" \
-   scpca_metaprograms_dir="data/goodspeed/full_cohort" \
-   scpca_metaprograms_file="data/goodspeed/full_cohort/k-11_metaprograms.rds" \
+   cohort_metaprograms_dir="data/goodspeed/full_cohort" \
+   cohort_metaprograms_file="data/goodspeed/full_cohort/k-11_metaprograms.rds" \
    annotations_column="celltype_annotation" \
    celltype_value="Ewing sarcoma" \
-   ./SCPCP000015-mp-metrics.sh
+   ./generate-mp-metrics.sh
 ```
 
 ## Notebooks 
