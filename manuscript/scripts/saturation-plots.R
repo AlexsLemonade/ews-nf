@@ -82,7 +82,8 @@ metrics_df <- metrics_files |>
   ) |> 
   dplyr::bind_rows(.id = "subset_id") |> 
   # add the number of samples per subset
-  dplyr::left_join(subset_info_df, by = "subset_id")
+  dplyr::left_join(subset_info_df, by = "subset_id") |> 
+  dplyr::filter(!subset_id %in% c("primary", "met"))
 
 
 # define the thresholds to use
@@ -175,6 +176,7 @@ ComplexHeatmap::Heatmap(
   column_title          = "Number of samples in subset",
   column_title_side     = "bottom",
   column_title_gp       = grid::gpar(fontsize = 13),
+  column_names_centered = TRUE,
   row_title             = "Full cohort metaprogram",
   row_title_gp          = grid::gpar(fontsize = 13),
   rect_gp               = grid::gpar(col = "white", lwd = 1.5),
