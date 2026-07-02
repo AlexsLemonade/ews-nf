@@ -4,6 +4,8 @@ The `scripts` folder contains scripts used to generate any figures or intermedia
 
 * `fig-1_cell-type-annotation.R`: This script is used to generate the individual panels for Figure 1 that summarize cell type annotation using the `ews-nf` workflow. 
 * `metaprogram-heatmpas.R`: This file is used to generate the heatmaps for metaprogram correlation and results from ORA for each metaprogram. 
+* `saturation-plots.R`: This file is used to generate the saturation sina plot and heatmap comparing metaprograms across subsets to the full cohort. 
+Two versions of the saturation sina plot are saved, `full-saturation-sina.pdf`, which considers all metaprograms and `filterd-saturation-sina.pdf`, which considers all metaprograms except MP02, which is likely noise.
 
 The `full-cohort-metaprograms` folder contains the results from generating metaprograms across the full cohort. 
 
