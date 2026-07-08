@@ -200,7 +200,7 @@ Parameters are validated using the schema in [`nextflow_schema.json`](./nextflow
 | Parameter | Default | Description |
 | --- | --- | --- |
 | `ref_celltypes_file` | `references/reference-celltypes.tsv` | Consensus cell types to include when building the normal reference. |
-| `gtf_file` | `s3://scpca-references/homo_sapiens/ensembl-110/annotation/Homo_sapiens.GRCh38.110.gtf.gz` | GTF reference used to build the inferCNV gene order file. |
+| `gtf_file` | `s3://scpca-nf-references/homo_sapiens/ensembl-110/annotation/Homo_sapiens.GRCh38.110.gtf.gz` | GTF reference used to build the inferCNV gene order file. |
 | `custom_genesets_file` | `genesets/custom-gene-sets.tsv` | Table of custom gene sets for AUCell. |
 | `msigdb_genesets_file` | `genesets/msigdb-gene-sets.tsv` | Table of MSigDB gene sets for AUCell. |
 | `aucell_max_rank_threshold` | `0.01` | Proportion of detected genes used as the max AUC rank threshold. |

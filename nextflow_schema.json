@@ -121,7 +121,7 @@
         },
         "gtf_file": {
           "type": "string",
-          "default": "s3://scpca-references/homo_sapiens/ensembl-110/annotation/Homo_sapiens.GRCh38.110.gtf.gz",
+          "default": "s3://scpca-nf-references/homo_sapiens/ensembl-110/annotation/Homo_sapiens.GRCh38.110.gtf.gz",
           "pattern": "\\.gtf.gz$",
           "format": "file-path",
           "mimetype": "text/tab-separated-values",
