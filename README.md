@@ -34,11 +34,11 @@
 ## Description
 
 This repository holds a Nextflow workflow used to analyze single-cell RNA-sequencing samples obtained from patients with Ewing sarcoma.
-The repository provides four workflow entry points, selected with the `--workflow` parameter:
+The repository provides four workflow entry points, specified with the `--workflow` parameter:
 
-- [`reference`](#reference-workflow) — builds the pooled normal-cell reference and the inferCNV gene order file.
+- [`reference`](#reference-workflow) — builds the pooled normal-cell reference and the inferCNV gene order file used in the `annotation` workflow.
 - [`annotation` (default)](#annotation-workflow) — annotates tumor cells in individual samples.
-- [`nmf_metaprograms`](#annotation-workflow) — identifies recurrent gene expression programs or metaprograms across the tumor cells of many samples.
+- [`nmf_metaprograms`](#metaprogram-workflow) — identifies recurrent gene expression programs or metaprograms across the tumor cells of many samples.
 - [`shared_metaprograms`](#identifying-shared-metaprograms) — compares metaprograms derived from sample subsets against those derived from the full cohort.
 
 ### Reference workflow
@@ -93,7 +93,7 @@ The output from this module includes the optimal set of metaprograms, a TSV file
 
 ### Identifying shared metaprograms 
 
-The final workflow (`shared_metaprograms`) compares the metaprograms generated for a sample subset against those generated for the full cohort and exports a TSV of comparison metrics per subset.
+The workflow (`shared_metaprograms`) compares the metaprograms generated for a sample subset against those generated for the full cohort and exports a TSV of comparison metrics per subset.
 
 ## Prerequisites
 
@@ -217,7 +217,7 @@ Parameters are validated using the schema in [`nextflow_schema.json`](./nextflow
 | `k_components_upper` | `15` | Upper bound of `k` components for cNMF. |
 | `k_step_size` | `5` | Step size for the range of `k` components. |
 | `cnmf_k_range` | `all` | Comma-separated set of `k` values to keep when clustering spectra (or `all`). |
-| `n_metaprograms` | `8,9,10,11` | Range of metaprogram counts evaluated to find the optimal `k`. |
+| `n_metaprograms` | `8,9,10,11` | Range of number of metaprograms evaluated to find the optimal `k`. |
 | `filter_spectra` | `false` | Whether to filter orphan spectra before generating metaprograms. |
 | `orphan_cutoff` | `0.3` | Minimum cross-sample maximum required to keep spectra when `filter_spectra` is true. |
 | `skip_cnmf` | `false` | Skip re-running cNMF for samples with existing results. |
