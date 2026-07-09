@@ -34,6 +34,9 @@
 ## Description
 
 This repository holds a Nextflow workflow used to analyze single-cell RNA-sequencing samples obtained from patients with Ewing sarcoma.
+
+Prior to running this workflow, single-cell RNA-sequencing samples must be processed with [`scpca-nf`](https://github.com/AlexsLemonade/scpca-nf).
+
 The repository provides four workflow entry points, specified with the `--workflow` parameter:
 
 - [`reference`](#reference-workflow) — builds the pooled normal-cell reference and the inferCNV gene order file used in the `annotation` workflow.
@@ -81,15 +84,14 @@ The tumor cells output from the annotation workflow are then used as input to a 
 That workflow is organized into the following modules: 
 
 * `cnmf`: This module runs [`cNMF`](https://github.com/dylkot/cNMF) on all tumor cells over a range of `k` values.
-Here, tumor cells are those that are labeled as tumor by the main workflow with a CNV z-score > 0 (tier0).
-These cells are labeled as `tumor` in the `annotation_tier0` column of the TSV file output by the main annotation workflow (`annotations/<sample_id>/<library_id>-<sample_id>_annotations.tsv`).
-By default the range of `k` values is defined by `--k_components_lower` (5), `--k_components_upper` (15), and `--k_step_size` (5).
-The column and value used to select cells are controlled by `--annotations_column` (default `annotation_tier0`) and `--celltype_value` (default `tumor`).
-The consensus NMF program for each value of `k` is included in the output.
+  * Here, tumor cells are those that are labeled as tumor by the `annotation` workflow with a CNV z-score > 0 (tier0).
+  * By default the range of `k` values is defined by `--k_components_lower` (5), `--k_components_upper` (15), and `--k_step_size` (5).
+  * The column and value used to select cells are controlled by `--annotations_column` (default `annotation_tier0`) and `--celltype_value` (default `tumor`).
+  * The consensus NMF program for each value of `k` is included in the output.
 * `metaprograms`: This module clusters the cNMF spectra across samples to generate shared metaprograms. 
-As the number of clusters must be pre-specified, this module generates metaprograms using a range of k clusters specified using the `--n_metaprograms` parameter (default `8,9,10,11`). 
-A set of metrics is then calculated for each set of metaprograms and the optimal number of metaprograms is identified. 
-The output from this module includes the optimal set of metaprograms, a TSV file ontaining scores for all cells in all samples, and `two associated reports, `combined-metaprograms-metrics.html` and `k-<optimal n_metaprograms>_metaprograms-summary-report.html`. 
+  * As the number of clusters must be pre-determined, this module generates metaprograms using a range of k clusters specified using the `--n_metaprograms` parameter (default `8,9,10,11`). 
+  * A set of metrics is then calculated for each set of metaprograms and the optimal number of metaprograms is identified. 
+  * The output from this module includes the optimal set of metaprograms, a TSV file ontaining scores for all cells in all samples, and `two associated reports, `combined-metaprograms-metrics.html` and `k-<optimal n_metaprograms>_metaprograms-summary-report.html`. 
 
 ### Identifying shared metaprograms 
 
@@ -101,8 +103,10 @@ The workflow (`shared_metaprograms`) compares the metaprograms generated for a s
 - A container engine: Docker (used by the `standard` profile) or Singularity (used by the `pitt_htc` profile).
 - Quantified gene expression data produced by [`scpca-nf`](https://github.com/AlexsLemonade/scpca-nf).
 The processed `SingleCellExperiment` (`_processed.rds`) and `AnnData` (`_processed_rna.h5ad`) objects output from that workflow are used as input to `ews-nf`.
+For more information on `scpca-nf`, please see the [`scpca-nf` documentation](https://github.com/AlexsLemonade/scpca-nf/blob/main/external-instructions.md), including the section describing the [expected output structure](https://github.com/AlexsLemonade/scpca-nf/blob/main/external-instructions.md#output-files). 
 
-> **Note:** Libraries with fewer than 200 processed cells are not included in processing and a message is logged for each skipped library.
+**Note:** Libraries with fewer than 200 processed cells are excluded from processing when running the annotation or nmf_metaprograms workflow. 
+A message is included in the log file for each skipped library.
 
 ## Running the workflow 
 
@@ -110,13 +114,23 @@ The processed `SingleCellExperiment` (`_processed.rds`) and `AnnData` (`_process
 TODO: remove this and update running commands to use the public workflow rather than a local copy 
 Every nextflow run main.nf should be replaced with nextflow run AlexsLemonade/ews-nf
 -->
-In order to run the workflow you will first need to clone the repository. 
+In order to run the full workflow you will first need to clone the repository. 
+
+The different entry points specified with the `--workflow` parameter should be run in the following order: 
+
+1. `reference`: Build the pooled normal cell reference for all samples. 
+2. `annotation`: Annotate tumor cells across all samples. 
+3. `nmf_metaprograms`: Identify shared metaprograms across the full set of samples. 
+4. (Optional) `nmf_metaprograms` with [`--subset_mode`](#subset-mode): Generates shared metaprograms across specific groups of samples or subsets. 
+5. (Optional) `shared_metaprograms`: Compare metaprograms from each sample subset to those identified in the full cohort. 
 
 ### Building the normal reference
 
 Prior to annotating the cells in individual samples, the `reference` workflow should be used to build the necessary reference files. 
 This includes the pooled normal cell reference files and the gene order file to be used with `InferCNV`. 
+
 The pooled reference will include cells from all samples present in the specified `scpca-nf` output directory (`scpca_nf_dir` parameter). 
+Specifically, the processed `SingleCellExperiment` objects (`processed.rds` files) output from `scpca-nf` are used to grab consensus cell type annotations used to build the pooled reference. 
 
 The following command can be used to run the reference part of the workflow: 
 
@@ -126,7 +140,10 @@ nextflow run main.nf --workflow reference
 
 ### Running the main annotation workflow
 
-After creating the reference files with the `reference` workflow, the following command can be run from within the cloned repository and will run the annotation workflow locally with all default [parameters](#parameters):
+After creating the reference files with the `reference` workflow, the `annotation` workflow can be used to annotate tumor cells in each individual sample. 
+This workflow requires the pooled reference files output from the `reference` workflow and processed `SingleCellExperiment` objects (`processed.rds` files) output from `scpca-nf`.
+
+The following command can be used to run the annotation workflow locally with all default [parameters](#parameters):
 
 ```sh
 nextflow run main.nf
@@ -135,8 +152,13 @@ nextflow run main.nf
 ### Running the metaprogram identification workflow
 
 After annotating tumor cells using the main workflow, the `nmf_metaprograms` workflow can be used to identify metapgrograms across a group of samples. 
-This workflow requires the processed `AnnData` objects (`processed_rna.h5ad` files) output from `scpca-nf` and the tumor cell annotations TSV (`annotations/<sample_id>/<library_id>_annotations.tsv`) file output from the main `ews-nf` workflow. 
-By default, all samples with processed files detected in the `scpca_nf_dir` will be used as input to generating metaprograms. 
+This workflow requires: 
+
+- the processed `AnnData` objects (`processed_rna.h5ad` files) output from `scpca-nf` 
+- the processed `SingleCellExperiment` objects (`processed.rds` files)
+- and the tumor cell annotations TSV (`annotations/<sample_id>/<library_id>_annotations.tsv`) file output from the main `ews-nf` workflow. 
+
+By default, all samples with processed files (`processed_rna.h5ad` and `processed.rds`) detected in the `scpca_nf_dir` will be used as input to generating metaprograms. 
 To generate metaprograms for a specific subset of samples, see [Subset mode](#subset-mode).
 
 The following command can be used to generate metaprograms: 
@@ -147,7 +169,7 @@ nextflow run main.nf --workflow nmf_metaprograms
 
 ### Comparing metaprograms across subsets
 
-The `shared_metaprograms` workflow compares metaprograms generated for each sample subset against the metaprograms generated for the full cohort.
+The `shared_metaprograms` workflow compares metaprograms generated for each sample subset (see [Subset mode](#subset-mode)) against the metaprograms generated for the full cohort.
 It requires that `nmf_metaprograms` has already been run for both the relevant subsets and the full cohort, so that the corresponding `*_metaprograms.rds` files exist in the output directory.
 Subsets are defined in the file given by `--subset_tsv` (see [Subset mode](#subset-mode)).
 
@@ -365,6 +387,30 @@ nextflow run main.nf -with-tower
 Any runs of the workflow on the Pittsburgh HTC using the `pitt_htc` profile will appear on the Seqera Platform in the `ews-nf` workspace here: https://cloud.seqera.io/orgs/SeanKarlCohort/workspaces/ews-nf/watch 
 
 You must be a member of the `SeanKarlCohort` organization and have access to the `ews-nf` workspace to monitor runs.
+
+## Inpuut files 
+
+Prior to running any of the individual workflows within `ews-nf`, samples must be processed using [`scpca-nf`](https://github.com/AlexsLemonade/scpca-nf). 
+The `--scpca_nf_dir` parameter should be used to specify the directory with the output files from `scpca-nf` and should have the following structure. 
+Files explicitly used by `ews-nf` are denoted in the file structure: 
+
+```tree
+results
+└── {project_id}
+    └── {sample_id}
+        ├── {library_id}_unfiltered.rds
+        ├── {library_id}_filtered.rds
+        ├── {library_id}_processed.rds # required by ews-nf
+        ├── {library_id}_unfiltered_rna.h5ad
+        ├── {library_id}_filtered_rna.h5ad
+        ├── {library_id}_processed_rna.h5ad # required by ews-nf
+        ├── {library_id}_metadata.json # required by ews-nf
+        └── {library_id}_qc.html
+```
+
+**Note:** The `--scpca_nf_dir` parameter is used to automatically detect all samples that should be processed. 
+Therefore, any sample with processed files (`processed.rds` and `processed_rna.h5ad`) will be automatically run through `ews-nf`. 
+
 
 ## Output files 
 

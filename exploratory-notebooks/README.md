@@ -23,3 +23,5 @@ This folder contains exploratory notebooks used to develop the workflow.
 * `10-shared-metaprogram-metrics.html`: This notebook explores metrics used to compare metaprograms generated across different sample cohorts in an effort to identify shared metaprograms. 
 
 * `11-all-shared-metrics.html`: This notebook evaluates the output from comparing all subsets to the full Sean Karl cohort to generate saturation plots. 
+
+The `utils` folder contains helper functions used in some of the exploratory notebooks. 
