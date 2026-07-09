@@ -105,7 +105,7 @@ The workflow (`shared_metaprograms`) compares the metaprograms generated for a s
 The processed `SingleCellExperiment` (`_processed.rds`) and `AnnData` (`_processed_rna.h5ad`) objects output from that workflow are used as input to `ews-nf`.
 For more information on `scpca-nf`, please see the [`scpca-nf` documentation](https://github.com/AlexsLemonade/scpca-nf/blob/main/external-instructions.md), including the section describing the [expected output structure](https://github.com/AlexsLemonade/scpca-nf/blob/main/external-instructions.md#output-files). 
 
-**Note:** Libraries with fewer than 200 processed cells are excluded from processing when running the annotation or nmf_metaprograms workflow. 
+**Note:** Libraries with fewer than 200 processed cells are excluded from processing when running the `annotation` or `nmf_metaprograms` workflow. 
 A message is included in the log file for each skipped library.
 
 ## Running the workflow 
@@ -130,7 +130,7 @@ Prior to annotating the cells in individual samples, the `reference` workflow sh
 This includes the pooled normal cell reference files and the gene order file to be used with `InferCNV`. 
 
 The pooled reference will include cells from all samples present in the specified `scpca-nf` output directory (`scpca_nf_dir` parameter). 
-Specifically, the processed `SingleCellExperiment` objects (`processed.rds` files) output from `scpca-nf` are used to grab consensus cell type annotations used to build the pooled reference. 
+Specifically, the processed `SingleCellExperiment` objects (`processed.rds` files) output from `scpca-nf` provide the consensus cell type annotations used to build the pooled reference. 
 
 The following command can be used to run the reference part of the workflow: 
 
@@ -388,10 +388,10 @@ Any runs of the workflow on the Pittsburgh HTC using the `pitt_htc` profile will
 
 You must be a member of the `SeanKarlCohort` organization and have access to the `ews-nf` workspace to monitor runs.
 
-## Inpuut files 
+## Input files 
 
 Prior to running any of the individual workflows within `ews-nf`, samples must be processed using [`scpca-nf`](https://github.com/AlexsLemonade/scpca-nf). 
-The `--scpca_nf_dir` parameter should be used to specify the directory with the output files from `scpca-nf` and should have the following structure. 
+The `--scpca_nf_dir` parameter should be used to specify the directory with the output files from `scpca-nf` which have the following structure. 
 Files explicitly used by `ews-nf` are denoted in the file structure: 
 
 ```tree
