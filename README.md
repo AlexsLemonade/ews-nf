@@ -39,14 +39,14 @@ Prior to running this workflow, single-cell RNA-sequencing samples must be proce
 
 The repository provides four workflow entry points, specified with the `--workflow` parameter:
 
-- [`reference`](#reference-workflow) — builds the pooled normal-cell reference and the inferCNV gene order file used in the `annotation` workflow.
+- [`reference`](#reference-workflow) — builds the pooled normal-cell reference and the `InferCNV` gene order file used in the `annotation` workflow.
 - [`annotation` (default)](#annotation-workflow) — annotates tumor cells in individual samples.
 - [`nmf_metaprograms`](#metaprogram-workflow) — identifies recurrent gene expression programs or metaprograms across the tumor cells of many samples.
 - [`shared_metaprograms`](#identifying-shared-metaprograms) — compares metaprograms derived from sample subsets against those derived from the full cohort.
 
 ### Reference workflow
 
-Prior to annotating tumor cells, the reference workflow (`reference`) is used to generate a pooled reference of normal cells across all input samples and the gene order file needed for `inferCNV`. 
+Prior to annotating tumor cells, the reference workflow (`reference`) is used to generate a pooled reference of normal cells across all input samples and the gene order file needed for `InferCNV`. 
 
 This workflow extracts the counts for any cells that should be included in a normal cell reference and saves to a single `SingleCellExperiment` object for use with other modules. 
 An additional TSV file containing the library ID, cell barcode, and consensus cell type annotations is also saved.
@@ -64,9 +64,9 @@ The main workflow (`annotation`), used to annotate tumor cells, is organized int
 Gene sets used are found in `genesets/msigdb-gene-sets.tsv` and `genesets/custom-gene-sets.tsv`. 
 Once `AUCell` is run on each object, the AUC results for all cells belonging to the normal reference are used to build a background distribution. 
 The mean and standard deviation of the background distribution are used to obtain a z-score for the AUC results from all cells in each sample. 
-* `infercnv`: [`inferCNV`](https://github.com/broadinstitute/inferCNV/wiki) is used to infer copy number variations in all non-reference cells. 
-All cells that are classified as reference cells using the `build-reference` module are used as a normal reference to run `inferCNV` on each library. 
-A TSV file containing the estimated CNV profile for each cell along with a heatmap displaying the output from `inferCNV` are saved for each library. 
+* `infercnv`: [`InferCNV`](https://github.com/broadinstitute/inferCNV/wiki) is used to infer copy number variations in all non-reference cells. 
+All cells that are classified as reference cells using the `build-reference` module are used as a normal reference to run `InferCNV` on each library. 
+A TSV file containing the estimated CNV profile for each cell along with a heatmap displaying the output from `InferCNV` are saved for each library. 
 In addition, the total CNVs are summed and the mean and standard deviation of the reference cells are used to obtain a z-score for the total CNVs from all cells in each sample. 
 This same approach is used to calculate the z-score for all `proportion_scaled_*` columns that represent commonly observed CNVs in Ewing sarcoma (gain of chr1, gain of chr8, gain of ch12, and loss of chr16). 
 * `annotate-tumor-cells`: Annotations are assigned to all cells based on the CNV and AUCell z-scores: 
@@ -88,7 +88,7 @@ That workflow is organized into the following modules:
   * By default the range of `k` values is defined by `--k_components_lower` (5), `--k_components_upper` (15), and `--k_step_size` (5).
   * The column and value used to select cells are controlled by `--annotations_column` (default `annotation_tier0`) and `--celltype_value` (default `tumor`).
   * The consensus NMF program for each value of `k` is included in the output.
-* `metaprograms`: This module clusters the cNMF spectra across samples to generate shared metaprograms. 
+* `metaprograms`: This module clusters the `cNMF` spectra across samples to generate shared metaprograms. 
   * As the number of clusters must be pre-determined, this module generates metaprograms using a range of k clusters specified using the `--n_metaprograms` parameter (default `8,9,10,11`). 
   * A set of metrics is then calculated for each set of metaprograms and the optimal number of metaprograms is identified. 
   * The output from this module includes the optimal set of metaprograms, a TSV file ontaining scores for all cells in all samples, and `two associated reports, `combined-metaprograms-metrics.html` and `k-<optimal n_metaprograms>_metaprograms-summary-report.html`. 
@@ -222,27 +222,27 @@ Parameters are validated using the schema in [`nextflow_schema.json`](./nextflow
 | Parameter | Default | Description |
 | --- | --- | --- |
 | `ref_celltypes_file` | `references/reference-celltypes.tsv` | Consensus cell types to include when building the normal reference. |
-| `gtf_file` | `s3://scpca-nf-references/homo_sapiens/ensembl-110/annotation/Homo_sapiens.GRCh38.110.gtf.gz` | GTF reference used to build the inferCNV gene order file. |
+| `gtf_file` | `s3://scpca-nf-references/homo_sapiens/ensembl-110/annotation/Homo_sapiens.GRCh38.110.gtf.gz` | GTF reference used to build the `InferCNV` gene order file. |
 | `custom_genesets_file` | `genesets/custom-gene-sets.tsv` | Table of custom gene sets for AUCell. |
 | `msigdb_genesets_file` | `genesets/msigdb-gene-sets.tsv` | Table of MSigDB gene sets for AUCell. |
 | `aucell_max_rank_threshold` | `0.01` | Proportion of detected genes used as the max AUC rank threshold. |
 | `marker_gene_cutoff` | `2` | z-score cutoff for classifying cells as `high` (EF-activated) or `low` (EF-repressed). |
-| `skip_infercnv` | `false` | Skip re-running inferCNV for samples with existing results. |
+| `skip_infercnv` | `false` | Skip re-running `InferCNV` for samples with existing results. |
 
 **cNMF / metaprogram parameters**
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `annotations_column` | `annotation_tier0` | Annotations column used to select cells for cNMF. |
-| `celltype_value` | `tumor` | Value in `annotations_column` identifying cells to use for cNMF. |
-| `k_components_lower` | `5` | Lower bound of `k` components for cNMF. |
-| `k_components_upper` | `15` | Upper bound of `k` components for cNMF. |
+| `annotations_column` | `annotation_tier0` | Annotations column used to select cells for `cNMF`. |
+| `celltype_value` | `tumor` | Value in `annotations_column` identifying cells to use for `cNMF`. |
+| `k_components_lower` | `5` | Lower bound of `k` components for `cNMF`. |
+| `k_components_upper` | `15` | Upper bound of `k` components for `cNMF`. |
 | `k_step_size` | `5` | Step size for the range of `k` components. |
 | `cnmf_k_range` | `all` | Comma-separated set of `k` values to keep when clustering spectra (or `all`). |
 | `n_metaprograms` | `8,9,10,11` | Range of number of metaprograms evaluated to find the optimal `k`. |
 | `filter_spectra` | `false` | Whether to filter orphan spectra before generating metaprograms. |
 | `orphan_cutoff` | `0.3` | Minimum cross-sample maximum required to keep spectra when `filter_spectra` is true. |
-| `skip_cnmf` | `false` | Skip re-running cNMF for samples with existing results. |
+| `skip_cnmf` | `false` | Skip re-running `cNMF` for samples with existing results. |
 | `score_sces` | `false` | Whether to score and annotate SCEs with the optimal value of `k`. |
 
 **Subset parameters**
@@ -324,7 +324,7 @@ The `--sample_ids` argument can be used to specify a subset of samples to annota
 sbatch slurm-submit.sh --sample_ids "SCPCSXXXXXX,SCPCSXXXXXX"
 ```
 
-To skip running inferCNV for any samples with existing inferCNV results, use: 
+To skip running `InferCNV` for any samples with existing `InferCNV` results, use: 
 
 ```sh
 sbatch slurm-submit.sh --skip_infercnv 1
@@ -346,7 +346,7 @@ This script can be run using the following command:
 sbatch slurm-submit-nmf.sh
 ```
 
-To skip running cNMF for any samples with existing cNMF results, use: 
+To skip running `cNMF` for any samples with existing `cNMF` results, use: 
 
 ```sh
 sbatch slurm-submit-nmf.sh --skip_cnmf 1
@@ -418,7 +418,7 @@ Therefore, any sample with processed files (`processed.rds` and `processed_rna.h
 
 Running the workflow with the `reference` workflow will output three reference files found in `<output_dir>/reference`: 
 
-- A gene order file for use with `inferCNV`. 
+- A gene order file for use with `InferCNV`. 
 The name of the file will be representative of the Ensembl version used to create the file, e.g., `Homo_sapiens.GRCh38.110.gene_order.txt`. 
 - A TSV file with the cell types for all cells included in the pooled reference, `all-ref-annotations.tsv`.
 - An RDS file with a `SingleCellExperiment` object containing the counts for all cells included in the pooled reference, `all-ref-sce.rds`
@@ -471,7 +471,7 @@ The summarized results, including the final annotations, are available in the `<
 
 ### Metaprogram files
 
-The `nmf_metaprograms` workflow writes cNMF and metaprogram results under `<outdir>`. 
+The `nmf_metaprograms` workflow writes `cNMF` and metaprogram results under `<outdir>`. 
 When running the workflow in the default mode, the output structure will be as follows:
 
 ```tree
