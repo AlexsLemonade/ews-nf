@@ -8,8 +8,11 @@ set -euo pipefail
 # pin the Nextflow version
 NXF_VER=${NXF_VER:-25.10.7}
 
-# directory containing main.nf and ccdl_profiles.config
+# directory of the cloned workflow repo
 workflow_dir=${1:-${WORKFLOW_DIR:-$HOME/ewsnf}}
+
+# config file location, as a path relative to the repo root
+config_file=${CONFIG_FILE:-ccdl_profiles.config}
 
 tmux_session="tmux_ewsnf_testing"
 
@@ -17,6 +20,18 @@ if [[ ! -f "${workflow_dir}/main.nf" ]]; then
   echo "Error: main.nf not found in '${workflow_dir}'." 1>&2
   exit 1
 fi
+
+# if the config isn't at the repo root, look for it elsewhere in the repo
+if [[ ! -f "${workflow_dir}/${config_file}" ]]; then
+  found_config=$(cd "$workflow_dir" && find . -name "$(basename "$config_file")" -not -path './.git/*' -print -quit)
+  if [[ -z "$found_config" ]]; then
+    echo "Error: '${config_file}' not found in '${workflow_dir}'." 1>&2
+    exit 1
+  fi
+  config_file="${found_config#./}"
+fi
+
+echo "Using config: ${config_file}"
 
 if tmux has-session -t "$tmux_session" 2>/dev/null; then
   echo "Error: tmux session '${tmux_session}' already exists. Attach or kill it first." 1>&2
@@ -34,7 +49,7 @@ tmux set-environment -t "$tmux_session" PATH "$HOME/.local/bin:$HOME/bin:$PATH"
 
 # respawn the pane so it picks up the session environment set above
 tmux respawn-pane -t "$tmux_session" -k -c "$workflow_dir" \
-  "nextflow run main.nf -c ccdl_profiles.config -profile scpca_testing"
+  "nextflow run main.nf -c ${config_file} -profile scpca_testing"
 
 echo "Launched session '${tmux_session}' in ${workflow_dir}."
 echo "Attach with: tmux attach -t ${tmux_session}"
