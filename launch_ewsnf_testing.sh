@@ -49,7 +49,7 @@ tmux set-environment -t "$tmux_session" PATH "$HOME/.local/bin:$HOME/bin:$PATH"
 
 # respawn the pane so it picks up the session environment set above
 tmux respawn-pane -t "$tmux_session" -k -c "$workflow_dir" \
-  "nextflow run main.nf -c ${config_file} -profile scpca_testing"
+  "nextflow run main.nf -c ${config_file} -profile scpca_testing -with-tower -resume"
 
 echo "Launched session '${tmux_session}' in ${workflow_dir}."
 echo "Attach with: tmux attach -t ${tmux_session}"
