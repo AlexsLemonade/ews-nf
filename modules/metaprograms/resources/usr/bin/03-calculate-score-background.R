@@ -6,30 +6,36 @@
 # output is a data frame with unique_id, metaprogram, replicate, num_cells, mean_mp_score, M2
 
 # Functions --------------------------------------------------------------------
-# quantile normalize the logcounts for tumor cells using all genes in the gene universe
-quantile_norm_tumor_cells <- function(sce, annotations_df, gene_universe, annotations_column, celltype_value){
-  
-  # get a vector of tumor cells for subsetting
-  tumor_cells <- annotations_df |> 
-    dplyr::filter(
-      stringr::str_detect(.data[[annotations_column]], celltype_value)
-    ) |> 
-    dplyr::pull(barcodes)
-  
-  # get expression matrix for tumor cells and mp genes of interest 
+# quantile normalize the logcounts for the cells to use, using all genes in the gene universe
+# if annotations_file is an empty file, no annotations were found for this sample so all cells are used
+quantile_norm_tumor_cells <- function(sce, annotations_file, gene_universe, annotations_column, celltype_value){
+
+  if (file.info(annotations_file)$size == 0) {
+    cells_to_use <- colnames(sce)
+  } else {
+    annotations_df <- readr::read_tsv(annotations_file)
+    # get a vector of tumor cells for subsetting
+    cells_to_use <- annotations_df |>
+      dplyr::filter(
+        stringr::str_detect(.data[[annotations_column]], celltype_value)
+      ) |>
+      dplyr::pull(barcodes)
+  }
+
+  # get expression matrix for cells to use and mp genes of interest
   # only pull out genes that are actually in this object and part of the gene universe
   genes_to_use <- intersect(gene_universe, rownames(sce))
-  
-  # get expression matrix for tumor cells and mp genes of interest 
-  expr <- logcounts(sce)[genes_to_use,tumor_cells] 
-  
-  # quantile normalize the scores 
+
+  # get expression matrix for cells to use and mp genes of interest
+  expr <- logcounts(sce)[genes_to_use,cells_to_use]
+
+  # quantile normalize the scores
   # preprocessCore requires a regular matrix
   norm_expr <- preprocessCore::normalize.quantiles(as.matrix(expr))
   # make sure to add back cell and gene info
   colnames(norm_expr) <- colnames(expr)
-  rownames(norm_expr) <- rownames(expr) 
-  
+  rownames(norm_expr) <- rownames(expr)
+
   return(norm_expr)
 }
 
@@ -79,7 +85,8 @@ option_list <- list(
     opt_str = c("--annotations_file"),
     type = "character",
     default = "ews-nf-out/annotations/SCPCS000841/SCPCL001228-SCPCS000841_annotations.tsv",
-    help = "TSV with tumor cell type annotations"
+    help = "TSV with tumor cell type annotations. If an empty file is provided, no cell type
+      filtering is performed and all cells are used."
   ),
   make_option(
     opt_str = c("--annotations_column"),
@@ -138,7 +145,6 @@ stopifnot(
 
 # read in files
 sce <- readr::read_rds(opt$sce_file)
-annotations_df <- readr::read_tsv(opt$annotations_file)
 
 # read in the metaprogram object and extract gene universe and shuffled mps
 mp_object <- readr::read_rds(opt$metaprograms_file)
@@ -150,12 +156,12 @@ unique_id <- opt$unique_id
 
 # Calculate scores and export --------------------------------------------------
 
-# quantile normalize gene expression for all tumor cells and all genes in the universe
+# quantile normalize gene expression for all cells to use and all genes in the universe
 norm_expr <- quantile_norm_tumor_cells(
-  sce, 
-  annotations_df, 
-  gene_universe, 
-  opt$annotations_column, 
+  sce,
+  opt$annotations_file,
+  gene_universe,
+  opt$annotations_column,
   opt$celltype_value
 )
 

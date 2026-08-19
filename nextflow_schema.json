@@ -96,6 +96,14 @@
           "format": "directory-path",
           "description": "Directory where the cell type annotations for each sample will be saved"
         },
+        "no_annotations_file": {
+          "type": "string",
+          "default": "${projectDir}/references/no_annotations_file.tsv",
+          "pattern": "\\.tsv$",
+          "format": "file-path",
+          "mimetype": "text/tab-separated-values",
+          "description": "Empty placeholder file used in place of a sample's annotations file when none is found in annotations_output_dir; when used, all cells are included in cNMF and metaprogram scoring with no subsetting"
+        },
         "ref_celltypes_file": {
           "type": "string",
           "default": "${projectDir}/references/reference-celltypes.tsv",

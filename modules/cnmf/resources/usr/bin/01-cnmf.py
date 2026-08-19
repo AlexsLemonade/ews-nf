@@ -25,7 +25,8 @@ def parse_args() -> argparse.Namespace:
         "--annotations_file",
         type=Path,
         required=True,
-        help="Path to the TSV file containing the tumor cell annotations",
+        help="Path to the TSV file containing the tumor cell annotations."
+        " If an empty file is provided, no cell type filtering is performed and all cells are used for cNMF.",
     )
     parser.add_argument(
         "--annotations_column",
@@ -133,20 +134,25 @@ def main():
     # read in h5ad
     adata = anndata.read_h5ad(args.h5ad_file)
 
-    # read in annotations tsv
-    annotations_df = pandas.read_csv(args.annotations_file, sep= "\t")
-    # make sure the specified annotations column is provided
-    if not args.annotations_column in annotations_df.columns:
-        raise KeyError(
-            f"Provided annotations file does not contain the required column, `{args.annotations_column}`"
-        )
-    
-    # get vector of tumor cells to keep 
-    tumor_barcodes = annotations_df.loc[
-        annotations_df[args.annotations_column] == args.celltype_value, "barcodes"
-    ].tolist()
+    # an empty annotations file indicates that no annotations were found for this sample
+    # in that case, skip subsetting and use all cells for cNMF
+    if args.annotations_file.stat().st_size == 0:
+        barcodes_to_keep = adata.obs_names.tolist()
+    else:
+        # read in annotations tsv
+        annotations_df = pandas.read_csv(args.annotations_file, sep= "\t")
+        # make sure the specified annotations column is provided
+        if not args.annotations_column in annotations_df.columns:
+            raise KeyError(
+                f"Provided annotations file does not contain the required column, `{args.annotations_column}`"
+            )
 
-    # make sure .X contains the raw counts 
+        # get vector of tumor cells to keep
+        barcodes_to_keep = annotations_df.loc[
+            annotations_df[args.annotations_column] == args.celltype_value, "barcodes"
+        ].tolist()
+
+    # make sure .X contains the raw counts
     # if adata.raw is present, then .X is normalized so need to replace it with the raw counts from adata.raw.X
     if adata.raw is not None:
         adata.X = adata.raw.X
@@ -156,12 +162,12 @@ def main():
     if numpy.any(x_vals % 1 != 0):
         raise ValueError(f"adata.X does not contain integer counts")
     
-    # create a new anndata object with just tumor cells 
-    subset_adata = adata[tumor_barcodes, ].copy()
+    # create a new anndata object with just the cells to use
+    subset_adata = adata[barcodes_to_keep, ].copy()
 
     # get the mean of each gene across all cells and only keep those with expression > 0
     detected_genes = subset_adata.X.mean(axis=0) > 0
-    subset_adata = adata[tumor_barcodes, detected_genes].copy()
+    subset_adata = adata[barcodes_to_keep, detected_genes].copy()
 
     # make a simplified version of the object for easy exporting
     new_adata = anndata.AnnData(X=subset_adata.X)

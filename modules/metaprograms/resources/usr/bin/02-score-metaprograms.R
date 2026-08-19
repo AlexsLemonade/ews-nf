@@ -52,7 +52,8 @@ option_list <- list(
     opt_str = c("--annotations_file"),
     type = "character",
     default = "",
-    help = "Path to annotations file output from ews-nf with tumor cell annotations"
+    help = "Path to annotations file output from ews-nf with tumor cell annotations.
+      If an empty file is provided, no cell type filtering is performed and all cells are scored."
   ),
   make_option(
     opt_str = c("--annotations_column"),
@@ -117,23 +118,29 @@ stopifnot(
 
 # read in files
 sce <- readr::read_rds(opt$sce_file)
-annotations_df <- readr::read_tsv(opt$annotations_file)
 mp_obj <- readr::read_rds(opt$metaprograms_file)
 
-# pull out unique Id to save to TSV 
+# pull out unique Id to save to TSV
 unique_id <- opt$unique_id
 
 # Prep gene expr mtx -----------------------------------------------------------
 
-# get a vector of tumor cells for subsetting
-tumor_cells <- annotations_df |> 
-  dplyr::filter(stringr::str_detect( .data[[opt$annotations_column]], opt$celltype_value)) |> 
-  dplyr::pull(barcodes)
+# an empty annotations file indicates that no annotations were found for this sample
+# in that case, skip subsetting and score all cells
+if (file.info(opt$annotations_file)$size == 0) {
+  cells_to_use <- colnames(sce)
+} else {
+  annotations_df <- readr::read_tsv(opt$annotations_file)
+  # get a vector of tumor cells for subsetting
+  cells_to_use <- annotations_df |>
+    dplyr::filter(stringr::str_detect( .data[[opt$annotations_column]], opt$celltype_value)) |>
+    dplyr::pull(barcodes)
+}
 
-# get expression matrix for tumor cells and mp genes of interest 
+# get expression matrix for cells to use and mp genes of interest
 # only pull out genes that are actually in this object and part of the gene universe
 genes_to_use <- intersect(mp_obj$gene_universe, rownames(sce))
-expr <- logcounts(sce)[genes_to_use, tumor_cells] 
+expr <- logcounts(sce)[genes_to_use, cells_to_use]
 
 # quantile normalize the scores 
 # preprocessCore requires a regular matrix

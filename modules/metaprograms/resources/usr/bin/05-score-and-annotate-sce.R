@@ -25,7 +25,8 @@ option_list <- list(
     opt_str = c("--annotations_file"),
     type = "character",
     default = "",
-    help = "Path to annotations file output from ews-nf with tumor cell annotations"
+    help = "Path to annotations file output from ews-nf with tumor cell annotations.
+      If an empty file is provided, no annotations are added to the SCE and only scores are added."
   ),
   make_option(
     opt_str = c("--annotations_column"),
@@ -61,30 +62,40 @@ stopifnot(
 # read in files
 sce <- readr::read_rds(opt$sce_file)
 
-# read in annotations and filter to only cells from that library 
-annotations_df <- readr::read_tsv(opt$annotations_file) |> 
-  dplyr::filter(unique_id == opt$unique_id) |> 
-  # match the column name for final annotations that is currently used in shared data
-  dplyr::mutate(ews_nf_celltype_annotation = .data[[opt$annotations_column]]) 
+# an empty annotations file indicates that no annotations were found for this sample
+# in that case, skip adding annotations and only add scores
+has_annotations <- file.info(opt$annotations_file)$size > 0
 
 # read in scores file
-scores_df <- readr::read_tsv(opt$scores_file) |> 
+scores_df <- readr::read_tsv(opt$scores_file) |>
   dplyr::filter(unique_id == opt$unique_id)
 
 # expand to have one row per barcode and one column per mp
-wide_scores_df <- scores_df |> 
-  dplyr::select(-unique_id) |> 
+wide_scores_df <- scores_df |>
+  dplyr::select(-unique_id) |>
   tidyr::pivot_wider(
     names_from = metaprogram,
     values_from = mp_score,
     names_prefix = "score_"
   )
 
-# join annotations and scores with coldata then add back to object
-colData(sce) <- colData(sce) |> 
-  as.data.frame() |>
-  dplyr::left_join(annotations_df, by = "barcodes") |> 
-  dplyr::left_join(wide_scores_df, by = "barcodes") |> 
+new_coldata <- colData(sce) |>
+  as.data.frame()
+
+if (has_annotations) {
+  # read in annotations and filter to only cells from that library
+  annotations_df <- readr::read_tsv(opt$annotations_file) |>
+    dplyr::filter(unique_id == opt$unique_id) |>
+    # match the column name for final annotations that is currently used in shared data
+    dplyr::mutate(ews_nf_celltype_annotation = .data[[opt$annotations_column]])
+
+  new_coldata <- new_coldata |>
+    dplyr::left_join(annotations_df, by = "barcodes")
+}
+
+# join scores with coldata then add back to object
+colData(sce) <- new_coldata |>
+  dplyr::left_join(wide_scores_df, by = "barcodes") |>
   DataFrame(row.names = colnames(sce))
 
 readr::write_rds(sce, opt$output_file, compress = "bz2")
