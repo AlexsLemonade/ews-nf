@@ -26,7 +26,8 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         required=True,
         help="Path to the TSV file containing the tumor cell annotations."
-        " If an empty file is provided, no cell type filtering is performed and all cells are used for cNMF.",
+        " If an empty file is provided, cells are subset using the annotations_column in adata.obs"
+        " if that column is present, otherwise no cell type filtering is performed and all cells are used for cNMF.",
     )
     parser.add_argument(
         "--annotations_column",
@@ -135,9 +136,20 @@ def main():
     adata = anndata.read_h5ad(args.h5ad_file)
 
     # an empty annotations file indicates that no annotations were found for this sample
-    # in that case, skip subsetting and use all cells for cNMF
+    # if a celltype value was provided, check whether the cell metadata already contains the
+    # annotations column and subset using that; otherwise fall back to using all cells
     if args.annotations_file.stat().st_size == 0:
-        barcodes_to_keep = adata.obs_names.tolist()
+        if args.celltype_value and args.annotations_column in adata.obs.columns:
+            barcodes_to_keep = adata.obs.loc[
+                adata.obs[args.annotations_column] == args.celltype_value
+            ].index.tolist()
+        else:
+            if args.celltype_value:
+                print(
+                    f"WARNING: Column `{args.annotations_column}` not found in adata.obs. "
+                    "All cells will be used for cNMF."
+                )
+            barcodes_to_keep = adata.obs_names.tolist()
     else:
         # read in annotations tsv
         annotations_df = pandas.read_csv(args.annotations_file, sep= "\t")

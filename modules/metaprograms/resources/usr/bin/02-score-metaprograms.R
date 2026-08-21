@@ -53,7 +53,8 @@ option_list <- list(
     type = "character",
     default = "",
     help = "Path to annotations file output from ews-nf with tumor cell annotations.
-      If an empty file is provided, no cell type filtering is performed and all cells are scored."
+      If an empty file is provided, cells are subset using the annotations_column in colData(sce)
+      if that column is present, otherwise no cell type filtering is performed and all cells are scored."
   ),
   make_option(
     opt_str = c("--annotations_column"),
@@ -126,9 +127,17 @@ unique_id <- opt$unique_id
 # Prep gene expr mtx -----------------------------------------------------------
 
 # an empty annotations file indicates that no annotations were found for this sample
-# in that case, skip subsetting and score all cells
+# if a celltype value was provided, check whether the cell metadata already contains the
+# annotations column and subset using that; otherwise fall back to scoring all cells
 if (file.info(opt$annotations_file)$size == 0) {
-  cells_to_use <- colnames(sce)
+  if (opt$celltype_value != "" && opt$annotations_column %in% colnames(colData(sce))) {
+    cells_to_use <- colnames(sce)[stringr::str_detect(colData(sce)[[opt$annotations_column]], opt$celltype_value)]
+  } else {
+    if (opt$celltype_value != "") {
+      warning(glue::glue("Column `{opt$annotations_column}` not found in colData(sce). All cells will be used for metaprogram scoring."))
+    }
+    cells_to_use <- colnames(sce)
+  }
 } else {
   annotations_df <- readr::read_tsv(opt$annotations_file)
   # get a vector of tumor cells for subsetting

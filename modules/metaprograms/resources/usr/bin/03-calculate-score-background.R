@@ -7,11 +7,20 @@
 
 # Functions --------------------------------------------------------------------
 # quantile normalize the logcounts for the cells to use, using all genes in the gene universe
-# if annotations_file is an empty file, no annotations were found for this sample so all cells are used
+# if annotations_file is an empty file, no annotations were found for this sample
+# in that case, if a celltype value was provided, check whether the cell metadata already contains
+# the annotations column and subset using that; otherwise fall back to using all cells
 quantile_norm_tumor_cells <- function(sce, annotations_file, gene_universe, annotations_column, celltype_value){
 
   if (file.info(annotations_file)$size == 0) {
-    cells_to_use <- colnames(sce)
+    if (celltype_value != "" && annotations_column %in% colnames(colData(sce))) {
+      cells_to_use <- colnames(sce)[stringr::str_detect(colData(sce)[[annotations_column]], celltype_value)]
+    } else {
+      if (celltype_value != "") {
+        warning(glue::glue("Column `{annotations_column}` not found in colData(sce). All cells will be used for the score background calculation."))
+      }
+      cells_to_use <- colnames(sce)
+    }
   } else {
     annotations_df <- readr::read_tsv(annotations_file)
     # get a vector of tumor cells for subsetting
@@ -85,8 +94,9 @@ option_list <- list(
     opt_str = c("--annotations_file"),
     type = "character",
     default = "ews-nf-out/annotations/SCPCS000841/SCPCL001228-SCPCS000841_annotations.tsv",
-    help = "TSV with tumor cell type annotations. If an empty file is provided, no cell type
-      filtering is performed and all cells are used."
+    help = "TSV with tumor cell type annotations. If an empty file is provided, cells are subset
+      using the annotations_column in colData(sce) if that column is present, otherwise no cell
+      type filtering is performed and all cells are used."
   ),
   make_option(
     opt_str = c("--annotations_column"),

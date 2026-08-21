@@ -170,10 +170,11 @@ workflow nmf_metaprograms {
     .map { sample_id, unique_id, h5_file, num_processed_cells ->
       def expected_annotations_file = file("${params.annotations_output_dir}/${sample_id}/${unique_id}_annotations.tsv")
       // if no annotations file is found for this sample, fall back to an empty placeholder file
-      // downstream steps treat the placeholder as a signal to skip subsetting and use all cells
+      // downstream steps treat the placeholder as a signal to check the cell metadata (.obs/colData) for
+      // the annotations column and subset by celltype_value if present; otherwise all cells are used
       def annotations_file = expected_annotations_file.exists() ? expected_annotations_file : file(params.no_annotations_file)
       if (!expected_annotations_file.exists()) {
-        log.warn("No annotations file found for ${unique_id} at ${expected_annotations_file}. All cells will be used for cNMF and metaprogram scoring.")
+        log.warn("No annotations file found for ${unique_id} at ${expected_annotations_file}. Will check for the '${params.annotations_column}' column in the cell metadata to subset cells; if not found, all cells will be used for cNMF and metaprogram scoring.")
       }
       [sample_id, unique_id, h5_file, annotations_file]
     }
