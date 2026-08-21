@@ -769,9 +769,17 @@ mean_scores_df <- score_df |>
       .default = tumor_type
     )
   )
+```
 
-# check to see if multiple tumor types are actually present in the data
-has_multiple_sample_types <- dplyr::n_distinct(mean_scores_df$tumor_type) > 1
+
+```{r}
+# make sure has multiple sample types is set regardless of presence of tumor type to skip downstream processes
+if(has_sample_types){
+ # check to see if multiple tumor types are actually present in the data
+  has_multiple_sample_types <- dplyr::n_distinct(mean_scores_df$tumor_type) > 1 
+} else {
+  has_multiple_sample_types <- FALSE
+}
 ```
 
 ```{r}
