@@ -139,26 +139,24 @@ process metaprogram_metrics {
   publishDir "${metaprograms_publish_dir}", mode: 'copy', enabled: !params.subset_mode
   input:
     tuple val(subset_id),
-          val(n_metaprograms), 
+          val(n_metaprograms),
           val(unique_id_tuple),
-          val(metaprograms_publish_dir), 
+          val(metaprograms_publish_dir),
           path(metaprograms_file)
-    path custom_genesets_file
-    path msigdb_genesets_file
+    path hallmark_reactome_genesets_file
     path gene_set_category_file
     path sample_metadata_file
   output:
     tuple val(subset_id),
           val(n_metaprograms),
-          val(metaprograms_publish_dir), 
+          val(metaprograms_publish_dir),
           path("k-${n_metaprograms}_metaprograms-metrics.rds")
   script:
     """
     04-metaprogram-metrics.R \
       --metaprograms_file ${metaprograms_file} \
       --sample_metadata_file ${sample_metadata_file} \
-      --custom_geneset_file ${custom_genesets_file} \
-      --msigdb_geneset_file ${msigdb_genesets_file} \
+      --hallmark_reactome_geneset_file ${hallmark_reactome_genesets_file} \
       --category_file ${gene_set_category_file} \
       --output_file "k-${n_metaprograms}_metaprograms-metrics.rds" \
       --nreps ${params.nreps} \
@@ -230,11 +228,10 @@ process individual_metaprogram_report {
           path(metrics_file),
           path(combined_score_file)
     path template_file
-    path gene_set_category_file
     path sample_metadata_file
   output:
     tuple val(subset_id),
-          val(n_metaprograms), 
+          val(n_metaprograms),
           path(metaprograms_file),
           path(metrics_file),
           path(combined_score_file),
@@ -246,7 +243,6 @@ process individual_metaprogram_report {
       params = list(metaprograms_object_file = '${metaprograms_file}', \
                     metaprograms_metrics_file = '${metrics_file}', \
                     combined_scores_file = '${combined_score_file}', \
-                    category_file = '${gene_set_category_file}', \
                     sample_metadata_file = '${sample_metadata_file}'))"
     """
   stub:
@@ -386,12 +382,11 @@ workflow metaprograms {
     // create a single data frame for all observed and all background scores
     combine_score_files(grouped_score_ch)
 
-    // calculate metrics 
+    // calculate metrics
     metaprogram_metrics(
-      generate_metaprograms.out, 
-      file(params.custom_genesets_file),
-      file(params.msigdb_genesets_file),
-      file(params.gene_set_category_file), 
+      generate_metaprograms.out,
+      file(params.hallmark_reactome_genesets_file),
+      file(params.gene_set_category_file),
       file(params.sample_metadata_file)
     )
 
@@ -500,7 +495,6 @@ workflow metaprograms {
     individual_metaprogram_report(
       report_ch,
       file(individual_report_template_file),
-      file(params.gene_set_category_file), 
       file(params.sample_metadata_file)
     )
 

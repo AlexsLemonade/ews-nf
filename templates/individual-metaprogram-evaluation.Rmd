@@ -12,7 +12,6 @@ params:
   metaprograms_object_file: "../ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/metaprograms.rds"
   metaprograms_metrics_file: "../ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k-7_metaprograms-metrics.rds"
   combined_scores_file: "../ews-nf-out/metaprograms/metaprograms-7_cnmf-5-10-15_filtered/k-7_metaprogram_scores.tsv.gz"
-  category_file: "../genesets/gene-set-categories.tsv"
   sample_metadata_file: "../sample-info/sample-metadata.tsv"
 ---
 
@@ -214,17 +213,12 @@ stopifnot(
   "Metaprogram object file does not exist" = file.exists(params$metaprograms_object_file),
   "Metaprogram metrics file does not exist" = file.exists(params$metaprograms_metrics_file),
   "Metaprogram scores file does not exist" = file.exists(params$combined_scores_file),
-  "Gene set category file does not exist" = file.exists(params$category_file),
   "Sample metadata file does not exist" = file.exists(params$sample_metadata_file)
 )
 ```
 
 
 ```{r}
-# read in table of gene set categories
-# use this to pull out custom EF-high and EF-low gene sets
-ef_category_df <- readr::read_tsv(params$category_file, col_types = list(.default = "c"))
-
 # read in sample metadata
 sample_df <- readr::read_tsv(params$sample_metadata_file, col_types = list(.default = "c", subdiagnosis = "l", is_xenograft = "l", is_cell_line = "l"))
 
@@ -533,7 +527,7 @@ ggplot(sample_type_df, aes(x = metaprogram, y = proportion, fill = sample_type))
 Ultimately, we want to be able to easily interpret the MPs. 
 We won't actually annotate them here, but we will look to see how biologically distinct the MPs might be. 
 
-To do that, we'll take the first 200 genes for all MPs and do ORA using the custom genesets we use for classifying EWS::FLI1 high and low cells, the Hallmarks collection from `MSigDb`, and the Reactome gene set from `MSigDb`. 
+To do that, we'll take the first 200 genes for all MPs and do ORA using the Hallmark collection from `MSigDb` and the Reactome gene set from `MSigDb`.
 
 ```{r}
 # pull out the top genes and ora results from metrics df
@@ -620,34 +614,11 @@ ora_jaccard_heatmap(ora_results_df,
 ```
 
 
-The custom EF-activated and EF-repressed gene sets are likely to be found in more than 1 module as all of these cells should exhibit some level of EWS::FLI1 activity. 
-To look at the uniqueness of non-EWS::FLI1 gene sets we will re-calculate the Jaccard index for all other gene sets. 
-
-```{r}
-# get the EF activated and EF repressed gene sets
-ef_activated_genesets <- ef_category_df |> 
-  dplyr::filter(geneset_category == "EF-activated") |> 
-  dplyr::pull(full_geneset_name)
-
-ef_repressed_genesets <- ef_category_df |> 
-  dplyr::filter(geneset_category == "EF-repressed") |> 
-  dplyr::pull(full_geneset_name)
-
-# remove ef gene sets for jaccard calculations
-# we expect some overlap of these already so let's see how unique the remaining genesets are
-filtered_ora_results_df <- ora_results_df |> 
-  dplyr::filter(!ID %in% c(ef_repressed_genesets, ef_activated_genesets))
-
-ora_jaccard_heatmap(filtered_ora_results_df,
-                    title = "EF gene sets removed")
-```
-
 ### Specificity and similarity of gene sets
 
-Here we will look at the identified gene sets for each metaprogram. 
-If multiple gene sets are returned, it's likely that they are biologically similar. 
+Here we will look at the identified gene sets for each metaprogram.
+If multiple gene sets are returned, it's likely that they are biologically similar.
 Having multiple gene sets that are biologically distinct is going to impede interpretation.
-This plot shows all gene sets, including EWS::FLI1 gene sets.
 
 ```{r}
 #| fig.height: 25
@@ -665,26 +636,7 @@ split(ora_results_df, ora_results_df$metaprogram) |>
 ```
 
 
-### Ewing specific gene sets
-
-We know that these tumor cells should show have a group of cells with a EWS::FLI1 repressed cell signature, or "low", as we have been calling them. 
-To see if any of these MPs show that signature, we'll get a score for whether or not that MP shows a high or low signature.
-This is calculated by getting the sum of all significant gene sets in either the EF-activated or EF-repressed gene sets and then dividing by the total number of gene sets in that group. 
-
-
-```{r}
-ora_results_df |> 
-  dplyr::mutate(ef_high = ID %in% ef_activated_genesets,
-                ef_low = ID %in% ef_repressed_genesets) |> 
-  dplyr::summarize(
-    ef_high_score = round(sum(ef_high)/length(ef_activated_genesets), 2),
-    ef_low_score = round(sum(ef_low)/length(ef_repressed_genesets),2),
-    .by = "metaprogram"
-  ) |> 
-  DT::datatable()
-```
-
-## Using metaprograms to identify cell states 
+## Using metaprograms to identify cell states
 
 Ultimately we want to be able to use these MPs to identify cell states in our original data. 
 In order to do that, we need to assign a score to each cell for each MP and then use that to pull out cells with high scores for that MP. 

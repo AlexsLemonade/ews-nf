@@ -15,6 +15,20 @@ The following columns can be found in the file:
 | category | Broad category for the specified gene set, e.g., Hallmark (H) or Curated gene sets (C2) | 
 | subcategory | Sub category for the specified gene set, e.g., CGP or BP | 
 
+## Hallmark and Reactome gene sets
+
+The `hallmark-reactome-gene-sets.tsv` file contains the Hallmark and Reactome gene sets from [`MSigDB`](https://www.gsea-msigdb.org/gsea/msigdb/) that are used for over representation analysis of metaprograms in `modules/metaprograms/resources/usr/bin/04-metaprogram-metrics.R`.
+This file was prepared using `setup/download-msigdb-genesets.R`, which downloads the gene sets directly from `MSigDB` using `msigdbr` and is not part of the workflow.
+Re-run this script if the gene sets need to be updated.
+
+The following columns can be found in the file:
+
+| Column name | Description |
+| -- | -- |
+| collection | The MSigDB collection the gene set belongs to, either `Hallmark` or `Reactome` |
+| gs_name | Full name of the gene set as listed in `MSigDB` |
+| ensembl_gene | Ensembl gene identifier for a gene included in the gene set |
+
 ## Custom gene sets 
 
 The `custom-gene-sets.tsv` file contains all genes that belong to a custom gene set that was either sent by an investigator or present in a publication. 
