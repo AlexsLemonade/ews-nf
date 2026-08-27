@@ -28,7 +28,7 @@ process generate_metaprograms {
       --cnmf_results_dirs ${cnmf_results_string} \
       --cnmf_k_range ${params.cnmf_k_range} \
       --n_metaprograms ${n_metaprograms} \
-      --filter_spectra ${params.filter_spectra} \
+      ${params.filter_spectra ? '--filter_spectra' : ''} \
       --orphan_cutoff ${params.orphan_cutoff} \
       --output_file "k-${n_metaprograms}_metaprograms.rds" \
       --seed ${params.seed}

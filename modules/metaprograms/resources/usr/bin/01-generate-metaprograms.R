@@ -224,6 +224,20 @@ stopifnot(
 # read in and build spectra mtx
 spectra_mtx <- build_spectra_mtx(spectra_files)
 
+# remove any spectra with zero variance (e.g. degenerate cNMF components that can arise
+# from samples with a small number of cells) since they produce an undefined (NA)
+# correlation with every other spectra, which later causes hclust() to fail
+spectra_sd <- apply(spectra_mtx, 2, sd, na.rm = TRUE)
+zero_var_spectra <- names(spectra_sd)[which(spectra_sd == 0)]
+
+if(length(zero_var_spectra) > 0){
+  message(
+    "Removing ", length(zero_var_spectra), " spectra with zero variance: ",
+    paste(zero_var_spectra, collapse = ", ")
+  )
+  spectra_mtx <- spectra_mtx[, !colnames(spectra_mtx) %in% zero_var_spectra, drop = FALSE]
+}
+
 # get correlations
 cor_mtx <- cor(spectra_mtx, method = "pearson", use = "pairwise.complete.obs")
 
@@ -244,6 +258,25 @@ if(opt$filter_spectra){
 spectra_cor_df <- build_spectra_cor_df(cor_mtx)
 
 # Generate MPs -----------------------------------------------------------------
+
+# defensive check: hclust() cannot handle non-finite distances, so fail here with a
+# message identifying the offending spectra pairs rather than a generic hclust error
+bad_mtx <- !is.finite(cor_mtx)
+bad_mtx[lower.tri(bad_mtx, diag = TRUE)] <- FALSE
+
+if(any(bad_mtx)){
+  bad_idx <- which(bad_mtx, arr.ind = TRUE)
+  bad_pairs <- paste(
+    rownames(cor_mtx)[bad_idx[, "row"]],
+    colnames(cor_mtx)[bad_idx[, "col"]],
+    sep = " / "
+  )
+  stop(
+    "Correlation matrix contains non-finite values (NA/NaN/Inf) for the following spectra pairs, ",
+    "likely due to insufficient shared genes between samples:\n",
+    paste(bad_pairs, collapse = "\n")
+  )
+}
 
 # cluster spectra into MPs using correlation
 dist_mtx <- as.dist(1-cor_mtx)
