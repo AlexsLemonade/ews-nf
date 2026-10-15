@@ -110,11 +110,7 @@ A message is included in the log file for each skipped library.
 
 ## Running the workflow 
 
-<!--
-TODO: remove this and update running commands to use the public workflow rather than a local copy 
-Every nextflow run main.nf should be replaced with nextflow run AlexsLemonade/ews-nf
--->
-In order to run the full workflow you will first need to clone the repository. 
+The workflow can be run by directly pulling from GitHub using `nextflow run AlexsLemonade/ews-nf` or by cloning the repository and running `nextflow run main.nf`. 
 
 The different entry points specified with the `--workflow` parameter should be run in the following order: 
 
@@ -135,7 +131,7 @@ Specifically, the processed `SingleCellExperiment` objects (`processed.rds` file
 The following command can be used to run the reference part of the workflow: 
 
 ```sh
-nextflow run main.nf --workflow reference
+nextflow run AlexsLemonade/ews-nf --workflow reference
 ```
 
 ### Running the main annotation workflow
@@ -164,7 +160,7 @@ To generate metaprograms for a specific subset of samples, see [Subset mode](#su
 The following command can be used to generate metaprograms: 
 
 ```sh
-nextflow run main.nf --workflow nmf_metaprograms
+nextflow run AlexsLemonade/ews-nf --workflow nmf_metaprograms
 ```
 
 ### Comparing metaprograms across subsets
@@ -174,7 +170,7 @@ It requires that `nmf_metaprograms` has already been run for both the relevant s
 Subsets are defined in the file given by `--subset_tsv` (see [Subset mode](#subset-mode)).
 
 ```sh
-nextflow run main.nf --workflow shared_metaprograms
+nextflow run AlexsLemonade/ews-nf --workflow shared_metaprograms
 ```
 
 ### Subset mode
@@ -188,7 +184,7 @@ Subsets are specified in a TSV file (`--subset_tsv`, default [`sample-info/sampl
 The following command can be used to run the `nmf_metaprograms` workflow with subset mode: 
 
 ```sh
-nextflow run main.nf --workflow nmf_metaprograms \
+nextflow run AlexsLemonade/ews-nf --workflow nmf_metaprograms \
   --subset_mode \
   --subset_ids <optional comma separated list of subset ids> 
 ```
@@ -256,7 +252,7 @@ Parameters are validated using the schema in [`nextflow_schema.json`](./nextflow
 Below is an example of running the workflow and specifying different parameters:
 
 ```sh
-nextflow run main.nf \
+nextflow run AlexsLemonade/ews-nf \
   --scpca_nf_out <path to scpca-nf output> \
   --sample_ids <comma separated list of sample ids> \
   --outdir <path to directory to save output from workflow>
@@ -282,7 +278,7 @@ Instead, please follow the [instructions on running the workflow using the HTC b
 To use the `pitt_htc` profile run: 
 
 ```sh
-nextflow run main.nf -profile pitt_htc
+nextflow run AlexsLemonade/ews-nf -profile pitt_htc
 ```
 
 - `stub`: This profile can be used for testing the workflow configuration and process input/outputs. 
@@ -290,7 +286,7 @@ nextflow run main.nf -profile pitt_htc
 To use the `stub` profile run: 
 
 ```sh
-nextflow run main.nf -profile stub -stub 
+nextflow run AlexsLemonade/ews-nf -profile stub -stub 
 ```
 
 ### Running the workflow on the Pittsburgh High Throughput Cluster
@@ -381,7 +377,7 @@ We recommend that you also add this line to your `~/.bash_profile` or equivalent
 To run the workflow using Seqera, use the following command: 
 
 ```sh
-nextflow run main.nf -with-tower
+nextflow run AlexsLemonade/ews-nf -with-tower
 ```
 
 Any runs of the workflow on the Pittsburgh HTC using the `pitt_htc` profile will appear on the Seqera Platform in the `ews-nf` workspace here: https://cloud.seqera.io/orgs/SeanKarlCohort/workspaces/ews-nf/watch 
