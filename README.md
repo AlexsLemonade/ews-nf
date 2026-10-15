@@ -110,7 +110,7 @@ A message is included in the log file for each skipped library.
 
 ## Running the workflow 
 
-In order to run the full workflow you will first need to clone the repository. 
+The workflow can be run by directly pulling from GitHub using `nextflow run AlexsLemonade/ews-nf` or by cloning the repository and running `nextflow run main.nf`. 
 
 The different entry points specified with the `--workflow` parameter should be run in the following order: 
 
